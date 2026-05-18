@@ -129,6 +129,13 @@ export async function createIssue(input: CreateIssueInput) {
   });
 }
 
+export async function transitionIssue(issueId: string, status: IssueStatus) {
+  return request<Issue>(`/api/v1/issues/${encodeURIComponent(issueId)}/transition`, {
+    method: "POST",
+    body: JSON.stringify({ status }),
+  });
+}
+
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,

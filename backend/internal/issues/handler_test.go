@@ -78,3 +78,48 @@ func TestNormalizeCreateIssueValidation(t *testing.T) {
 		})
 	}
 }
+
+func TestNormalizeTransitionIssue(t *testing.T) {
+	t.Parallel()
+
+	status, err := normalizeTransitionIssue(transitionIssueRequest{
+		Status: " in_progress ",
+	})
+	if err != nil {
+		t.Fatalf("normalize transition issue: %v", err)
+	}
+	if status != "in_progress" {
+		t.Fatalf("status = %q, want %q", status, "in_progress")
+	}
+}
+
+func TestNormalizeTransitionIssueValidation(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		req  transitionIssueRequest
+	}{
+		{
+			name: "missing status",
+			req:  transitionIssueRequest{},
+		},
+		{
+			name: "bad status",
+			req: transitionIssueRequest{
+				Status: "review",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			if _, err := normalizeTransitionIssue(tt.req); err == nil {
+				t.Fatal("expected error")
+			}
+		})
+	}
+}

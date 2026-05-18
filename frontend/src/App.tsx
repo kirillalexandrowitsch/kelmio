@@ -15,6 +15,7 @@ import {
   listProjects,
   login,
   logout,
+  transitionIssue,
 } from "./lib/api";
 
 const columns = [
@@ -65,6 +66,7 @@ export function App() {
   const [issuePriority, setIssuePriority] = useState<IssuePriority>("medium");
   const [issueStatus, setIssueStatus] = useState<IssueStatus>("todo");
   const [issueDueDate, setIssueDueDate] = useState("");
+  const [transitioningIssueIds, setTransitioningIssueIds] = useState<string[]>([]);
 
   useEffect(() => {
     let isMounted = true;
@@ -195,6 +197,7 @@ export function App() {
     setProjectFormError("");
     setIssuesError("");
     setIssueFormError("");
+    setTransitioningIssueIds([]);
   }
 
   async function handleCreateProject(event: FormEvent<HTMLFormElement>) {
@@ -221,6 +224,28 @@ export function App() {
       }
     } finally {
       setIsCreatingProject(false);
+    }
+  }
+
+  async function handleTransitionIssue(issueId: string, status: IssueStatus) {
+    setIssuesError("");
+    setTransitioningIssueIds((currentIds) =>
+      currentIds.includes(issueId) ? currentIds : [...currentIds, issueId],
+    );
+
+    try {
+      const updatedIssue = await transitionIssue(issueId, status);
+      setIssues((currentIssues) =>
+        currentIssues.map((issue) =>
+          issue.id === updatedIssue.id ? updatedIssue : issue,
+        ),
+      );
+    } catch {
+      setIssuesError("Could not update issue status.");
+    } finally {
+      setTransitioningIssueIds((currentIds) =>
+        currentIds.filter((currentIssueId) => currentIssueId !== issueId),
+      );
     }
   }
 
@@ -620,6 +645,31 @@ export function App() {
                       </div>
                       <h3>{issue.title}</h3>
                       {issue.due_date ? <p>Due {issue.due_date}</p> : null}
+                      <div className="issue-card-actions">
+                        <label>
+                          <span>Status</span>
+                          <select
+                            aria-label={`Status for ${issue.issue_key}`}
+                            disabled={transitioningIssueIds.includes(issue.id)}
+                            onChange={(event) => {
+                              void handleTransitionIssue(
+                                issue.id,
+                                event.target.value as IssueStatus,
+                              );
+                            }}
+                            value={issue.status}
+                          >
+                            {columns.map((nextColumn) => (
+                              <option
+                                key={nextColumn.status}
+                                value={nextColumn.status}
+                              >
+                                {nextColumn.title}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      </div>
                     </article>
                   ))}
 

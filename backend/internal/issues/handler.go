@@ -53,6 +53,10 @@ type createIssueRequest struct {
 	DueDate     string `json:"due_date"`
 }
 
+type transitionIssueRequest struct {
+	Status string `json:"status"`
+}
+
 type issueResponse struct {
 	ID          string    `json:"id"`
 	ProjectID   string    `json:"project_id"`
@@ -96,6 +100,7 @@ func NewHandler(db *pgxpool.Pool, authHandler *auth.Handler) *Handler {
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/issues", h.list)
 	mux.HandleFunc("POST /api/v1/issues", h.create)
+	mux.HandleFunc("POST /api/v1/issues/{id}/transition", h.transition)
 }
 
 func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
@@ -153,6 +158,47 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusCreated, issue)
+}
+
+func (h *Handler) transition(w http.ResponseWriter, r *http.Request) {
+	user, ok := h.requireUser(w, r)
+	if !ok {
+		return
+	}
+
+	issueID := strings.TrimSpace(r.PathValue("id"))
+	if issueID == "" {
+		writeError(w, http.StatusBadRequest, "invalid_request", "issue id is required")
+		return
+	}
+
+	var req transitionIssueRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	status, err := normalizeTransitionIssue(req)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	issue, err := h.transitionIssueStatus(ctx, user.WorkspaceID, issueID, status)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "issue_not_found", "issue was not found")
+			return
+		}
+
+		writeError(w, http.StatusInternalServerError, "internal_error", "could not update issue status")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, issue)
 }
 
 func (h *Handler) listIssues(ctx context.Context, workspaceID string, query map[string][]string) ([]issueResponse, error) {
@@ -325,6 +371,35 @@ func (h *Handler) createIssue(ctx context.Context, user auth.CurrentUser, input 
 	return issue, nil
 }
 
+func (h *Handler) transitionIssueStatus(ctx context.Context, workspaceID string, issueID string, status string) (issueResponse, error) {
+	return scanIssue(h.db.QueryRow(ctx, `
+		UPDATE issues i
+		SET status = $3,
+			updated_at = now()
+		FROM projects p
+		WHERE i.project_id = p.id
+			AND i.id = $1
+			AND p.workspace_id = $2
+			AND p.archived_at IS NULL
+		RETURNING
+			i.id::text,
+			i.project_id::text,
+			p.key,
+			i.number,
+			i.issue_key,
+			i.title,
+			i.description,
+			i.issue_type,
+			i.status,
+			i.priority,
+			i.reporter_id::text,
+			i.assignee_id::text,
+			i.due_date::text,
+			i.created_at,
+			i.updated_at
+	`, issueID, workspaceID, status))
+}
+
 func (h *Handler) requireUser(w http.ResponseWriter, r *http.Request) (auth.CurrentUser, bool) {
 	user, err := h.auth.CurrentUser(r)
 	if err != nil {
@@ -377,6 +452,18 @@ func normalizeCreateIssue(req createIssueRequest) (normalizedCreateIssue, error)
 	}
 
 	return input, nil
+}
+
+func normalizeTransitionIssue(req transitionIssueRequest) (string, error) {
+	status := strings.TrimSpace(req.Status)
+	if status == "" {
+		return "", errors.New("status is required")
+	}
+	if !validIssueStatuses[status] {
+		return "", errors.New("status is invalid")
+	}
+
+	return status, nil
 }
 
 func withDefault(value string, fallback string) string {

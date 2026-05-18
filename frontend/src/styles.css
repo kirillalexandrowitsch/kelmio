@@ -109,7 +109,8 @@ a {
 .project-form textarea:focus,
 .issue-form input:focus,
 .issue-form select:focus,
-.issue-form textarea:focus {
+.issue-form textarea:focus,
+.issue-card select:focus {
   border-color: #4e795d;
   box-shadow: 0 0 0 3px rgba(78, 121, 93, 0.15);
 }
@@ -615,6 +616,30 @@ h1 {
   font-size: 11px;
   font-weight: 800;
   text-transform: uppercase;
+}
+
+.issue-card-actions label {
+  display: grid;
+  gap: 6px;
+}
+
+.issue-card-actions span {
+  color: #657268;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.issue-card-actions select {
+  width: 100%;
+  min-height: 34px;
+  padding: 7px 9px;
+  border: 1px solid #c8d1cb;
+  border-radius: 8px;
+  color: #17211b;
+  background: #ffffff;
+  font-size: 12px;
+  outline: none;
 }
 
 @media (max-width: 900px) {
