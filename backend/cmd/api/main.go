@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"team-task-tracker/backend/internal/auth"
 	"team-task-tracker/backend/internal/config"
 	"team-task-tracker/backend/internal/database"
 )
@@ -36,9 +37,12 @@ func main() {
 	mux.HandleFunc("GET /readyz", readinessHandler(db))
 	mux.HandleFunc("GET /api/v1/ready", readinessHandler(db))
 
+	authHandler := auth.NewHandler(db, 7*24*time.Hour)
+	authHandler.RegisterRoutes(mux)
+
 	server := &http.Server{
 		Addr:         ":" + cfg.Port,
-		Handler:      requestLogger(logger, mux),
+		Handler:      requestLogger(logger, cors(cfg.FrontendURL, mux)),
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 10 * time.Second,
 		IdleTimeout:  120 * time.Second,
@@ -108,5 +112,25 @@ func requestLogger(logger *slog.Logger, next http.Handler) http.Handler {
 			"path", r.URL.Path,
 			"duration_ms", time.Since(start).Milliseconds(),
 		)
+	})
+}
+
+func cors(frontendURL string, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		origin := r.Header.Get("Origin")
+		if origin != "" && origin == frontendURL {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Set("Access-Control-Allow-Credentials", "true")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
+			w.Header().Set("Vary", "Origin")
+		}
+
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+
+		next.ServeHTTP(w, r)
 	})
 }

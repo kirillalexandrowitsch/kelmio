@@ -40,6 +40,21 @@ curl http://localhost:8080/healthz
 curl http://localhost:8080/readyz
 ```
 
+Auth API smoke test:
+
+```sh
+curl -i -c /tmp/team-task-tracker.cookies \
+  -H 'Content-Type: application/json' \
+  -d '{"login":"admin","password":"admin12345"}' \
+  http://localhost:8080/api/v1/auth/login
+
+curl -b /tmp/team-task-tracker.cookies \
+  http://localhost:8080/api/v1/auth/me
+
+curl -i -b /tmp/team-task-tracker.cookies \
+  -X POST http://localhost:8080/api/v1/auth/logout
+```
+
 Для локального запуска frontend без Docker:
 
 ```sh
