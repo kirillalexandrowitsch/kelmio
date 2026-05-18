@@ -3,7 +3,10 @@ import "./styles.css";
 import {
   ApiError,
   CurrentUser,
+  Project,
+  createProject,
   getCurrentUser,
+  listProjects,
   login,
   logout,
 } from "./lib/api";
@@ -22,6 +25,14 @@ export function App() {
   const [error, setError] = useState("");
   const [isBooting, setIsBooting] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [projectsError, setProjectsError] = useState("");
+  const [projectFormError, setProjectFormError] = useState("");
+  const [isLoadingProjects, setIsLoadingProjects] = useState(false);
+  const [isCreatingProject, setIsCreatingProject] = useState(false);
+  const [projectKey, setProjectKey] = useState("");
+  const [projectName, setProjectName] = useState("");
+  const [projectDescription, setProjectDescription] = useState("");
 
   useEffect(() => {
     let isMounted = true;
@@ -52,6 +63,39 @@ export function App() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!user) {
+      setProjects([]);
+      return;
+    }
+
+    let isMounted = true;
+    setProjectsError("");
+    setProjectFormError("");
+    setIsLoadingProjects(true);
+
+    listProjects()
+      .then((response) => {
+        if (isMounted) {
+          setProjects(response.projects);
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setProjectsError("Could not load projects.");
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsLoadingProjects(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user]);
+
   async function handleLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
@@ -74,6 +118,35 @@ export function App() {
   async function handleLogout() {
     await logout();
     setUser(null);
+    setProjects([]);
+    setProjectsError("");
+    setProjectFormError("");
+  }
+
+  async function handleCreateProject(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setProjectFormError("");
+    setIsCreatingProject(true);
+
+    try {
+      const project = await createProject({
+        key: projectKey,
+        name: projectName,
+        description: projectDescription,
+      });
+      setProjects((currentProjects) => [project, ...currentProjects]);
+      setProjectKey("");
+      setProjectName("");
+      setProjectDescription("");
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setProjectFormError(err.message);
+      } else {
+        setProjectFormError("Could not create project.");
+      }
+    } finally {
+      setIsCreatingProject(false);
+    }
   }
 
   if (isBooting) {
@@ -176,7 +249,7 @@ export function App() {
         <section className="summary-grid" aria-label="Project summary">
           <article>
             <span>Projects</span>
-            <strong>0</strong>
+            <strong>{projects.length}</strong>
           </article>
           <article>
             <span>Open issues</span>
@@ -186,6 +259,87 @@ export function App() {
             <span>Team members</span>
             <strong>1</strong>
           </article>
+        </section>
+
+        <section className="projects-layout" aria-label="Projects">
+          <div className="projects-panel">
+            <header className="section-header">
+              <div>
+                <p className="eyebrow">Projects</p>
+                <h2>Workspace projects</h2>
+              </div>
+              {isLoadingProjects ? <span className="muted">Loading</span> : null}
+            </header>
+
+            {projectsError ? <p className="form-error">{projectsError}</p> : null}
+
+            {projects.length > 0 ? (
+              <div className="project-list">
+                {projects.map((project) => (
+                  <article className="project-row" key={project.id}>
+                    <span className="project-key">{project.key}</span>
+                    <div>
+                      <h3>{project.name}</h3>
+                      <p>{project.description || "No description"}</p>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <div className="project-empty">No projects yet</div>
+            )}
+          </div>
+
+          {user.workspace.role === "admin" ? (
+            <form className="project-form" onSubmit={handleCreateProject}>
+              <header className="section-header">
+                <div>
+                  <p className="eyebrow">Admin</p>
+                  <h2>Create project</h2>
+                </div>
+              </header>
+
+              <label>
+                <span>Key</span>
+                <input
+                  maxLength={10}
+                  onChange={(event) =>
+                    setProjectKey(event.target.value.toUpperCase())
+                  }
+                  placeholder="CORE"
+                  value={projectKey}
+                />
+              </label>
+
+              <label>
+                <span>Name</span>
+                <input
+                  maxLength={120}
+                  onChange={(event) => setProjectName(event.target.value)}
+                  placeholder="Core Platform"
+                  value={projectName}
+                />
+              </label>
+
+              <label>
+                <span>Description</span>
+                <textarea
+                  onChange={(event) => setProjectDescription(event.target.value)}
+                  placeholder="Main product workspace"
+                  rows={4}
+                  value={projectDescription}
+                />
+              </label>
+
+              {projectFormError ? (
+                <p className="form-error">{projectFormError}</p>
+              ) : null}
+
+              <button disabled={isCreatingProject} type="submit">
+                {isCreatingProject ? "Creating..." : "Create project"}
+              </button>
+            </form>
+          ) : null}
         </section>
 
         <section className="board" aria-label="Task board preview">

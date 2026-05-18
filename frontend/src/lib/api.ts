@@ -15,6 +15,26 @@ type AuthResponse = {
   user: CurrentUser;
 };
 
+export type Project = {
+  id: string;
+  key: string;
+  name: string;
+  description: string;
+  created_by: string;
+  created_at: string;
+  archived_at: string | null;
+};
+
+type ListProjectsResponse = {
+  projects: Project[];
+};
+
+type CreateProjectInput = {
+  key: string;
+  name: string;
+  description: string;
+};
+
 export class ApiError extends Error {
   status: number;
 
@@ -45,6 +65,17 @@ export async function logout() {
   });
 }
 
+export async function listProjects() {
+  return request<ListProjectsResponse>("/api/v1/projects");
+}
+
+export async function createProject(input: CreateProjectInput) {
+  return request<Project>("/api/v1/projects", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
@@ -68,4 +99,3 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 
   return payload as T;
 }
-
