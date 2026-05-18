@@ -10,6 +10,7 @@ import {
   Project,
   createIssue,
   createProject,
+  getIssue,
   getCurrentUser,
   listIssues,
   listProjects,
@@ -39,6 +40,15 @@ const issueTypeLabels: Record<IssueType, string> = {
   story: "Story",
 };
 
+function formatDateTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleString();
+}
+
 export function App() {
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [loginValue, setLoginValue] = useState("admin");
@@ -67,6 +77,9 @@ export function App() {
   const [issueStatus, setIssueStatus] = useState<IssueStatus>("todo");
   const [issueDueDate, setIssueDueDate] = useState("");
   const [transitioningIssueIds, setTransitioningIssueIds] = useState<string[]>([]);
+  const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null);
+  const [selectedIssueError, setSelectedIssueError] = useState("");
+  const [isLoadingSelectedIssue, setIsLoadingSelectedIssue] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -198,6 +211,8 @@ export function App() {
     setIssuesError("");
     setIssueFormError("");
     setTransitioningIssueIds([]);
+    setSelectedIssue(null);
+    setSelectedIssueError("");
   }
 
   async function handleCreateProject(event: FormEvent<HTMLFormElement>) {
@@ -240,12 +255,34 @@ export function App() {
           issue.id === updatedIssue.id ? updatedIssue : issue,
         ),
       );
+      setSelectedIssue((currentIssue) =>
+        currentIssue?.id === updatedIssue.id ? updatedIssue : currentIssue,
+      );
     } catch {
       setIssuesError("Could not update issue status.");
     } finally {
       setTransitioningIssueIds((currentIds) =>
         currentIds.filter((currentIssueId) => currentIssueId !== issueId),
       );
+    }
+  }
+
+  async function handleSelectIssue(issueId: string) {
+    const issuePreview = issues.find((issue) => issue.id === issueId);
+    if (issuePreview) {
+      setSelectedIssue(issuePreview);
+    }
+
+    setSelectedIssueError("");
+    setIsLoadingSelectedIssue(true);
+
+    try {
+      const issue = await getIssue(issueId);
+      setSelectedIssue(issue);
+    } catch {
+      setSelectedIssueError("Could not load issue details.");
+    } finally {
+      setIsLoadingSelectedIssue(false);
     }
   }
 
@@ -266,6 +303,7 @@ export function App() {
       });
 
       setIssues((currentIssues) => [issue, ...currentIssues]);
+      setSelectedIssue(issue);
       setIssueTitle("");
       setIssueDescription("");
       setIssueType("task");
@@ -616,6 +654,15 @@ export function App() {
                           ?.title ?? issue.status}
                       </p>
                     </div>
+                    <button
+                      className="small-button"
+                      onClick={() => {
+                        void handleSelectIssue(issue.id);
+                      }}
+                      type="button"
+                    >
+                      Open
+                    </button>
                   </article>
                 ))}
               </div>
@@ -623,6 +670,111 @@ export function App() {
               <div className="project-empty">No issues yet</div>
             )}
           </div>
+        </section>
+
+        <section className="issue-detail-panel" aria-label="Issue details">
+          <header className="section-header">
+            <div>
+              <p className="eyebrow">Issue details</p>
+              <h2>
+                {selectedIssue
+                  ? `${selectedIssue.issue_key} · ${selectedIssue.title}`
+                  : "Select an issue"}
+              </h2>
+            </div>
+            {selectedIssue ? (
+              <button
+                className="ghost-button"
+                onClick={() => {
+                  setSelectedIssue(null);
+                  setSelectedIssueError("");
+                }}
+                type="button"
+              >
+                Close
+              </button>
+            ) : null}
+          </header>
+
+          {selectedIssueError ? (
+            <p className="form-error">{selectedIssueError}</p>
+          ) : null}
+
+          {isLoadingSelectedIssue ? (
+            <span className="muted">Loading details</span>
+          ) : null}
+
+          {selectedIssue ? (
+            <div className="issue-detail-body">
+              <div className="issue-detail-main">
+                <div className="issue-detail-headline">
+                  <span className="issue-key">{selectedIssue.issue_key}</span>
+                  <span className="detail-chip">
+                    {issueTypeLabels[selectedIssue.issue_type]}
+                  </span>
+                  <span className="detail-chip">
+                    {priorityLabels[selectedIssue.priority]}
+                  </span>
+                </div>
+
+                <div>
+                  <p className="eyebrow">Description</p>
+                  <p className="issue-detail-description">
+                    {selectedIssue.description || "No description yet."}
+                  </p>
+                </div>
+              </div>
+
+              <aside className="issue-detail-sidebar">
+                <label className="issue-detail-status">
+                  <span>Status</span>
+                  <select
+                    disabled={transitioningIssueIds.includes(selectedIssue.id)}
+                    onChange={(event) => {
+                      void handleTransitionIssue(
+                        selectedIssue.id,
+                        event.target.value as IssueStatus,
+                      );
+                    }}
+                    value={selectedIssue.status}
+                  >
+                    {columns.map((column) => (
+                      <option key={column.status} value={column.status}>
+                        {column.title}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <div className="metadata-grid">
+                  <div>
+                    <span>Project</span>
+                    <strong>{selectedIssue.project_key}</strong>
+                  </div>
+                  <div>
+                    <span>Assignee</span>
+                    <strong>{selectedIssue.assignee_id ?? "Unassigned"}</strong>
+                  </div>
+                  <div>
+                    <span>Due date</span>
+                    <strong>{selectedIssue.due_date ?? "No due date"}</strong>
+                  </div>
+                  <div>
+                    <span>Created</span>
+                    <strong>{formatDateTime(selectedIssue.created_at)}</strong>
+                  </div>
+                  <div>
+                    <span>Updated</span>
+                    <strong>{formatDateTime(selectedIssue.updated_at)}</strong>
+                  </div>
+                </div>
+              </aside>
+            </div>
+          ) : (
+            <div className="issue-detail-empty">
+              Open a card from Recent issues or the board to inspect its details.
+            </div>
+          )}
         </section>
 
         <section className="board" aria-label="Task board preview">
@@ -646,6 +798,15 @@ export function App() {
                       <h3>{issue.title}</h3>
                       {issue.due_date ? <p>Due {issue.due_date}</p> : null}
                       <div className="issue-card-actions">
+                        <button
+                          className="small-button"
+                          onClick={() => {
+                            void handleSelectIssue(issue.id);
+                          }}
+                          type="button"
+                        >
+                          Open
+                        </button>
                         <label>
                           <span>Status</span>
                           <select

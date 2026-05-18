@@ -123,3 +123,46 @@ func TestNormalizeTransitionIssueValidation(t *testing.T) {
 		})
 	}
 }
+
+func TestNormalizeIssueID(t *testing.T) {
+	t.Parallel()
+
+	got, err := normalizeIssueID(" 6D5257D4-002E-44DA-8925-D9108699C504 ")
+	if err != nil {
+		t.Fatalf("normalize issue id: %v", err)
+	}
+
+	want := "6d5257d4-002e-44da-8925-d9108699c504"
+	if got != want {
+		t.Fatalf("issue id = %q, want %q", got, want)
+	}
+}
+
+func TestNormalizeIssueIDValidation(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		id   string
+	}{
+		{
+			name: "missing id",
+			id:   "",
+		},
+		{
+			name: "bad id",
+			id:   "not-a-uuid",
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			if _, err := normalizeIssueID(tt.id); err == nil {
+				t.Fatal("expected error")
+			}
+		})
+	}
+}

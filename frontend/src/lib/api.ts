@@ -122,6 +122,10 @@ export async function listIssues(projectId?: string) {
   return request<ListIssuesResponse>(`/api/v1/issues${query ? `?${query}` : ""}`);
 }
 
+export async function getIssue(issueId: string) {
+  return request<Issue>(`/api/v1/issues/${encodeURIComponent(issueId)}`);
+}
+
 export async function createIssue(input: CreateIssueInput) {
   return request<Issue>("/api/v1/issues", {
     method: "POST",

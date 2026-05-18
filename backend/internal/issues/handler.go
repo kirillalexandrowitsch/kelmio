@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -36,6 +37,8 @@ var validIssuePriorities = map[string]bool{
 	"high":     true,
 	"critical": true,
 }
+
+var uuidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 
 type Handler struct {
 	db   *pgxpool.Pool
@@ -100,6 +103,7 @@ func NewHandler(db *pgxpool.Pool, authHandler *auth.Handler) *Handler {
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/issues", h.list)
 	mux.HandleFunc("POST /api/v1/issues", h.create)
+	mux.HandleFunc("GET /api/v1/issues/{id}", h.get)
 	mux.HandleFunc("POST /api/v1/issues/{id}/transition", h.transition)
 }
 
@@ -160,15 +164,44 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, issue)
 }
 
+func (h *Handler) get(w http.ResponseWriter, r *http.Request) {
+	user, ok := h.requireUser(w, r)
+	if !ok {
+		return
+	}
+
+	issueID, err := normalizeIssueID(r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	issue, err := h.getIssue(ctx, user.WorkspaceID, issueID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "issue_not_found", "issue was not found")
+			return
+		}
+
+		writeError(w, http.StatusInternalServerError, "internal_error", "could not load issue")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, issue)
+}
+
 func (h *Handler) transition(w http.ResponseWriter, r *http.Request) {
 	user, ok := h.requireUser(w, r)
 	if !ok {
 		return
 	}
 
-	issueID := strings.TrimSpace(r.PathValue("id"))
-	if issueID == "" {
-		writeError(w, http.StatusBadRequest, "invalid_request", "issue id is required")
+	issueID, err := normalizeIssueID(r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
 		return
 	}
 
@@ -268,6 +301,32 @@ func (h *Handler) listIssues(ctx context.Context, workspaceID string, query map[
 }
 
 var errInvalidAssignee = errors.New("invalid assignee")
+
+func (h *Handler) getIssue(ctx context.Context, workspaceID string, issueID string) (issueResponse, error) {
+	return scanIssue(h.db.QueryRow(ctx, `
+		SELECT
+			i.id::text,
+			i.project_id::text,
+			p.key,
+			i.number,
+			i.issue_key,
+			i.title,
+			i.description,
+			i.issue_type,
+			i.status,
+			i.priority,
+			i.reporter_id::text,
+			i.assignee_id::text,
+			i.due_date::text,
+			i.created_at,
+			i.updated_at
+		FROM issues i
+		JOIN projects p ON p.id = i.project_id
+		WHERE i.id = $1
+			AND p.workspace_id = $2
+			AND p.archived_at IS NULL
+	`, issueID, workspaceID))
+}
 
 func (h *Handler) createIssue(ctx context.Context, user auth.CurrentUser, input normalizedCreateIssue) (issueResponse, error) {
 	tx, err := h.db.BeginTx(ctx, pgx.TxOptions{})
@@ -464,6 +523,18 @@ func normalizeTransitionIssue(req transitionIssueRequest) (string, error) {
 	}
 
 	return status, nil
+}
+
+func normalizeIssueID(id string) (string, error) {
+	id = strings.ToLower(strings.TrimSpace(id))
+	if id == "" {
+		return "", errors.New("issue id is required")
+	}
+	if !uuidPattern.MatchString(id) {
+		return "", errors.New("issue id is invalid")
+	}
+
+	return id, nil
 }
 
 func withDefault(value string, fallback string) string {
