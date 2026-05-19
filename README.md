@@ -96,6 +96,9 @@ curl -b /tmp/team-task-tracker.cookies \
 curl -b /tmp/team-task-tracker.cookies \
   "http://localhost:8080/api/v1/issues?project_id=$PROJECT_ID&status=todo&priority=high"
 
+curl -b /tmp/team-task-tracker.cookies \
+  "http://localhost:8080/api/v1/issues?assignee_id=unassigned"
+
 ISSUE_ID="$(curl -s -b /tmp/team-task-tracker.cookies "http://localhost:8080/api/v1/issues?project_id=$PROJECT_ID" \
   | node -e 'let data=""; process.stdin.on("data", c => data += c); process.stdin.on("end", () => console.log(JSON.parse(data).issues[0].id));')"
 

@@ -493,7 +493,13 @@ func (h *Handler) listIssues(ctx context.Context, workspaceID string, query map[
 	addFilter("i.project_id", firstQueryValue(query, "project_id"))
 	addFilter("i.status", firstQueryValue(query, "status"))
 	addFilter("i.priority", firstQueryValue(query, "priority"))
-	addFilter("i.assignee_id", firstQueryValue(query, "assignee_id"))
+
+	assigneeID := strings.TrimSpace(firstQueryValue(query, "assignee_id"))
+	if assigneeID == "unassigned" {
+		conditions = append(conditions, "i.assignee_id IS NULL")
+	} else {
+		addFilter("i.assignee_id", assigneeID)
+	}
 
 	sql := fmt.Sprintf(`
 		SELECT

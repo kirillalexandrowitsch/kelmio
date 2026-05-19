@@ -592,7 +592,7 @@ h1 {
 
 .issue-filters {
   display: grid;
-  grid-template-columns: minmax(140px, 1fr) minmax(140px, 1fr) minmax(140px, 1fr) auto;
+  grid-template-columns: repeat(4, minmax(130px, 1fr)) auto;
   align-items: end;
   gap: 10px;
   padding: 12px;

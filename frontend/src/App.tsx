@@ -54,6 +54,7 @@ function issueMatchesFilters(
   projectId: string,
   status: IssueStatus | "",
   priority: IssuePriority | "",
+  assigneeId: string,
 ) {
   if (projectId && issue.project_id !== projectId) {
     return false;
@@ -62,6 +63,12 @@ function issueMatchesFilters(
     return false;
   }
   if (priority && issue.priority !== priority) {
+    return false;
+  }
+  if (assigneeId === "unassigned" && issue.assignee_id !== null) {
+    return false;
+  }
+  if (assigneeId && assigneeId !== "unassigned" && issue.assignee_id !== assigneeId) {
     return false;
   }
 
@@ -184,6 +191,7 @@ export function App() {
   const [issueFilterPriority, setIssueFilterPriority] = useState<
     IssuePriority | ""
   >("");
+  const [issueFilterAssigneeId, setIssueFilterAssigneeId] = useState("");
   const [transitioningIssueIds, setTransitioningIssueIds] = useState<string[]>([]);
   const [assigningIssueIds, setAssigningIssueIds] = useState<string[]>([]);
   const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null);
@@ -322,6 +330,7 @@ export function App() {
       projectId: issueFilterProjectId || undefined,
       status: issueFilterStatus || undefined,
       priority: issueFilterPriority || undefined,
+      assigneeId: issueFilterAssigneeId || undefined,
     })
       .then((response) => {
         if (isMounted) {
@@ -342,7 +351,13 @@ export function App() {
     return () => {
       isMounted = false;
     };
-  }, [user, issueFilterProjectId, issueFilterStatus, issueFilterPriority]);
+  }, [
+    user,
+    issueFilterProjectId,
+    issueFilterStatus,
+    issueFilterPriority,
+    issueFilterAssigneeId,
+  ]);
 
   useEffect(() => {
     if (!selectedIssueId) {
@@ -444,6 +459,7 @@ export function App() {
     setIssueFilterProjectId("");
     setIssueFilterStatus("");
     setIssueFilterPriority("");
+    setIssueFilterAssigneeId("");
     setTransitioningIssueIds([]);
     setAssigningIssueIds([]);
     setSelectedIssue(null);
@@ -530,6 +546,7 @@ export function App() {
             issueFilterProjectId,
             issueFilterStatus,
             issueFilterPriority,
+            issueFilterAssigneeId,
           )
         ) {
           return currentIssues.filter((issue) => issue.id !== updatedIssue.id);
@@ -568,6 +585,7 @@ export function App() {
             issueFilterProjectId,
             issueFilterStatus,
             issueFilterPriority,
+            issueFilterAssigneeId,
           )
         ) {
           return currentIssues.filter((issue) => issue.id !== updatedIssue.id);
@@ -600,11 +618,23 @@ export function App() {
 
     try {
       const updatedIssue = await assignIssue(issueId, assigneeId);
-      setIssues((currentIssues) =>
-        currentIssues.map((issue) =>
+      setIssues((currentIssues) => {
+        if (
+          !issueMatchesFilters(
+            updatedIssue,
+            issueFilterProjectId,
+            issueFilterStatus,
+            issueFilterPriority,
+            issueFilterAssigneeId,
+          )
+        ) {
+          return currentIssues.filter((issue) => issue.id !== updatedIssue.id);
+        }
+
+        return currentIssues.map((issue) =>
           issue.id === updatedIssue.id ? updatedIssue : issue,
-        ),
-      );
+        );
+      });
       setSelectedIssue((currentIssue) =>
         currentIssue?.id === updatedIssue.id ? updatedIssue : currentIssue,
       );
@@ -663,6 +693,7 @@ export function App() {
           issueFilterProjectId,
           issueFilterStatus,
           issueFilterPriority,
+          issueFilterAssigneeId,
         )
       ) {
         setIssues((currentIssues) => [issue, ...currentIssues]);
@@ -716,7 +747,8 @@ export function App() {
   const hasIssueFilters =
     issueFilterProjectId !== "" ||
     issueFilterStatus !== "" ||
-    issueFilterPriority !== "";
+    issueFilterPriority !== "" ||
+    issueFilterAssigneeId !== "";
 
   if (isBooting) {
     return (
@@ -1131,6 +1163,22 @@ export function App() {
                 </select>
               </label>
 
+              <label>
+                <span>Assignee</span>
+                <select
+                  onChange={(event) => setIssueFilterAssigneeId(event.target.value)}
+                  value={issueFilterAssigneeId}
+                >
+                  <option value="">All assignees</option>
+                  <option value="unassigned">Unassigned</option>
+                  {teamMembers.map((member) => (
+                    <option key={member.id} value={member.id}>
+                      {member.display_name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
               <button
                 className="small-button"
                 disabled={!hasIssueFilters}
@@ -1138,6 +1186,7 @@ export function App() {
                   setIssueFilterProjectId("");
                   setIssueFilterStatus("");
                   setIssueFilterPriority("");
+                  setIssueFilterAssigneeId("");
                 }}
                 type="button"
               >
@@ -1164,7 +1213,8 @@ export function App() {
                         {issueTypeLabels[issue.issue_type]} ·{" "}
                         {priorityLabels[issue.priority]} ·{" "}
                         {columns.find((column) => column.status === issue.status)
-                          ?.title ?? issue.status}
+                          ?.title ?? issue.status}{" "}
+                        · {memberDisplayName(teamMembers, issue.assignee_id)}
                       </p>
                     </div>
                     <button
@@ -1522,6 +1572,7 @@ export function App() {
                       </div>
                       <h3>{issue.title}</h3>
                       {issue.due_date ? <p>Due {issue.due_date}</p> : null}
+                      <p>Assignee: {memberDisplayName(teamMembers, issue.assignee_id)}</p>
                       <div className="issue-card-actions">
                         <button
                           className="small-button"
