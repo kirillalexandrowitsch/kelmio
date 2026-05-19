@@ -47,12 +47,26 @@ export type Issue = {
   updated_at: string;
 };
 
+export type IssueComment = {
+  id: string;
+  issue_id: string;
+  author_id: string;
+  author_display_name: string;
+  body: string;
+  created_at: string;
+  updated_at: string;
+};
+
 type ListProjectsResponse = {
   projects: Project[];
 };
 
 type ListIssuesResponse = {
   issues: Issue[];
+};
+
+type ListIssueCommentsResponse = {
+  comments: IssueComment[];
 };
 
 type CreateProjectInput = {
@@ -126,6 +140,12 @@ export async function getIssue(issueId: string) {
   return request<Issue>(`/api/v1/issues/${encodeURIComponent(issueId)}`);
 }
 
+export async function listIssueComments(issueId: string) {
+  return request<ListIssueCommentsResponse>(
+    `/api/v1/issues/${encodeURIComponent(issueId)}/comments`,
+  );
+}
+
 export async function createIssue(input: CreateIssueInput) {
   return request<Issue>("/api/v1/issues", {
     method: "POST",
@@ -138,6 +158,16 @@ export async function transitionIssue(issueId: string, status: IssueStatus) {
     method: "POST",
     body: JSON.stringify({ status }),
   });
+}
+
+export async function createIssueComment(issueId: string, body: string) {
+  return request<IssueComment>(
+    `/api/v1/issues/${encodeURIComponent(issueId)}/comments`,
+    {
+      method: "POST",
+      body: JSON.stringify({ body }),
+    },
+  );
 }
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {

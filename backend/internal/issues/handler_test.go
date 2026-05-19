@@ -1,6 +1,9 @@
 package issues
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestNormalizeCreateIssueDefaults(t *testing.T) {
 	t.Parallel()
@@ -161,6 +164,49 @@ func TestNormalizeIssueIDValidation(t *testing.T) {
 			t.Parallel()
 
 			if _, err := normalizeIssueID(tt.id); err == nil {
+				t.Fatal("expected error")
+			}
+		})
+	}
+}
+
+func TestNormalizeCommentBody(t *testing.T) {
+	t.Parallel()
+
+	got, err := normalizeCommentBody("  Needs more context.  ")
+	if err != nil {
+		t.Fatalf("normalize comment body: %v", err)
+	}
+
+	want := "Needs more context."
+	if got != want {
+		t.Fatalf("body = %q, want %q", got, want)
+	}
+}
+
+func TestNormalizeCommentBodyValidation(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		body string
+	}{
+		{
+			name: "missing body",
+			body: "   ",
+		},
+		{
+			name: "too long",
+			body: strings.Repeat("x", 4001),
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			if _, err := normalizeCommentBody(tt.body); err == nil {
 				t.Fatal("expected error")
 			}
 		})

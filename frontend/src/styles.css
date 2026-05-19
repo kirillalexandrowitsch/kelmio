@@ -111,7 +111,8 @@ a {
 .issue-form select:focus,
 .issue-form textarea:focus,
 .issue-card select:focus,
-.issue-detail-status select:focus {
+.issue-detail-status select:focus,
+.comment-form textarea:focus {
   border-color: #4e795d;
   box-shadow: 0 0 0 3px rgba(78, 121, 93, 0.15);
 }
@@ -119,6 +120,7 @@ a {
 .auth-form button,
 .project-form button,
 .issue-form button,
+.comment-form button,
 .ghost-button,
 .small-button {
   min-height: 40px;
@@ -153,8 +155,15 @@ a {
   background: #18231d;
 }
 
-.issue-form button:hover:not(:disabled) {
+.issue-form button:hover:not(:disabled),
+.comment-form button:hover:not(:disabled) {
   background: #27362d;
+}
+
+.comment-form button {
+  border: 1px solid #18231d;
+  color: #ffffff;
+  background: #18231d;
 }
 
 .form-error {
@@ -728,6 +737,101 @@ h1 {
   font-size: 14px;
   line-height: 1.55;
   white-space: pre-wrap;
+}
+
+.comments-section {
+  display: grid;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid #edf0ed;
+}
+
+.comments-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.comments-header h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.comment-list {
+  display: grid;
+  gap: 10px;
+}
+
+.comment-card {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid #edf0ed;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.comment-card header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.comment-card strong {
+  font-size: 13px;
+}
+
+.comment-card span {
+  color: #657268;
+  font-size: 12px;
+}
+
+.comment-card p {
+  margin: 0;
+  color: #28352d;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.comments-empty {
+  display: grid;
+  min-height: 76px;
+  place-items: center;
+  border: 1px dashed #d7ded8;
+  border-radius: 8px;
+  color: #8a968d;
+  font-size: 14px;
+}
+
+.comment-form {
+  display: grid;
+  gap: 10px;
+}
+
+.comment-form label {
+  display: grid;
+  gap: 8px;
+}
+
+.comment-form label span {
+  color: #4e5c54;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.comment-form textarea {
+  width: 100%;
+  min-height: 92px;
+  padding: 10px 12px;
+  border: 1px solid #c8d1cb;
+  border-radius: 8px;
+  color: #17211b;
+  background: #ffffff;
+  outline: none;
+  resize: vertical;
 }
 
 .issue-detail-status {

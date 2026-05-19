@@ -4,14 +4,17 @@ import {
   ApiError,
   CurrentUser,
   Issue,
+  IssueComment,
   IssuePriority,
   IssueStatus,
   IssueType,
   Project,
   createIssue,
+  createIssueComment,
   createProject,
   getIssue,
   getCurrentUser,
+  listIssueComments,
   listIssues,
   listProjects,
   login,
@@ -80,6 +83,12 @@ export function App() {
   const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null);
   const [selectedIssueError, setSelectedIssueError] = useState("");
   const [isLoadingSelectedIssue, setIsLoadingSelectedIssue] = useState(false);
+  const [issueComments, setIssueComments] = useState<IssueComment[]>([]);
+  const [commentsError, setCommentsError] = useState("");
+  const [commentBody, setCommentBody] = useState("");
+  const [isLoadingComments, setIsLoadingComments] = useState(false);
+  const [isCreatingComment, setIsCreatingComment] = useState(false);
+  const selectedIssueId = selectedIssue?.id ?? "";
 
   useEffect(() => {
     let isMounted = true;
@@ -182,6 +191,40 @@ export function App() {
     };
   }, [user]);
 
+  useEffect(() => {
+    if (!selectedIssueId) {
+      setIssueComments([]);
+      setCommentsError("");
+      setCommentBody("");
+      return;
+    }
+
+    let isMounted = true;
+    setCommentsError("");
+    setIsLoadingComments(true);
+
+    listIssueComments(selectedIssueId)
+      .then((response) => {
+        if (isMounted) {
+          setIssueComments(response.comments);
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setCommentsError("Could not load comments.");
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsLoadingComments(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedIssueId]);
+
   async function handleLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
@@ -213,6 +256,9 @@ export function App() {
     setTransitioningIssueIds([]);
     setSelectedIssue(null);
     setSelectedIssueError("");
+    setIssueComments([]);
+    setCommentsError("");
+    setCommentBody("");
   }
 
   async function handleCreateProject(event: FormEvent<HTMLFormElement>) {
@@ -318,6 +364,30 @@ export function App() {
       }
     } finally {
       setIsCreatingIssue(false);
+    }
+  }
+
+  async function handleCreateComment(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selectedIssue) {
+      return;
+    }
+
+    setCommentsError("");
+    setIsCreatingComment(true);
+
+    try {
+      const comment = await createIssueComment(selectedIssue.id, commentBody);
+      setIssueComments((currentComments) => [...currentComments, comment]);
+      setCommentBody("");
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setCommentsError(err.message);
+      } else {
+        setCommentsError("Could not create comment.");
+      }
+    } finally {
+      setIsCreatingComment(false);
     }
   }
 
@@ -723,6 +793,57 @@ export function App() {
                     {selectedIssue.description || "No description yet."}
                   </p>
                 </div>
+
+                <section className="comments-section" aria-label="Issue comments">
+                  <header className="comments-header">
+                    <div>
+                      <p className="eyebrow">Comments</p>
+                      <h3>{issueComments.length}</h3>
+                    </div>
+                    {isLoadingComments ? (
+                      <span className="muted">Loading comments</span>
+                    ) : null}
+                  </header>
+
+                  {commentsError ? (
+                    <p className="form-error">{commentsError}</p>
+                  ) : null}
+
+                  {issueComments.length > 0 ? (
+                    <div className="comment-list">
+                      {issueComments.map((comment) => (
+                        <article className="comment-card" key={comment.id}>
+                          <header>
+                            <strong>{comment.author_display_name}</strong>
+                            <span>{formatDateTime(comment.created_at)}</span>
+                          </header>
+                          <p>{comment.body}</p>
+                        </article>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="comments-empty">No comments yet</div>
+                  )}
+
+                  <form className="comment-form" onSubmit={handleCreateComment}>
+                    <label>
+                      <span>Add comment</span>
+                      <textarea
+                        maxLength={4000}
+                        onChange={(event) => setCommentBody(event.target.value)}
+                        placeholder="Share context, decisions, or next steps"
+                        rows={3}
+                        value={commentBody}
+                      />
+                    </label>
+                    <button
+                      disabled={isCreatingComment || commentBody.trim() === ""}
+                      type="submit"
+                    >
+                      {isCreatingComment ? "Posting..." : "Post comment"}
+                    </button>
+                  </form>
+                </section>
               </div>
 
               <aside className="issue-detail-sidebar">

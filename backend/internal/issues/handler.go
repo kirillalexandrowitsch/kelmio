@@ -60,6 +60,10 @@ type transitionIssueRequest struct {
 	Status string `json:"status"`
 }
 
+type createCommentRequest struct {
+	Body string `json:"body"`
+}
+
 type issueResponse struct {
 	ID          string    `json:"id"`
 	ProjectID   string    `json:"project_id"`
@@ -80,6 +84,20 @@ type issueResponse struct {
 
 type listIssuesResponse struct {
 	Issues []issueResponse `json:"issues"`
+}
+
+type issueCommentResponse struct {
+	ID                string    `json:"id"`
+	IssueID           string    `json:"issue_id"`
+	AuthorID          string    `json:"author_id"`
+	AuthorDisplayName string    `json:"author_display_name"`
+	Body              string    `json:"body"`
+	CreatedAt         time.Time `json:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at"`
+}
+
+type listCommentsResponse struct {
+	Comments []issueCommentResponse `json:"comments"`
 }
 
 type normalizedCreateIssue struct {
@@ -105,6 +123,8 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/issues", h.create)
 	mux.HandleFunc("GET /api/v1/issues/{id}", h.get)
 	mux.HandleFunc("POST /api/v1/issues/{id}/transition", h.transition)
+	mux.HandleFunc("GET /api/v1/issues/{id}/comments", h.listComments)
+	mux.HandleFunc("POST /api/v1/issues/{id}/comments", h.createComment)
 }
 
 func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
@@ -232,6 +252,71 @@ func (h *Handler) transition(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, issue)
+}
+
+func (h *Handler) listComments(w http.ResponseWriter, r *http.Request) {
+	user, ok := h.requireUser(w, r)
+	if !ok {
+		return
+	}
+
+	issueID, err := normalizeIssueID(r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	comments, err := h.listIssueComments(ctx, user.WorkspaceID, issueID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "internal_error", "could not list comments")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, listCommentsResponse{Comments: comments})
+}
+
+func (h *Handler) createComment(w http.ResponseWriter, r *http.Request) {
+	user, ok := h.requireUser(w, r)
+	if !ok {
+		return
+	}
+
+	issueID, err := normalizeIssueID(r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	var req createCommentRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	body, err := normalizeCommentBody(req.Body)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	comment, err := h.createIssueComment(ctx, user.WorkspaceID, issueID, user.ID, body)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "issue_not_found", "issue was not found")
+			return
+		}
+
+		writeError(w, http.StatusInternalServerError, "internal_error", "could not create comment")
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, comment)
 }
 
 func (h *Handler) listIssues(ctx context.Context, workspaceID string, query map[string][]string) ([]issueResponse, error) {
@@ -459,6 +544,77 @@ func (h *Handler) transitionIssueStatus(ctx context.Context, workspaceID string,
 	`, issueID, workspaceID, status))
 }
 
+func (h *Handler) listIssueComments(ctx context.Context, workspaceID string, issueID string) ([]issueCommentResponse, error) {
+	rows, err := h.db.Query(ctx, `
+		SELECT
+			c.id::text,
+			c.issue_id::text,
+			c.author_id::text,
+			u.display_name,
+			c.body,
+			c.created_at,
+			c.updated_at
+		FROM comments c
+		JOIN issues i ON i.id = c.issue_id
+		JOIN projects p ON p.id = i.project_id
+		JOIN users u ON u.id = c.author_id
+		WHERE c.issue_id = $1
+			AND p.workspace_id = $2
+			AND p.archived_at IS NULL
+		ORDER BY c.created_at ASC
+		LIMIT 100
+	`, issueID, workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	comments := make([]issueCommentResponse, 0)
+	for rows.Next() {
+		comment, err := scanIssueComment(rows)
+		if err != nil {
+			return nil, err
+		}
+
+		comments = append(comments, comment)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return comments, nil
+}
+
+func (h *Handler) createIssueComment(ctx context.Context, workspaceID string, issueID string, authorID string, body string) (issueCommentResponse, error) {
+	return scanIssueComment(h.db.QueryRow(ctx, `
+		WITH target_issue AS (
+			SELECT i.id
+			FROM issues i
+			JOIN projects p ON p.id = i.project_id
+			WHERE i.id = $1
+				AND p.workspace_id = $2
+				AND p.archived_at IS NULL
+		),
+		inserted AS (
+			INSERT INTO comments (issue_id, author_id, body)
+			SELECT id, $3, $4
+			FROM target_issue
+			RETURNING id, issue_id, author_id, body, created_at, updated_at
+		)
+		SELECT
+			inserted.id::text,
+			inserted.issue_id::text,
+			inserted.author_id::text,
+			u.display_name,
+			inserted.body,
+			inserted.created_at,
+			inserted.updated_at
+		FROM inserted
+		JOIN users u ON u.id = inserted.author_id
+	`, issueID, workspaceID, authorID, body))
+}
+
 func (h *Handler) requireUser(w http.ResponseWriter, r *http.Request) (auth.CurrentUser, bool) {
 	user, err := h.auth.CurrentUser(r)
 	if err != nil {
@@ -537,6 +693,18 @@ func normalizeIssueID(id string) (string, error) {
 	return id, nil
 }
 
+func normalizeCommentBody(body string) (string, error) {
+	body = strings.TrimSpace(body)
+	if body == "" {
+		return "", errors.New("body is required")
+	}
+	if len(body) > 4000 {
+		return "", errors.New("body must be 4000 characters or fewer")
+	}
+
+	return body, nil
+}
+
 func withDefault(value string, fallback string) string {
 	if value == "" {
 		return fallback
@@ -586,6 +754,23 @@ func scanIssue(row rowScanner) (issueResponse, error) {
 	issue.DueDate = nullableText(dueDate)
 
 	return issue, nil
+}
+
+func scanIssueComment(row rowScanner) (issueCommentResponse, error) {
+	var comment issueCommentResponse
+	if err := row.Scan(
+		&comment.ID,
+		&comment.IssueID,
+		&comment.AuthorID,
+		&comment.AuthorDisplayName,
+		&comment.Body,
+		&comment.CreatedAt,
+		&comment.UpdatedAt,
+	); err != nil {
+		return issueCommentResponse{}, err
+	}
+
+	return comment, nil
 }
 
 func nullableText(value pgtype.Text) *string {

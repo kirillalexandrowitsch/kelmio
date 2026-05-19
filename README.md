@@ -94,6 +94,14 @@ curl -b /tmp/team-task-tracker.cookies \
 
 curl -i -b /tmp/team-task-tracker.cookies \
   -H 'Content-Type: application/json' \
+  -d '{"body":"Looks good for the first pass."}' \
+  "http://localhost:8080/api/v1/issues/$ISSUE_ID/comments"
+
+curl -b /tmp/team-task-tracker.cookies \
+  "http://localhost:8080/api/v1/issues/$ISSUE_ID/comments"
+
+curl -i -b /tmp/team-task-tracker.cookies \
+  -H 'Content-Type: application/json' \
   -d '{"status":"in_progress"}' \
   "http://localhost:8080/api/v1/issues/$ISSUE_ID/transition"
 ```
