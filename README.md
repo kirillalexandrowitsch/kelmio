@@ -58,6 +58,11 @@ curl -i -b /tmp/team-task-tracker.cookies \
 Team API smoke test:
 
 ```sh
+curl -i -b /tmp/team-task-tracker.cookies \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"member@example.com","username":"member","display_name":"Member","password":"member12345","role":"member"}' \
+  http://localhost:8080/api/v1/team/members
+
 curl -b /tmp/team-task-tracker.cookies \
   http://localhost:8080/api/v1/team/members
 ```

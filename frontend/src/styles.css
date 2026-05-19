@@ -107,6 +107,8 @@ a {
 .auth-form input:focus,
 .project-form input:focus,
 .project-form textarea:focus,
+.team-member-form input:focus,
+.team-member-form select:focus,
 .label-form input:focus,
 .issue-form input:focus,
 .issue-form select:focus,
@@ -124,6 +126,7 @@ a {
 
 .auth-form button,
 .project-form button,
+.team-member-form button,
 .label-form button,
 .issue-form button,
 .issue-edit-form button,
@@ -153,6 +156,16 @@ a {
 }
 
 .project-form button:hover:not(:disabled) {
+  background: #27362d;
+}
+
+.team-member-form button {
+  border: 1px solid #18231d;
+  color: #ffffff;
+  background: #18231d;
+}
+
+.team-member-form button:hover:not(:disabled) {
   background: #27362d;
 }
 
@@ -567,6 +580,7 @@ h1 {
 }
 
 .project-form label span,
+.team-member-form label span,
 .label-form label span,
 .issue-form label span,
 .issue-filters label span {
@@ -577,6 +591,8 @@ h1 {
 
 .project-form input,
 .project-form textarea,
+.team-member-form input,
+.team-member-form select,
 .label-form input,
 .issue-form input,
 .issue-form select,
@@ -592,6 +608,8 @@ h1 {
 }
 
 .project-form input,
+.team-member-form input,
+.team-member-form select,
 .label-form input,
 .issue-form input,
 .issue-form select,
@@ -603,6 +621,24 @@ h1 {
 .issue-form textarea {
   min-height: 92px;
   resize: vertical;
+}
+
+.team-member-form {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(120px, 1fr)) auto;
+  align-items: end;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid #edf0ed;
+}
+
+.team-member-form label {
+  display: grid;
+  gap: 8px;
+}
+
+.team-member-form .form-error {
+  grid-column: 1 / -1;
 }
 
 .label-form {
@@ -1195,6 +1231,7 @@ h1 {
 
   .projects-layout,
   .issues-layout,
+  .team-member-form,
   .issue-filters,
   .issue-detail-body {
     grid-template-columns: 1fr;

@@ -99,6 +99,14 @@ type ListTeamMembersResponse = {
   members: TeamMember[];
 };
 
+type CreateTeamMemberInput = {
+  email: string;
+  username: string;
+  display_name: string;
+  password: string;
+  role: TeamMember["role"];
+};
+
 type ListLabelsResponse = {
   labels: Label[];
 };
@@ -196,6 +204,13 @@ export async function createProject(input: CreateProjectInput) {
 
 export async function listTeamMembers() {
   return request<ListTeamMembersResponse>("/api/v1/team/members");
+}
+
+export async function createTeamMember(input: CreateTeamMemberInput) {
+  return request<TeamMember>("/api/v1/team/members", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
 }
 
 export async function listLabels() {

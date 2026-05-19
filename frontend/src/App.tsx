@@ -17,6 +17,7 @@ import {
   createIssue,
   createIssueComment,
   createProject,
+  createTeamMember,
   getIssue,
   getCurrentUser,
   listIssueActivity,
@@ -187,7 +188,15 @@ export function App() {
   const [isCreatingProject, setIsCreatingProject] = useState(false);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [teamMembersError, setTeamMembersError] = useState("");
+  const [teamMemberFormError, setTeamMemberFormError] = useState("");
   const [isLoadingTeamMembers, setIsLoadingTeamMembers] = useState(false);
+  const [isCreatingTeamMember, setIsCreatingTeamMember] = useState(false);
+  const [teamMemberEmail, setTeamMemberEmail] = useState("");
+  const [teamMemberUsername, setTeamMemberUsername] = useState("");
+  const [teamMemberDisplayName, setTeamMemberDisplayName] = useState("");
+  const [teamMemberPassword, setTeamMemberPassword] = useState("");
+  const [teamMemberRole, setTeamMemberRole] =
+    useState<TeamMember["role"]>("member");
   const [labels, setLabels] = useState<Label[]>([]);
   const [labelsError, setLabelsError] = useState("");
   const [isLoadingLabels, setIsLoadingLabels] = useState(false);
@@ -317,6 +326,7 @@ export function App() {
 
     let isMounted = true;
     setTeamMembersError("");
+    setTeamMemberFormError("");
     setIsLoadingTeamMembers(true);
 
     listTeamMembers()
@@ -515,6 +525,12 @@ export function App() {
     setProjectsError("");
     setProjectFormError("");
     setTeamMembersError("");
+    setTeamMemberFormError("");
+    setTeamMemberEmail("");
+    setTeamMemberUsername("");
+    setTeamMemberDisplayName("");
+    setTeamMemberPassword("");
+    setTeamMemberRole("member");
     setLabelsError("");
     setLabelName("");
     setLabelColor("#4e795d");
@@ -563,6 +579,36 @@ export function App() {
       }
     } finally {
       setIsCreatingProject(false);
+    }
+  }
+
+  async function handleCreateTeamMember(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setTeamMemberFormError("");
+    setIsCreatingTeamMember(true);
+
+    try {
+      const member = await createTeamMember({
+        email: teamMemberEmail,
+        username: teamMemberUsername,
+        display_name: teamMemberDisplayName,
+        password: teamMemberPassword,
+        role: teamMemberRole,
+      });
+      setTeamMembers((currentMembers) => [...currentMembers, member]);
+      setTeamMemberEmail("");
+      setTeamMemberUsername("");
+      setTeamMemberDisplayName("");
+      setTeamMemberPassword("");
+      setTeamMemberRole("member");
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setTeamMemberFormError(err.message);
+      } else {
+        setTeamMemberFormError("Could not create team member.");
+      }
+    } finally {
+      setIsCreatingTeamMember(false);
     }
   }
 
@@ -1040,6 +1086,86 @@ export function App() {
           ) : (
             <div className="project-empty">No team members yet</div>
           )}
+
+          {user.workspace.role === "admin" ? (
+            <form className="team-member-form" onSubmit={handleCreateTeamMember}>
+              <label>
+                <span>Email</span>
+                <input
+                  autoComplete="off"
+                  onChange={(event) => setTeamMemberEmail(event.target.value)}
+                  placeholder="member@example.com"
+                  type="email"
+                  value={teamMemberEmail}
+                />
+              </label>
+
+              <label>
+                <span>Username</span>
+                <input
+                  autoComplete="off"
+                  maxLength={32}
+                  onChange={(event) =>
+                    setTeamMemberUsername(event.target.value.toLowerCase())
+                  }
+                  placeholder="member_name"
+                  value={teamMemberUsername}
+                />
+              </label>
+
+              <label>
+                <span>Display name</span>
+                <input
+                  maxLength={80}
+                  onChange={(event) => setTeamMemberDisplayName(event.target.value)}
+                  placeholder="Member Name"
+                  value={teamMemberDisplayName}
+                />
+              </label>
+
+              <label>
+                <span>Role</span>
+                <select
+                  onChange={(event) =>
+                    setTeamMemberRole(event.target.value as TeamMember["role"])
+                  }
+                  value={teamMemberRole}
+                >
+                  <option value="member">Member</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </label>
+
+              <label>
+                <span>Password</span>
+                <input
+                  autoComplete="new-password"
+                  minLength={8}
+                  onChange={(event) => setTeamMemberPassword(event.target.value)}
+                  placeholder="At least 8 characters"
+                  type="password"
+                  value={teamMemberPassword}
+                />
+              </label>
+
+              <button
+                disabled={
+                  isCreatingTeamMember ||
+                  teamMemberEmail.trim() === "" ||
+                  teamMemberUsername.trim() === "" ||
+                  teamMemberDisplayName.trim() === "" ||
+                  teamMemberPassword.length < 8
+                }
+                type="submit"
+              >
+                {isCreatingTeamMember ? "Creating..." : "Create member"}
+              </button>
+
+              {teamMemberFormError ? (
+                <p className="form-error">{teamMemberFormError}</p>
+              ) : null}
+            </form>
+          ) : null}
         </section>
 
         <section className="labels-panel" aria-label="Labels">
