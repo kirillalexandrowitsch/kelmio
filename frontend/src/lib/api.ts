@@ -69,6 +69,13 @@ type ListIssueCommentsResponse = {
   comments: IssueComment[];
 };
 
+export type IssueFilters = {
+  projectId?: string;
+  status?: IssueStatus;
+  priority?: IssuePriority;
+  assigneeId?: string;
+};
+
 type CreateProjectInput = {
   key: string;
   name: string;
@@ -126,10 +133,19 @@ export async function createProject(input: CreateProjectInput) {
   });
 }
 
-export async function listIssues(projectId?: string) {
+export async function listIssues(filters: IssueFilters = {}) {
   const params = new URLSearchParams();
-  if (projectId) {
-    params.set("project_id", projectId);
+  if (filters.projectId) {
+    params.set("project_id", filters.projectId);
+  }
+  if (filters.status) {
+    params.set("status", filters.status);
+  }
+  if (filters.priority) {
+    params.set("priority", filters.priority);
+  }
+  if (filters.assigneeId) {
+    params.set("assignee_id", filters.assigneeId);
   }
 
   const query = params.toString();

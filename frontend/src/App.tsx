@@ -43,6 +43,25 @@ const issueTypeLabels: Record<IssueType, string> = {
   story: "Story",
 };
 
+function issueMatchesFilters(
+  issue: Issue,
+  projectId: string,
+  status: IssueStatus | "",
+  priority: IssuePriority | "",
+) {
+  if (projectId && issue.project_id !== projectId) {
+    return false;
+  }
+  if (status && issue.status !== status) {
+    return false;
+  }
+  if (priority && issue.priority !== priority) {
+    return false;
+  }
+
+  return true;
+}
+
 function formatDateTime(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
@@ -79,6 +98,11 @@ export function App() {
   const [issuePriority, setIssuePriority] = useState<IssuePriority>("medium");
   const [issueStatus, setIssueStatus] = useState<IssueStatus>("todo");
   const [issueDueDate, setIssueDueDate] = useState("");
+  const [issueFilterProjectId, setIssueFilterProjectId] = useState("");
+  const [issueFilterStatus, setIssueFilterStatus] = useState<IssueStatus | "">("");
+  const [issueFilterPriority, setIssueFilterPriority] = useState<
+    IssuePriority | ""
+  >("");
   const [transitioningIssueIds, setTransitioningIssueIds] = useState<string[]>([]);
   const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null);
   const [selectedIssueError, setSelectedIssueError] = useState("");
@@ -169,7 +193,11 @@ export function App() {
     setIssueFormError("");
     setIsLoadingIssues(true);
 
-    listIssues()
+    listIssues({
+      projectId: issueFilterProjectId || undefined,
+      status: issueFilterStatus || undefined,
+      priority: issueFilterPriority || undefined,
+    })
       .then((response) => {
         if (isMounted) {
           setIssues(response.issues);
@@ -189,7 +217,7 @@ export function App() {
     return () => {
       isMounted = false;
     };
-  }, [user]);
+  }, [user, issueFilterProjectId, issueFilterStatus, issueFilterPriority]);
 
   useEffect(() => {
     if (!selectedIssueId) {
@@ -253,6 +281,9 @@ export function App() {
     setProjectFormError("");
     setIssuesError("");
     setIssueFormError("");
+    setIssueFilterProjectId("");
+    setIssueFilterStatus("");
+    setIssueFilterPriority("");
     setTransitioningIssueIds([]);
     setSelectedIssue(null);
     setSelectedIssueError("");
@@ -296,11 +327,22 @@ export function App() {
 
     try {
       const updatedIssue = await transitionIssue(issueId, status);
-      setIssues((currentIssues) =>
-        currentIssues.map((issue) =>
+      setIssues((currentIssues) => {
+        if (
+          !issueMatchesFilters(
+            updatedIssue,
+            issueFilterProjectId,
+            issueFilterStatus,
+            issueFilterPriority,
+          )
+        ) {
+          return currentIssues.filter((issue) => issue.id !== updatedIssue.id);
+        }
+
+        return currentIssues.map((issue) =>
           issue.id === updatedIssue.id ? updatedIssue : issue,
-        ),
-      );
+        );
+      });
       setSelectedIssue((currentIssue) =>
         currentIssue?.id === updatedIssue.id ? updatedIssue : currentIssue,
       );
@@ -348,7 +390,16 @@ export function App() {
         due_date: issueDueDate,
       });
 
-      setIssues((currentIssues) => [issue, ...currentIssues]);
+      if (
+        issueMatchesFilters(
+          issue,
+          issueFilterProjectId,
+          issueFilterStatus,
+          issueFilterPriority,
+        )
+      ) {
+        setIssues((currentIssues) => [issue, ...currentIssues]);
+      }
       setSelectedIssue(issue);
       setIssueTitle("");
       setIssueDescription("");
@@ -392,6 +443,10 @@ export function App() {
   }
 
   const openIssuesCount = issues.filter((issue) => issue.status !== "done").length;
+  const hasIssueFilters =
+    issueFilterProjectId !== "" ||
+    issueFilterStatus !== "" ||
+    issueFilterPriority !== "";
 
   if (isBooting) {
     return (
@@ -707,6 +762,76 @@ export function App() {
               </div>
               {isLoadingIssues ? <span className="muted">Loading</span> : null}
             </header>
+
+            <section className="issue-filters" aria-label="Issue filters">
+              <label>
+                <span>Project</span>
+                <select
+                  onChange={(event) => setIssueFilterProjectId(event.target.value)}
+                  value={issueFilterProjectId}
+                >
+                  <option value="">All projects</option>
+                  {projects.map((project) => (
+                    <option key={project.id} value={project.id}>
+                      {project.key}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label>
+                <span>Status</span>
+                <select
+                  onChange={(event) =>
+                    setIssueFilterStatus(event.target.value as IssueStatus | "")
+                  }
+                  value={issueFilterStatus}
+                >
+                  <option value="">All statuses</option>
+                  {columns.map((column) => (
+                    <option key={column.status} value={column.status}>
+                      {column.title}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label>
+                <span>Priority</span>
+                <select
+                  onChange={(event) =>
+                    setIssueFilterPriority(event.target.value as IssuePriority | "")
+                  }
+                  value={issueFilterPriority}
+                >
+                  <option value="">All priorities</option>
+                  {Object.entries(priorityLabels).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <button
+                className="small-button"
+                disabled={!hasIssueFilters}
+                onClick={() => {
+                  setIssueFilterProjectId("");
+                  setIssueFilterStatus("");
+                  setIssueFilterPriority("");
+                }}
+                type="button"
+              >
+                Clear
+              </button>
+            </section>
+
+            <p className="filter-summary">
+              {hasIssueFilters
+                ? `${issues.length} issues match current filters`
+                : "Showing latest issues across all projects"}
+            </p>
 
             {issuesError ? <p className="form-error">{issuesError}</p> : null}
 

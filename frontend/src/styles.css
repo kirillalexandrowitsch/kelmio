@@ -110,6 +110,7 @@ a {
 .issue-form input:focus,
 .issue-form select:focus,
 .issue-form textarea:focus,
+.issue-filters select:focus,
 .issue-card select:focus,
 .issue-detail-status select:focus,
 .comment-form textarea:focus {
@@ -473,7 +474,8 @@ h1 {
 }
 
 .project-form label span,
-.issue-form label span {
+.issue-form label span,
+.issue-filters label span {
   color: #4e5c54;
   font-size: 13px;
   font-weight: 700;
@@ -483,7 +485,8 @@ h1 {
 .project-form textarea,
 .issue-form input,
 .issue-form select,
-.issue-form textarea {
+.issue-form textarea,
+.issue-filters select {
   width: 100%;
   padding: 10px 12px;
   border: 1px solid #c8d1cb;
@@ -495,7 +498,8 @@ h1 {
 
 .project-form input,
 .issue-form input,
-.issue-form select {
+.issue-form select,
+.issue-filters select {
   min-height: 40px;
 }
 
@@ -514,6 +518,29 @@ h1 {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
+}
+
+.issue-filters {
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) minmax(140px, 1fr) minmax(140px, 1fr) auto;
+  align-items: end;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #edf0ed;
+  border-radius: 8px;
+  background: #fbfcfb;
+}
+
+.issue-filters label {
+  display: grid;
+  gap: 8px;
+}
+
+.filter-summary {
+  margin: -4px 0 0;
+  color: #657268;
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .issue-list {
@@ -905,6 +932,7 @@ h1 {
 
   .projects-layout,
   .issues-layout,
+  .issue-filters,
   .issue-detail-body {
     grid-template-columns: 1fr;
   }
