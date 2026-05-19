@@ -94,3 +94,82 @@ func TestNormalizeCreateMemberValidation(t *testing.T) {
 		})
 	}
 }
+
+func TestNormalizeMemberID(t *testing.T) {
+	t.Parallel()
+
+	got, err := normalizeMemberID(" F2D59348-61A3-491A-9EB1-5AEC91FBDF1E ")
+	if err != nil {
+		t.Fatalf("normalize member id: %v", err)
+	}
+
+	want := "f2d59348-61a3-491a-9eb1-5aec91fbdf1e"
+	if got != want {
+		t.Fatalf("member id = %q, want %q", got, want)
+	}
+}
+
+func TestNormalizeMemberIDValidation(t *testing.T) {
+	t.Parallel()
+
+	if _, err := normalizeMemberID("not-a-uuid"); err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestNormalizeUpdateMember(t *testing.T) {
+	t.Parallel()
+
+	isActive := false
+	got, err := normalizeUpdateMember("f2d59348-61a3-491a-9eb1-5aec91fbdf1e", updateMemberRequest{
+		Role:     "admin",
+		IsActive: &isActive,
+	})
+	if err != nil {
+		t.Fatalf("normalize update member: %v", err)
+	}
+
+	if got.RequestedID != "f2d59348-61a3-491a-9eb1-5aec91fbdf1e" {
+		t.Fatalf("RequestedID = %q", got.RequestedID)
+	}
+	if got.Role != "admin" {
+		t.Fatalf("Role = %q, want %q", got.Role, "admin")
+	}
+	if got.IsActive == nil || *got.IsActive {
+		t.Fatalf("IsActive = %v, want false pointer", got.IsActive)
+	}
+	if !got.HasChanges {
+		t.Fatal("HasChanges = false, want true")
+	}
+}
+
+func TestNormalizeUpdateMemberValidation(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		req  updateMemberRequest
+	}{
+		{
+			name: "empty",
+			req:  updateMemberRequest{},
+		},
+		{
+			name: "bad role",
+			req: updateMemberRequest{
+				Role: "owner",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			if _, err := normalizeUpdateMember("f2d59348-61a3-491a-9eb1-5aec91fbdf1e", tt.req); err == nil {
+				t.Fatal("expected error")
+			}
+		})
+	}
+}

@@ -479,7 +479,7 @@ h1 {
 
 .team-member-row {
   display: grid;
-  grid-template-columns: 42px minmax(0, 1fr) auto;
+  grid-template-columns: 42px minmax(0, 1fr) auto minmax(220px, auto);
   align-items: center;
   gap: 12px;
   padding: 12px;
@@ -525,6 +525,54 @@ h1 {
   background: #ffffff;
   font-size: 12px;
   font-weight: 800;
+}
+
+.member-controls {
+  display: grid;
+  grid-template-columns: minmax(110px, 1fr) auto;
+  align-items: end;
+  gap: 8px;
+}
+
+.member-controls label {
+  display: grid;
+  gap: 6px;
+}
+
+.member-controls label > span {
+  color: #657268;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.member-controls select {
+  width: 100%;
+  min-height: 34px;
+  padding: 7px 9px;
+  border: 1px solid #c8d1cb;
+  border-radius: 8px;
+  color: #17211b;
+  background: #ffffff;
+  font-size: 12px;
+  outline: none;
+}
+
+.member-active-toggle {
+  display: flex !important;
+  min-height: 34px;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 9px;
+  border: 1px solid #c8d1cb;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.member-active-toggle input {
+  width: 15px;
+  height: 15px;
+  accent-color: #4e795d;
 }
 
 .project-row {
@@ -1231,6 +1279,7 @@ h1 {
 
   .projects-layout,
   .issues-layout,
+  .team-member-row,
   .team-member-form,
   .issue-filters,
   .issue-detail-body {

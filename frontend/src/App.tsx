@@ -30,6 +30,7 @@ import {
   logout,
   setIssueLabels,
   transitionIssue,
+  updateTeamMember,
   updateIssue,
 } from "./lib/api";
 
@@ -197,6 +198,7 @@ export function App() {
   const [teamMemberPassword, setTeamMemberPassword] = useState("");
   const [teamMemberRole, setTeamMemberRole] =
     useState<TeamMember["role"]>("member");
+  const [updatingTeamMemberIds, setUpdatingTeamMemberIds] = useState<string[]>([]);
   const [labels, setLabels] = useState<Label[]>([]);
   const [labelsError, setLabelsError] = useState("");
   const [isLoadingLabels, setIsLoadingLabels] = useState(false);
@@ -531,6 +533,7 @@ export function App() {
     setTeamMemberDisplayName("");
     setTeamMemberPassword("");
     setTeamMemberRole("member");
+    setUpdatingTeamMemberIds([]);
     setLabelsError("");
     setLabelName("");
     setLabelColor("#4e795d");
@@ -609,6 +612,35 @@ export function App() {
       }
     } finally {
       setIsCreatingTeamMember(false);
+    }
+  }
+
+  async function handleUpdateTeamMember(
+    memberId: string,
+    input: { role?: TeamMember["role"]; is_active?: boolean },
+  ) {
+    setTeamMembersError("");
+    setUpdatingTeamMemberIds((currentIds) =>
+      currentIds.includes(memberId) ? currentIds : [...currentIds, memberId],
+    );
+
+    try {
+      const member = await updateTeamMember(memberId, input);
+      setTeamMembers((currentMembers) =>
+        currentMembers.map((currentMember) =>
+          currentMember.id === member.id ? member : currentMember,
+        ),
+      );
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setTeamMembersError(err.message);
+      } else {
+        setTeamMembersError("Could not update team member.");
+      }
+    } finally {
+      setUpdatingTeamMemberIds((currentIds) =>
+        currentIds.filter((currentId) => currentId !== memberId),
+      );
     }
   }
 
@@ -1068,20 +1100,57 @@ export function App() {
 
           {teamMembers.length > 0 ? (
             <div className="team-list">
-              {teamMembers.map((member) => (
-                <article className="team-member-row" key={member.id}>
-                  <span className="member-avatar">
-                    {memberInitials(member.display_name)}
-                  </span>
-                  <div>
-                    <h3>{member.display_name}</h3>
-                    <p>
-                      @{member.username} · {member.email}
-                    </p>
-                  </div>
-                  <span className="member-role">{member.role}</span>
-                </article>
-              ))}
+              {teamMembers.map((member) => {
+                const isSelf = member.id === user.id;
+                const isUpdatingMember = updatingTeamMemberIds.includes(member.id);
+
+                return (
+                  <article className="team-member-row" key={member.id}>
+                    <span className="member-avatar">
+                      {memberInitials(member.display_name)}
+                    </span>
+                    <div>
+                      <h3>{member.display_name}</h3>
+                      <p>
+                        @{member.username} · {member.email}
+                      </p>
+                    </div>
+                    <span className="member-role">{member.role}</span>
+                    {user.workspace.role === "admin" ? (
+                      <div className="member-controls">
+                        <label>
+                          <span>Role</span>
+                          <select
+                            disabled={isSelf || isUpdatingMember}
+                            onChange={(event) => {
+                              void handleUpdateTeamMember(member.id, {
+                                role: event.target.value as TeamMember["role"],
+                              });
+                            }}
+                            value={member.role}
+                          >
+                            <option value="member">Member</option>
+                            <option value="admin">Admin</option>
+                          </select>
+                        </label>
+                        <label className="member-active-toggle">
+                          <input
+                            checked={member.is_active}
+                            disabled={isSelf || isUpdatingMember}
+                            onChange={(event) => {
+                              void handleUpdateTeamMember(member.id, {
+                                is_active: event.target.checked,
+                              });
+                            }}
+                            type="checkbox"
+                          />
+                          <span>{member.is_active ? "Active" : "Inactive"}</span>
+                        </label>
+                      </div>
+                    ) : null}
+                  </article>
+                );
+              })}
             </div>
           ) : (
             <div className="project-empty">No team members yet</div>

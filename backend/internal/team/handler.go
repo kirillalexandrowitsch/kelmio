@@ -19,6 +19,10 @@ import (
 
 var emailPattern = regexp.MustCompile(`^[^@\s]+@[^@\s]+\.[^@\s]+$`)
 var usernamePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{2,31}$`)
+var uuidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
+
+var errInvalidMemberUpdate = errors.New("invalid member update")
+var errLastActiveAdmin = errors.New("last active admin")
 
 type Handler struct {
 	db   *pgxpool.Pool
@@ -31,6 +35,11 @@ type createMemberRequest struct {
 	DisplayName string `json:"display_name"`
 	Password    string `json:"password"`
 	Role        string `json:"role"`
+}
+
+type updateMemberRequest struct {
+	Role     string `json:"role"`
+	IsActive *bool  `json:"is_active"`
 }
 
 type memberResponse struct {
@@ -55,6 +64,13 @@ type normalizedCreateMember struct {
 	Role        string
 }
 
+type normalizedUpdateMember struct {
+	Role        string
+	IsActive    *bool
+	HasChanges  bool
+	RequestedID string
+}
+
 func NewHandler(db *pgxpool.Pool, authHandler *auth.Handler) *Handler {
 	return &Handler{
 		db:   db,
@@ -65,6 +81,7 @@ func NewHandler(db *pgxpool.Pool, authHandler *auth.Handler) *Handler {
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/team/members", h.listMembers)
 	mux.HandleFunc("POST /api/v1/team/members", h.createMember)
+	mux.HandleFunc("PATCH /api/v1/team/members/{id}", h.updateMember)
 }
 
 func (h *Handler) listMembers(w http.ResponseWriter, r *http.Request) {
@@ -164,6 +181,60 @@ func (h *Handler) createMember(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, member)
 }
 
+func (h *Handler) updateMember(w http.ResponseWriter, r *http.Request) {
+	user, ok := h.requireUser(w, r)
+	if !ok {
+		return
+	}
+
+	if user.Role != "admin" {
+		writeError(w, http.StatusForbidden, "forbidden", "admin role is required")
+		return
+	}
+
+	memberID, err := normalizeMemberID(r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	var req updateMemberRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	input, err := normalizeUpdateMember(memberID, req)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	member, err := h.updateWorkspaceMember(ctx, user, input)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "member_not_found", "team member was not found")
+			return
+		}
+		if errors.Is(err, errInvalidMemberUpdate) {
+			writeError(w, http.StatusBadRequest, "invalid_member_update", "you cannot update your own membership")
+			return
+		}
+		if errors.Is(err, errLastActiveAdmin) {
+			writeError(w, http.StatusBadRequest, "last_active_admin", "workspace must keep at least one active admin")
+			return
+		}
+
+		writeError(w, http.StatusInternalServerError, "internal_error", "could not update team member")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, member)
+}
+
 func (h *Handler) createWorkspaceMember(ctx context.Context, workspaceID string, input normalizedCreateMember) (memberResponse, error) {
 	passwordHash, err := bcrypt.GenerateFromPassword([]byte(input.Password), bcrypt.DefaultCost)
 	if err != nil {
@@ -199,6 +270,108 @@ func (h *Handler) createWorkspaceMember(ctx context.Context, workspaceID string,
 		RETURNING role, joined_at
 	`, workspaceID, member.ID, input.Role).Scan(&member.Role, &member.JoinedAt); err != nil {
 		return memberResponse{}, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return memberResponse{}, err
+	}
+
+	return member, nil
+}
+
+func (h *Handler) updateWorkspaceMember(ctx context.Context, actor auth.CurrentUser, input normalizedUpdateMember) (memberResponse, error) {
+	if input.RequestedID == actor.ID {
+		return memberResponse{}, errInvalidMemberUpdate
+	}
+
+	tx, err := h.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return memberResponse{}, err
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	var member memberResponse
+	if err := tx.QueryRow(ctx, `
+		SELECT
+			u.id::text,
+			u.email,
+			u.username,
+			u.display_name,
+			wm.role,
+			u.is_active,
+			wm.joined_at
+		FROM workspace_members wm
+		JOIN users u ON u.id = wm.user_id
+		WHERE wm.workspace_id = $1
+			AND wm.user_id = $2
+		FOR UPDATE OF wm, u
+	`, actor.WorkspaceID, input.RequestedID).Scan(
+		&member.ID,
+		&member.Email,
+		&member.Username,
+		&member.DisplayName,
+		&member.Role,
+		&member.IsActive,
+		&member.JoinedAt,
+	); err != nil {
+		return memberResponse{}, err
+	}
+
+	nextRole := member.Role
+	if input.Role != "" {
+		nextRole = input.Role
+	}
+	nextIsActive := member.IsActive
+	if input.IsActive != nil {
+		nextIsActive = *input.IsActive
+	}
+
+	if member.Role == "admin" && member.IsActive && (nextRole != "admin" || !nextIsActive) {
+		var otherActiveAdmins int
+		if err := tx.QueryRow(ctx, `
+			SELECT COUNT(*)
+			FROM workspace_members wm
+			JOIN users u ON u.id = wm.user_id
+			WHERE wm.workspace_id = $1
+				AND wm.user_id <> $2
+				AND wm.role = 'admin'
+				AND u.is_active = true
+		`, actor.WorkspaceID, member.ID).Scan(&otherActiveAdmins); err != nil {
+			return memberResponse{}, err
+		}
+		if otherActiveAdmins == 0 {
+			return memberResponse{}, errLastActiveAdmin
+		}
+	}
+
+	if err := tx.QueryRow(ctx, `
+		UPDATE workspace_members
+		SET role = $3
+		WHERE workspace_id = $1
+			AND user_id = $2
+		RETURNING role
+	`, actor.WorkspaceID, member.ID, nextRole).Scan(&member.Role); err != nil {
+		return memberResponse{}, err
+	}
+
+	if err := tx.QueryRow(ctx, `
+		UPDATE users
+		SET is_active = $2
+		WHERE id = $1
+		RETURNING is_active
+	`, member.ID, nextIsActive).Scan(&member.IsActive); err != nil {
+		return memberResponse{}, err
+	}
+
+	if !member.IsActive {
+		if _, err := tx.Exec(ctx, `
+			DELETE FROM sessions
+			WHERE user_id = $1
+		`, member.ID); err != nil {
+			return memberResponse{}, err
+		}
 	}
 
 	if err := tx.Commit(ctx); err != nil {
@@ -255,6 +428,38 @@ func normalizeCreateMember(req createMemberRequest) (normalizedCreateMember, err
 	}
 	if input.Role != "admin" && input.Role != "member" {
 		return input, errors.New("role is invalid")
+	}
+
+	return input, nil
+}
+
+func normalizeMemberID(id string) (string, error) {
+	id = strings.ToLower(strings.TrimSpace(id))
+	if id == "" {
+		return "", errors.New("member id is required")
+	}
+	if !uuidPattern.MatchString(id) {
+		return "", errors.New("member id is invalid")
+	}
+
+	return id, nil
+}
+
+func normalizeUpdateMember(memberID string, req updateMemberRequest) (normalizedUpdateMember, error) {
+	input := normalizedUpdateMember{
+		RequestedID: memberID,
+		Role:        strings.TrimSpace(req.Role),
+		IsActive:    req.IsActive,
+	}
+
+	if input.Role != "" && input.Role != "admin" && input.Role != "member" {
+		return input, errors.New("role is invalid")
+	}
+	if input.Role != "" || input.IsActive != nil {
+		input.HasChanges = true
+	}
+	if !input.HasChanges {
+		return input, errors.New("role or is_active is required")
 	}
 
 	return input, nil

@@ -65,6 +65,14 @@ curl -i -b /tmp/team-task-tracker.cookies \
 
 curl -b /tmp/team-task-tracker.cookies \
   http://localhost:8080/api/v1/team/members
+
+MEMBER_ID="$(curl -s -b /tmp/team-task-tracker.cookies http://localhost:8080/api/v1/team/members \
+  | node -e 'let data=""; process.stdin.on("data", c => data += c); process.stdin.on("end", () => console.log(JSON.parse(data).members.find((member) => member.username === "member").id));')"
+
+curl -i -X PATCH -b /tmp/team-task-tracker.cookies \
+  -H 'Content-Type: application/json' \
+  -d '{"role":"admin","is_active":true}' \
+  "http://localhost:8080/api/v1/team/members/$MEMBER_ID"
 ```
 
 Labels API smoke test:

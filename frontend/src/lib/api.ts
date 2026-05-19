@@ -107,6 +107,11 @@ type CreateTeamMemberInput = {
   role: TeamMember["role"];
 };
 
+type UpdateTeamMemberInput = {
+  role?: TeamMember["role"];
+  is_active?: boolean;
+};
+
 type ListLabelsResponse = {
   labels: Label[];
 };
@@ -211,6 +216,16 @@ export async function createTeamMember(input: CreateTeamMemberInput) {
     method: "POST",
     body: JSON.stringify(input),
   });
+}
+
+export async function updateTeamMember(memberId: string, input: UpdateTeamMemberInput) {
+  return request<TeamMember>(
+    `/api/v1/team/members/${encodeURIComponent(memberId)}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    },
+  );
 }
 
 export async function listLabels() {
