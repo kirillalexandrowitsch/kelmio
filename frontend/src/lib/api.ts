@@ -72,6 +72,7 @@ export type IssueActivity = {
   issue_id: string;
   action:
     | "issue_created"
+    | "issue_updated"
     | "status_changed"
     | "assignee_changed"
     | "comment_added"
@@ -123,6 +124,14 @@ type CreateIssueInput = {
   status: IssueStatus;
   priority: IssuePriority;
   assignee_id: string;
+  due_date: string;
+};
+
+export type UpdateIssueInput = {
+  title: string;
+  description: string;
+  issue_type: IssueType;
+  priority: IssuePriority;
   due_date: string;
 };
 
@@ -209,6 +218,13 @@ export async function listIssueActivity(issueId: string) {
 export async function createIssue(input: CreateIssueInput) {
   return request<Issue>("/api/v1/issues", {
     method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function updateIssue(issueId: string, input: UpdateIssueInput) {
+  return request<Issue>(`/api/v1/issues/${encodeURIComponent(issueId)}`, {
+    method: "PATCH",
     body: JSON.stringify(input),
   });
 }

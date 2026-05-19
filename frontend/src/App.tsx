@@ -25,6 +25,7 @@ import {
   login,
   logout,
   transitionIssue,
+  updateIssue,
 } from "./lib/api";
 
 const columns = [
@@ -75,6 +76,9 @@ function activityTitle(activity: IssueActivity) {
   if (activity.action === "issue_created") {
     return "Created issue";
   }
+  if (activity.action === "issue_updated") {
+    return "Updated issue";
+  }
   if (activity.action === "status_changed") {
     return "Changed status";
   }
@@ -105,6 +109,11 @@ function activityDescription(activity: IssueActivity, members: TeamMember[]) {
   }
   if (activity.action === "issue_created") {
     return activity.payload.title ?? "";
+  }
+  if (activity.action === "issue_updated") {
+    return activity.payload.fields
+      ? `Fields: ${activity.payload.fields.replaceAll(",", ", ")}`
+      : "";
   }
 
   return "";
@@ -180,6 +189,14 @@ export function App() {
   const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null);
   const [selectedIssueError, setSelectedIssueError] = useState("");
   const [isLoadingSelectedIssue, setIsLoadingSelectedIssue] = useState(false);
+  const [isEditingIssueDetails, setIsEditingIssueDetails] = useState(false);
+  const [isUpdatingIssue, setIsUpdatingIssue] = useState(false);
+  const [editIssueTitle, setEditIssueTitle] = useState("");
+  const [editIssueDescription, setEditIssueDescription] = useState("");
+  const [editIssueType, setEditIssueType] = useState<IssueType>("task");
+  const [editIssuePriority, setEditIssuePriority] =
+    useState<IssuePriority>("medium");
+  const [editIssueDueDate, setEditIssueDueDate] = useState("");
   const [issueComments, setIssueComments] = useState<IssueComment[]>([]);
   const [commentsError, setCommentsError] = useState("");
   const [commentBody, setCommentBody] = useState("");
@@ -431,6 +448,8 @@ export function App() {
     setAssigningIssueIds([]);
     setSelectedIssue(null);
     setSelectedIssueError("");
+    setIsEditingIssueDetails(false);
+    setIsUpdatingIssue(false);
     setIssueComments([]);
     setCommentsError("");
     setCommentBody("");
@@ -473,6 +492,64 @@ export function App() {
       setIssueActivity(response.activity);
     } catch {
       setActivityError("Could not load activity.");
+    }
+  }
+
+  function startEditingIssue(issue: Issue) {
+    setSelectedIssueError("");
+    setEditIssueTitle(issue.title);
+    setEditIssueDescription(issue.description);
+    setEditIssueType(issue.issue_type);
+    setEditIssuePriority(issue.priority);
+    setEditIssueDueDate(issue.due_date ?? "");
+    setIsEditingIssueDetails(true);
+  }
+
+  async function handleUpdateSelectedIssue(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selectedIssue) {
+      return;
+    }
+
+    setSelectedIssueError("");
+    setIsUpdatingIssue(true);
+
+    try {
+      const updatedIssue = await updateIssue(selectedIssue.id, {
+        title: editIssueTitle,
+        description: editIssueDescription,
+        issue_type: editIssueType,
+        priority: editIssuePriority,
+        due_date: editIssueDueDate,
+      });
+
+      setIssues((currentIssues) => {
+        if (
+          !issueMatchesFilters(
+            updatedIssue,
+            issueFilterProjectId,
+            issueFilterStatus,
+            issueFilterPriority,
+          )
+        ) {
+          return currentIssues.filter((issue) => issue.id !== updatedIssue.id);
+        }
+
+        return currentIssues.map((issue) =>
+          issue.id === updatedIssue.id ? updatedIssue : issue,
+        );
+      });
+      setSelectedIssue(updatedIssue);
+      setIsEditingIssueDetails(false);
+      await refreshIssueActivity(updatedIssue.id);
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setSelectedIssueError(err.message);
+      } else {
+        setSelectedIssueError("Could not update issue.");
+      }
+    } finally {
+      setIsUpdatingIssue(false);
     }
   }
 
@@ -550,6 +627,7 @@ export function App() {
     }
 
     setSelectedIssueError("");
+    setIsEditingIssueDetails(false);
     setIsLoadingSelectedIssue(true);
 
     try {
@@ -590,6 +668,7 @@ export function App() {
         setIssues((currentIssues) => [issue, ...currentIssues]);
       }
       setSelectedIssue(issue);
+      setIsEditingIssueDetails(false);
       setIssueTitle("");
       setIssueDescription("");
       setIssueType("task");
@@ -1117,16 +1196,32 @@ export function App() {
               </h2>
             </div>
             {selectedIssue ? (
-              <button
-                className="ghost-button"
-                onClick={() => {
-                  setSelectedIssue(null);
-                  setSelectedIssueError("");
-                }}
-                type="button"
-              >
-                Close
-              </button>
+              <div className="detail-actions">
+                <button
+                  className="ghost-button"
+                  onClick={() => {
+                    if (isEditingIssueDetails) {
+                      setIsEditingIssueDetails(false);
+                    } else {
+                      startEditingIssue(selectedIssue);
+                    }
+                  }}
+                  type="button"
+                >
+                  {isEditingIssueDetails ? "Cancel edit" : "Edit"}
+                </button>
+                <button
+                  className="ghost-button"
+                  onClick={() => {
+                    setSelectedIssue(null);
+                    setSelectedIssueError("");
+                    setIsEditingIssueDetails(false);
+                  }}
+                  type="button"
+                >
+                  Close
+                </button>
+              </div>
             ) : null}
           </header>
 
@@ -1141,22 +1236,113 @@ export function App() {
           {selectedIssue ? (
             <div className="issue-detail-body">
               <div className="issue-detail-main">
-                <div className="issue-detail-headline">
-                  <span className="issue-key">{selectedIssue.issue_key}</span>
-                  <span className="detail-chip">
-                    {issueTypeLabels[selectedIssue.issue_type]}
-                  </span>
-                  <span className="detail-chip">
-                    {priorityLabels[selectedIssue.priority]}
-                  </span>
-                </div>
+                {isEditingIssueDetails ? (
+                  <form
+                    className="issue-edit-form"
+                    onSubmit={handleUpdateSelectedIssue}
+                  >
+                    <label>
+                      <span>Title</span>
+                      <input
+                        maxLength={180}
+                        onChange={(event) => setEditIssueTitle(event.target.value)}
+                        value={editIssueTitle}
+                      />
+                    </label>
 
-                <div>
-                  <p className="eyebrow">Description</p>
-                  <p className="issue-detail-description">
-                    {selectedIssue.description || "No description yet."}
-                  </p>
-                </div>
+                    <label>
+                      <span>Description</span>
+                      <textarea
+                        onChange={(event) =>
+                          setEditIssueDescription(event.target.value)
+                        }
+                        rows={4}
+                        value={editIssueDescription}
+                      />
+                    </label>
+
+                    <div className="field-grid">
+                      <label>
+                        <span>Type</span>
+                        <select
+                          onChange={(event) =>
+                            setEditIssueType(event.target.value as IssueType)
+                          }
+                          value={editIssueType}
+                        >
+                          {Object.entries(issueTypeLabels).map(([value, label]) => (
+                            <option key={value} value={value}>
+                              {label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+
+                      <label>
+                        <span>Priority</span>
+                        <select
+                          onChange={(event) =>
+                            setEditIssuePriority(
+                              event.target.value as IssuePriority,
+                            )
+                          }
+                          value={editIssuePriority}
+                        >
+                          {Object.entries(priorityLabels).map(([value, label]) => (
+                            <option key={value} value={value}>
+                              {label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+
+                    <label>
+                      <span>Due date</span>
+                      <input
+                        onChange={(event) => setEditIssueDueDate(event.target.value)}
+                        type="date"
+                        value={editIssueDueDate}
+                      />
+                    </label>
+
+                    <div className="form-actions">
+                      <button
+                        disabled={isUpdatingIssue || editIssueTitle.trim() === ""}
+                        type="submit"
+                      >
+                        {isUpdatingIssue ? "Saving..." : "Save changes"}
+                      </button>
+                      <button
+                        className="ghost-button"
+                        disabled={isUpdatingIssue}
+                        onClick={() => setIsEditingIssueDetails(false)}
+                        type="button"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <>
+                    <div className="issue-detail-headline">
+                      <span className="issue-key">{selectedIssue.issue_key}</span>
+                      <span className="detail-chip">
+                        {issueTypeLabels[selectedIssue.issue_type]}
+                      </span>
+                      <span className="detail-chip">
+                        {priorityLabels[selectedIssue.priority]}
+                      </span>
+                    </div>
+
+                    <div>
+                      <p className="eyebrow">Description</p>
+                      <p className="issue-detail-description">
+                        {selectedIssue.description || "No description yet."}
+                      </p>
+                    </div>
+                  </>
+                )}
 
                 <section className="comments-section" aria-label="Issue comments">
                   <header className="comments-header">
@@ -1206,49 +1392,49 @@ export function App() {
                     >
                       {isCreatingComment ? "Posting..." : "Post comment"}
                     </button>
-	                  </form>
-	                </section>
+                  </form>
+                </section>
 
-	                <section className="activity-section" aria-label="Issue activity">
-	                  <header className="comments-header">
-	                    <div>
-	                      <p className="eyebrow">Activity</p>
-	                      <h3>{issueActivity.length}</h3>
-	                    </div>
-	                    {isLoadingActivity ? (
-	                      <span className="muted">Loading activity</span>
-	                    ) : null}
-	                  </header>
+                <section className="activity-section" aria-label="Issue activity">
+                  <header className="comments-header">
+                    <div>
+                      <p className="eyebrow">Activity</p>
+                      <h3>{issueActivity.length}</h3>
+                    </div>
+                    {isLoadingActivity ? (
+                      <span className="muted">Loading activity</span>
+                    ) : null}
+                  </header>
 
-	                  {activityError ? (
-	                    <p className="form-error">{activityError}</p>
-	                  ) : null}
+                  {activityError ? (
+                    <p className="form-error">{activityError}</p>
+                  ) : null}
 
-	                  {issueActivity.length > 0 ? (
-	                    <div className="activity-list">
-	                      {issueActivity.map((activity) => (
-	                        <article className="activity-card" key={activity.id}>
-	                          <span className="activity-dot" aria-hidden="true" />
-	                          <div>
-	                            <header>
-	                              <strong>{activityTitle(activity)}</strong>
-	                              <span>{formatDateTime(activity.created_at)}</span>
-	                            </header>
-	                            <p>
-	                              {activity.actor_display_name ?? "System"}
+                  {issueActivity.length > 0 ? (
+                    <div className="activity-list">
+                      {issueActivity.map((activity) => (
+                        <article className="activity-card" key={activity.id}>
+                          <span className="activity-dot" aria-hidden="true" />
+                          <div>
+                            <header>
+                              <strong>{activityTitle(activity)}</strong>
+                              <span>{formatDateTime(activity.created_at)}</span>
+                            </header>
+                            <p>
+                              {activity.actor_display_name ?? "System"}
                               {activityDescription(activity, teamMembers)
                                 ? ` · ${activityDescription(activity, teamMembers)}`
                                 : ""}
-	                            </p>
-	                          </div>
-	                        </article>
-	                      ))}
-	                    </div>
-	                  ) : (
-	                    <div className="comments-empty">No activity yet</div>
-	                  )}
-	                </section>
-	              </div>
+                            </p>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="comments-empty">No activity yet</div>
+                  )}
+                </section>
+              </div>
 
               <aside className="issue-detail-sidebar">
                 <label className="issue-detail-status">
@@ -1267,9 +1453,9 @@ export function App() {
                       <option key={column.status} value={column.status}>
                         {column.title}
                       </option>
-	                    ))}
-	                  </select>
-	                </label>
+                    ))}
+                  </select>
+                </label>
 
                 <label className="issue-detail-status">
                   <span>Assignee</span>

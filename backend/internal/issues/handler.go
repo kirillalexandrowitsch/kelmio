@@ -56,6 +56,14 @@ type createIssueRequest struct {
 	DueDate     string `json:"due_date"`
 }
 
+type updateIssueRequest struct {
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	IssueType   string `json:"issue_type"`
+	Priority    string `json:"priority"`
+	DueDate     string `json:"due_date"`
+}
+
 type transitionIssueRequest struct {
 	Status string `json:"status"`
 }
@@ -129,6 +137,14 @@ type normalizedCreateIssue struct {
 	DueDate     string
 }
 
+type normalizedUpdateIssue struct {
+	Title       string
+	Description string
+	IssueType   string
+	Priority    string
+	DueDate     string
+}
+
 func NewHandler(db *pgxpool.Pool, authHandler *auth.Handler) *Handler {
 	return &Handler{
 		db:   db,
@@ -140,6 +156,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/issues", h.list)
 	mux.HandleFunc("POST /api/v1/issues", h.create)
 	mux.HandleFunc("GET /api/v1/issues/{id}", h.get)
+	mux.HandleFunc("PATCH /api/v1/issues/{id}", h.update)
 	mux.HandleFunc("POST /api/v1/issues/{id}/transition", h.transition)
 	mux.HandleFunc("POST /api/v1/issues/{id}/assign", h.assign)
 	mux.HandleFunc("GET /api/v1/issues/{id}/comments", h.listComments)
@@ -227,6 +244,47 @@ func (h *Handler) get(w http.ResponseWriter, r *http.Request) {
 		}
 
 		writeError(w, http.StatusInternalServerError, "internal_error", "could not load issue")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, issue)
+}
+
+func (h *Handler) update(w http.ResponseWriter, r *http.Request) {
+	user, ok := h.requireUser(w, r)
+	if !ok {
+		return
+	}
+
+	issueID, err := normalizeIssueID(r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	var req updateIssueRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	input, err := normalizeUpdateIssue(req)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	issue, err := h.updateIssue(ctx, user, issueID, input)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "issue_not_found", "issue was not found")
+			return
+		}
+
+		writeError(w, http.StatusInternalServerError, "internal_error", "could not update issue")
 		return
 	}
 
@@ -623,6 +681,98 @@ func (h *Handler) createIssue(ctx context.Context, user auth.CurrentUser, input 
 	return issue, nil
 }
 
+func (h *Handler) updateIssue(ctx context.Context, user auth.CurrentUser, issueID string, input normalizedUpdateIssue) (issueResponse, error) {
+	tx, err := h.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return issueResponse{}, err
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	previous, err := scanIssue(tx.QueryRow(ctx, `
+		SELECT
+			i.id::text,
+			i.project_id::text,
+			p.key,
+			i.number,
+			i.issue_key,
+			i.title,
+			i.description,
+			i.issue_type,
+			i.status,
+			i.priority,
+			i.reporter_id::text,
+			i.assignee_id::text,
+			i.due_date::text,
+			i.created_at,
+			i.updated_at
+		FROM issues i
+		JOIN projects p ON p.id = i.project_id
+		WHERE i.id = $1
+			AND p.workspace_id = $2
+			AND p.archived_at IS NULL
+		FOR UPDATE OF i
+	`, issueID, user.WorkspaceID))
+	if err != nil {
+		return issueResponse{}, err
+	}
+
+	var dueDate any
+	if input.DueDate != "" {
+		dueDate = input.DueDate
+	}
+
+	issue, err := scanIssue(tx.QueryRow(ctx, `
+		UPDATE issues i
+		SET title = $3,
+			description = $4,
+			issue_type = $5,
+			priority = $6,
+			due_date = $7::date,
+			updated_at = now()
+		FROM projects p
+		WHERE i.project_id = p.id
+			AND i.id = $1
+			AND p.workspace_id = $2
+			AND p.archived_at IS NULL
+		RETURNING
+			i.id::text,
+			i.project_id::text,
+			p.key,
+			i.number,
+			i.issue_key,
+			i.title,
+			i.description,
+			i.issue_type,
+			i.status,
+			i.priority,
+			i.reporter_id::text,
+			i.assignee_id::text,
+			i.due_date::text,
+			i.created_at,
+			i.updated_at
+	`, issueID, user.WorkspaceID, input.Title, input.Description, input.IssueType, input.Priority, dueDate))
+	if err != nil {
+		return issueResponse{}, err
+	}
+
+	changedFields := changedIssueFields(previous, issue)
+	if len(changedFields) > 0 {
+		if err := insertIssueActivity(ctx, tx, issue.ID, user.ID, "issue_updated", map[string]string{
+			"fields": strings.Join(changedFields, ","),
+		}); err != nil {
+			return issueResponse{}, err
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return issueResponse{}, err
+	}
+
+	return issue, nil
+}
+
 func (h *Handler) transitionIssueStatus(ctx context.Context, user auth.CurrentUser, issueID string, status string) (issueResponse, error) {
 	tx, err := h.db.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
@@ -988,6 +1138,42 @@ func normalizeTransitionIssue(req transitionIssueRequest) (string, error) {
 	return status, nil
 }
 
+func normalizeUpdateIssue(req updateIssueRequest) (normalizedUpdateIssue, error) {
+	input := normalizedUpdateIssue{
+		Title:       strings.TrimSpace(req.Title),
+		Description: strings.TrimSpace(req.Description),
+		IssueType:   strings.TrimSpace(req.IssueType),
+		Priority:    strings.TrimSpace(req.Priority),
+		DueDate:     strings.TrimSpace(req.DueDate),
+	}
+
+	if input.Title == "" {
+		return input, errors.New("title is required")
+	}
+	if len(input.Title) > 180 {
+		return input, errors.New("title must be 180 characters or fewer")
+	}
+	if input.IssueType == "" {
+		return input, errors.New("issue_type is required")
+	}
+	if !validIssueTypes[input.IssueType] {
+		return input, errors.New("issue_type is invalid")
+	}
+	if input.Priority == "" {
+		return input, errors.New("priority is required")
+	}
+	if !validIssuePriorities[input.Priority] {
+		return input, errors.New("priority is invalid")
+	}
+	if input.DueDate != "" {
+		if _, err := time.Parse(time.DateOnly, input.DueDate); err != nil {
+			return input, errors.New("due_date must be YYYY-MM-DD")
+		}
+	}
+
+	return input, nil
+}
+
 func normalizeIssueID(id string) (string, error) {
 	id = strings.ToLower(strings.TrimSpace(id))
 	if id == "" {
@@ -1088,6 +1274,28 @@ func stringOrEmpty(value *string) string {
 	}
 
 	return *value
+}
+
+func changedIssueFields(previous issueResponse, current issueResponse) []string {
+	fields := make([]string, 0, 5)
+
+	if previous.Title != current.Title {
+		fields = append(fields, "title")
+	}
+	if previous.Description != current.Description {
+		fields = append(fields, "description")
+	}
+	if previous.IssueType != current.IssueType {
+		fields = append(fields, "issue_type")
+	}
+	if previous.Priority != current.Priority {
+		fields = append(fields, "priority")
+	}
+	if stringOrEmpty(previous.DueDate) != stringOrEmpty(current.DueDate) {
+		fields = append(fields, "due_date")
+	}
+
+	return fields
 }
 
 type rowScanner interface {

@@ -127,6 +127,89 @@ func TestNormalizeTransitionIssueValidation(t *testing.T) {
 	}
 }
 
+func TestNormalizeUpdateIssue(t *testing.T) {
+	t.Parallel()
+
+	got, err := normalizeUpdateIssue(updateIssueRequest{
+		Title:       "  Updated issue  ",
+		Description: "  More context  ",
+		IssueType:   "bug",
+		Priority:    "high",
+		DueDate:     "2026-05-19",
+	})
+	if err != nil {
+		t.Fatalf("normalize update issue: %v", err)
+	}
+
+	if got.Title != "Updated issue" {
+		t.Fatalf("Title = %q, want %q", got.Title, "Updated issue")
+	}
+	if got.Description != "More context" {
+		t.Fatalf("Description = %q, want %q", got.Description, "More context")
+	}
+	if got.IssueType != "bug" {
+		t.Fatalf("IssueType = %q, want %q", got.IssueType, "bug")
+	}
+	if got.Priority != "high" {
+		t.Fatalf("Priority = %q, want %q", got.Priority, "high")
+	}
+	if got.DueDate != "2026-05-19" {
+		t.Fatalf("DueDate = %q, want %q", got.DueDate, "2026-05-19")
+	}
+}
+
+func TestNormalizeUpdateIssueValidation(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		req  updateIssueRequest
+	}{
+		{
+			name: "missing title",
+			req: updateIssueRequest{
+				IssueType: "task",
+				Priority:  "medium",
+			},
+		},
+		{
+			name: "bad type",
+			req: updateIssueRequest{
+				Title:     "Updated issue",
+				IssueType: "incident",
+				Priority:  "medium",
+			},
+		},
+		{
+			name: "missing priority",
+			req: updateIssueRequest{
+				Title:     "Updated issue",
+				IssueType: "task",
+			},
+		},
+		{
+			name: "bad date",
+			req: updateIssueRequest{
+				Title:     "Updated issue",
+				IssueType: "task",
+				Priority:  "medium",
+				DueDate:   "2026/05/19",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			if _, err := normalizeUpdateIssue(tt.req); err == nil {
+				t.Fatal("expected error")
+			}
+		})
+	}
+}
+
 func TestNormalizeIssueID(t *testing.T) {
 	t.Parallel()
 
@@ -273,5 +356,32 @@ func TestActivityPayloadJSON(t *testing.T) {
 	}
 	if !strings.Contains(got, `"to_status":"done"`) {
 		t.Fatalf("payload %q does not contain to_status", got)
+	}
+}
+
+func TestChangedIssueFields(t *testing.T) {
+	t.Parallel()
+
+	oldDueDate := "2026-05-19"
+	newDueDate := "2026-05-20"
+	previous := issueResponse{
+		Title:       "Old title",
+		Description: "Old description",
+		IssueType:   "task",
+		Priority:    "medium",
+		DueDate:     &oldDueDate,
+	}
+	current := issueResponse{
+		Title:       "New title",
+		Description: "Old description",
+		IssueType:   "bug",
+		Priority:    "high",
+		DueDate:     &newDueDate,
+	}
+
+	got := strings.Join(changedIssueFields(previous, current), ",")
+	want := "title,issue_type,priority,due_date"
+	if got != want {
+		t.Fatalf("changed fields = %q, want %q", got, want)
 	}
 }

@@ -110,6 +110,9 @@ a {
 .issue-form input:focus,
 .issue-form select:focus,
 .issue-form textarea:focus,
+.issue-edit-form input:focus,
+.issue-edit-form select:focus,
+.issue-edit-form textarea:focus,
 .issue-filters select:focus,
 .issue-card select:focus,
 .issue-detail-status select:focus,
@@ -121,6 +124,7 @@ a {
 .auth-form button,
 .project-form button,
 .issue-form button,
+.issue-edit-form button,
 .comment-form button,
 .ghost-button,
 .small-button {
@@ -157,10 +161,12 @@ a {
 }
 
 .issue-form button:hover:not(:disabled),
+.issue-edit-form button:hover:not(:disabled),
 .comment-form button:hover:not(:disabled) {
   background: #27362d;
 }
 
+.issue-edit-form button,
 .comment-form button {
   border: 1px solid #18231d;
   color: #ffffff;
@@ -854,6 +860,48 @@ h1 {
 .comments-header h3 {
   margin: 0;
   font-size: 18px;
+}
+
+.detail-actions,
+.form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.issue-edit-form {
+  display: grid;
+  gap: 12px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #edf0ed;
+}
+
+.issue-edit-form label {
+  display: grid;
+  gap: 8px;
+}
+
+.issue-edit-form label span {
+  color: #4e5c54;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.issue-edit-form input,
+.issue-edit-form select,
+.issue-edit-form textarea {
+  width: 100%;
+  min-height: 40px;
+  padding: 10px 12px;
+  border: 1px solid #c8d1cb;
+  border-radius: 8px;
+  color: #17211b;
+  background: #ffffff;
+  outline: none;
+}
+
+.issue-edit-form textarea {
+  resize: vertical;
 }
 
 .comment-list {
