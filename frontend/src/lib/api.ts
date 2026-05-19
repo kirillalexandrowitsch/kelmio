@@ -35,6 +35,12 @@ export type TeamMember = {
   joined_at: string;
 };
 
+export type Label = {
+  id: string;
+  name: string;
+  color: string;
+};
+
 export type IssueStatus = "backlog" | "todo" | "in_progress" | "blocked" | "done";
 export type IssuePriority = "low" | "medium" | "high" | "critical";
 export type IssueType = "task" | "bug" | "story";
@@ -53,6 +59,7 @@ export type Issue = {
   reporter_id: string;
   assignee_id: string | null;
   due_date: string | null;
+  labels: Label[];
   created_at: string;
   updated_at: string;
 };
@@ -75,6 +82,7 @@ export type IssueActivity = {
     | "issue_updated"
     | "status_changed"
     | "assignee_changed"
+    | "labels_changed"
     | "comment_added"
     | string;
   actor_id: string | null;
@@ -89,6 +97,10 @@ type ListProjectsResponse = {
 
 type ListTeamMembersResponse = {
   members: TeamMember[];
+};
+
+type ListLabelsResponse = {
+  labels: Label[];
 };
 
 type ListIssuesResponse = {
@@ -108,6 +120,7 @@ export type IssueFilters = {
   status?: IssueStatus;
   priority?: IssuePriority;
   assigneeId?: string;
+  labelId?: string;
 };
 
 type CreateProjectInput = {
@@ -125,6 +138,11 @@ type CreateIssueInput = {
   priority: IssuePriority;
   assignee_id: string;
   due_date: string;
+};
+
+type CreateLabelInput = {
+  name: string;
+  color: string;
 };
 
 export type UpdateIssueInput = {
@@ -180,6 +198,17 @@ export async function listTeamMembers() {
   return request<ListTeamMembersResponse>("/api/v1/team/members");
 }
 
+export async function listLabels() {
+  return request<ListLabelsResponse>("/api/v1/labels");
+}
+
+export async function createLabel(input: CreateLabelInput) {
+  return request<Label>("/api/v1/labels", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
 export async function listIssues(filters: IssueFilters = {}) {
   const params = new URLSearchParams();
   if (filters.projectId) {
@@ -193,6 +222,9 @@ export async function listIssues(filters: IssueFilters = {}) {
   }
   if (filters.assigneeId) {
     params.set("assignee_id", filters.assigneeId);
+  }
+  if (filters.labelId) {
+    params.set("label_id", filters.labelId);
   }
 
   const query = params.toString();
@@ -240,6 +272,13 @@ export async function assignIssue(issueId: string, assigneeId: string) {
   return request<Issue>(`/api/v1/issues/${encodeURIComponent(issueId)}/assign`, {
     method: "POST",
     body: JSON.stringify({ assignee_id: assigneeId }),
+  });
+}
+
+export async function setIssueLabels(issueId: string, labelIds: string[]) {
+  return request<Issue>(`/api/v1/issues/${encodeURIComponent(issueId)}/labels`, {
+    method: "PUT",
+    body: JSON.stringify({ label_ids: labelIds }),
   });
 }
 

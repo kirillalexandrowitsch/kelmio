@@ -14,6 +14,7 @@ import (
 	"team-task-tracker/backend/internal/config"
 	"team-task-tracker/backend/internal/database"
 	"team-task-tracker/backend/internal/issues"
+	"team-task-tracker/backend/internal/labels"
 	"team-task-tracker/backend/internal/projects"
 	"team-task-tracker/backend/internal/team"
 )
@@ -48,6 +49,9 @@ func main() {
 
 	issuesHandler := issues.NewHandler(db, authHandler)
 	issuesHandler.RegisterRoutes(mux)
+
+	labelsHandler := labels.NewHandler(db, authHandler)
+	labelsHandler.RegisterRoutes(mux)
 
 	teamHandler := team.NewHandler(db, authHandler)
 	teamHandler.RegisterRoutes(mux)

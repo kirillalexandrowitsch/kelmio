@@ -283,6 +283,36 @@ func TestNormalizeOptionalUserIDValidation(t *testing.T) {
 	}
 }
 
+func TestNormalizeIssueLabelIDs(t *testing.T) {
+	t.Parallel()
+
+	got, err := normalizeIssueLabelIDs([]string{
+		" 6D5257D4-002E-44DA-8925-D9108699C504 ",
+		"6d5257d4-002e-44da-8925-d9108699c504",
+		"",
+		"F2D59348-61A3-491A-9EB1-5AEC91FBDF1E",
+	})
+	if err != nil {
+		t.Fatalf("normalize issue label ids: %v", err)
+	}
+
+	want := strings.Join([]string{
+		"6d5257d4-002e-44da-8925-d9108699c504",
+		"f2d59348-61a3-491a-9eb1-5aec91fbdf1e",
+	}, ",")
+	if strings.Join(got, ",") != want {
+		t.Fatalf("label ids = %q, want %q", strings.Join(got, ","), want)
+	}
+}
+
+func TestNormalizeIssueLabelIDsValidation(t *testing.T) {
+	t.Parallel()
+
+	if _, err := normalizeIssueLabelIDs([]string{"not-a-uuid"}); err == nil {
+		t.Fatal("expected error")
+	}
+}
+
 func TestNormalizeCommentBody(t *testing.T) {
 	t.Parallel()
 

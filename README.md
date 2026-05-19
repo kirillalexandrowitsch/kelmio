@@ -62,6 +62,18 @@ curl -b /tmp/team-task-tracker.cookies \
   http://localhost:8080/api/v1/team/members
 ```
 
+Labels API smoke test:
+
+```sh
+curl -i -b /tmp/team-task-tracker.cookies \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"frontend","color":"#4e795d"}' \
+  http://localhost:8080/api/v1/labels
+
+curl -b /tmp/team-task-tracker.cookies \
+  http://localhost:8080/api/v1/labels
+```
+
 Projects API smoke test:
 
 ```sh
@@ -130,6 +142,17 @@ curl -i -X PATCH -b /tmp/team-task-tracker.cookies \
   -H 'Content-Type: application/json' \
   -d '{"title":"Create first task with details","description":"Updated from smoke test.","issue_type":"task","priority":"medium","due_date":"2026-05-31"}' \
   "http://localhost:8080/api/v1/issues/$ISSUE_ID"
+
+LABEL_ID="$(curl -s -b /tmp/team-task-tracker.cookies http://localhost:8080/api/v1/labels \
+  | node -e 'let data=""; process.stdin.on("data", c => data += c); process.stdin.on("end", () => console.log(JSON.parse(data).labels[0].id));')"
+
+curl -i -X PUT -b /tmp/team-task-tracker.cookies \
+  -H 'Content-Type: application/json' \
+  -d "{\"label_ids\":[\"$LABEL_ID\"]}" \
+  "http://localhost:8080/api/v1/issues/$ISSUE_ID/labels"
+
+curl -b /tmp/team-task-tracker.cookies \
+  "http://localhost:8080/api/v1/issues?label_id=$LABEL_ID"
 ```
 
 Для локального запуска frontend без Docker:

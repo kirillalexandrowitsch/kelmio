@@ -9,9 +9,11 @@ import {
   IssuePriority,
   IssueStatus,
   IssueType,
+  Label,
   Project,
   TeamMember,
   assignIssue,
+  createLabel,
   createIssue,
   createIssueComment,
   createProject,
@@ -20,10 +22,12 @@ import {
   listIssueActivity,
   listIssueComments,
   listIssues,
+  listLabels,
   listProjects,
   listTeamMembers,
   login,
   logout,
+  setIssueLabels,
   transitionIssue,
   updateIssue,
 } from "./lib/api";
@@ -55,6 +59,7 @@ function issueMatchesFilters(
   status: IssueStatus | "",
   priority: IssuePriority | "",
   assigneeId: string,
+  labelId: string,
 ) {
   if (projectId && issue.project_id !== projectId) {
     return false;
@@ -69,6 +74,9 @@ function issueMatchesFilters(
     return false;
   }
   if (assigneeId && assigneeId !== "unassigned" && issue.assignee_id !== assigneeId) {
+    return false;
+  }
+  if (labelId && !issue.labels.some((label) => label.id === labelId)) {
     return false;
   }
 
@@ -91,6 +99,9 @@ function activityTitle(activity: IssueActivity) {
   }
   if (activity.action === "assignee_changed") {
     return "Changed assignee";
+  }
+  if (activity.action === "labels_changed") {
+    return "Changed labels";
   }
   if (activity.action === "comment_added") {
     return "Added comment";
@@ -122,6 +133,9 @@ function activityDescription(activity: IssueActivity, members: TeamMember[]) {
       ? `Fields: ${activity.payload.fields.replaceAll(",", ", ")}`
       : "";
   }
+  if (activity.action === "labels_changed") {
+    return "Labels updated";
+  }
 
   return "";
 }
@@ -144,6 +158,10 @@ function memberDisplayName(members: TeamMember[], memberId: string | null) {
   }
 
   return members.find((member) => member.id === memberId)?.display_name ?? memberId;
+}
+
+function issueLabelIds(issue: Issue) {
+  return issue.labels.map((label) => label.id);
 }
 
 function formatDateTime(value: string) {
@@ -170,6 +188,12 @@ export function App() {
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [teamMembersError, setTeamMembersError] = useState("");
   const [isLoadingTeamMembers, setIsLoadingTeamMembers] = useState(false);
+  const [labels, setLabels] = useState<Label[]>([]);
+  const [labelsError, setLabelsError] = useState("");
+  const [isLoadingLabels, setIsLoadingLabels] = useState(false);
+  const [labelName, setLabelName] = useState("");
+  const [labelColor, setLabelColor] = useState("#4e795d");
+  const [isCreatingLabel, setIsCreatingLabel] = useState(false);
   const [projectKey, setProjectKey] = useState("");
   const [projectName, setProjectName] = useState("");
   const [projectDescription, setProjectDescription] = useState("");
@@ -192,8 +216,10 @@ export function App() {
     IssuePriority | ""
   >("");
   const [issueFilterAssigneeId, setIssueFilterAssigneeId] = useState("");
+  const [issueFilterLabelId, setIssueFilterLabelId] = useState("");
   const [transitioningIssueIds, setTransitioningIssueIds] = useState<string[]>([]);
   const [assigningIssueIds, setAssigningIssueIds] = useState<string[]>([]);
+  const [labelingIssueIds, setLabelingIssueIds] = useState<string[]>([]);
   const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null);
   const [selectedIssueError, setSelectedIssueError] = useState("");
   const [isLoadingSelectedIssue, setIsLoadingSelectedIssue] = useState(false);
@@ -317,6 +343,38 @@ export function App() {
 
   useEffect(() => {
     if (!user) {
+      setLabels([]);
+      return;
+    }
+
+    let isMounted = true;
+    setLabelsError("");
+    setIsLoadingLabels(true);
+
+    listLabels()
+      .then((response) => {
+        if (isMounted) {
+          setLabels(response.labels);
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setLabelsError("Could not load labels.");
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsLoadingLabels(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) {
       setIssues([]);
       return;
     }
@@ -331,6 +389,7 @@ export function App() {
       status: issueFilterStatus || undefined,
       priority: issueFilterPriority || undefined,
       assigneeId: issueFilterAssigneeId || undefined,
+      labelId: issueFilterLabelId || undefined,
     })
       .then((response) => {
         if (isMounted) {
@@ -357,6 +416,7 @@ export function App() {
     issueFilterStatus,
     issueFilterPriority,
     issueFilterAssigneeId,
+    issueFilterLabelId,
   ]);
 
   useEffect(() => {
@@ -450,18 +510,24 @@ export function App() {
     setUser(null);
     setProjects([]);
     setTeamMembers([]);
+    setLabels([]);
     setIssues([]);
     setProjectsError("");
     setProjectFormError("");
     setTeamMembersError("");
+    setLabelsError("");
+    setLabelName("");
+    setLabelColor("#4e795d");
     setIssuesError("");
     setIssueFormError("");
     setIssueFilterProjectId("");
     setIssueFilterStatus("");
     setIssueFilterPriority("");
     setIssueFilterAssigneeId("");
+    setIssueFilterLabelId("");
     setTransitioningIssueIds([]);
     setAssigningIssueIds([]);
+    setLabelingIssueIds([]);
     setSelectedIssue(null);
     setSelectedIssueError("");
     setIsEditingIssueDetails(false);
@@ -497,6 +563,34 @@ export function App() {
       }
     } finally {
       setIsCreatingProject(false);
+    }
+  }
+
+  async function handleCreateLabel(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setLabelsError("");
+    setIsCreatingLabel(true);
+
+    try {
+      const label = await createLabel({
+        name: labelName,
+        color: labelColor,
+      });
+      setLabels((currentLabels) =>
+        [...currentLabels, label].sort((left, right) =>
+          left.name.localeCompare(right.name),
+        ),
+      );
+      setLabelName("");
+      setLabelColor("#4e795d");
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setLabelsError(err.message);
+      } else {
+        setLabelsError("Could not create label.");
+      }
+    } finally {
+      setIsCreatingLabel(false);
     }
   }
 
@@ -547,6 +641,7 @@ export function App() {
             issueFilterStatus,
             issueFilterPriority,
             issueFilterAssigneeId,
+            issueFilterLabelId,
           )
         ) {
           return currentIssues.filter((issue) => issue.id !== updatedIssue.id);
@@ -586,6 +681,7 @@ export function App() {
             issueFilterStatus,
             issueFilterPriority,
             issueFilterAssigneeId,
+            issueFilterLabelId,
           )
         ) {
           return currentIssues.filter((issue) => issue.id !== updatedIssue.id);
@@ -626,6 +722,7 @@ export function App() {
             issueFilterStatus,
             issueFilterPriority,
             issueFilterAssigneeId,
+            issueFilterLabelId,
           )
         ) {
           return currentIssues.filter((issue) => issue.id !== updatedIssue.id);
@@ -646,6 +743,54 @@ export function App() {
     } finally {
       setAssigningIssueIds((currentIds) =>
         currentIds.filter((currentIssueId) => currentIssueId !== issueId),
+      );
+    }
+  }
+
+  async function handleSetIssueLabel(
+    issue: Issue,
+    labelId: string,
+    shouldAttach: boolean,
+  ) {
+    setSelectedIssueError("");
+    setLabelingIssueIds((currentIds) =>
+      currentIds.includes(issue.id) ? currentIds : [...currentIds, issue.id],
+    );
+
+    const currentLabelIds = issueLabelIds(issue);
+    const nextLabelIds = shouldAttach
+      ? Array.from(new Set([...currentLabelIds, labelId]))
+      : currentLabelIds.filter((currentLabelId) => currentLabelId !== labelId);
+
+    try {
+      const updatedIssue = await setIssueLabels(issue.id, nextLabelIds);
+      setIssues((currentIssues) => {
+        if (
+          !issueMatchesFilters(
+            updatedIssue,
+            issueFilterProjectId,
+            issueFilterStatus,
+            issueFilterPriority,
+            issueFilterAssigneeId,
+            issueFilterLabelId,
+          )
+        ) {
+          return currentIssues.filter((currentIssue) => currentIssue.id !== updatedIssue.id);
+        }
+
+        return currentIssues.map((currentIssue) =>
+          currentIssue.id === updatedIssue.id ? updatedIssue : currentIssue,
+        );
+      });
+      setSelectedIssue((currentIssue) =>
+        currentIssue?.id === updatedIssue.id ? updatedIssue : currentIssue,
+      );
+      await refreshIssueActivity(updatedIssue.id);
+    } catch {
+      setSelectedIssueError("Could not update labels.");
+    } finally {
+      setLabelingIssueIds((currentIds) =>
+        currentIds.filter((currentIssueId) => currentIssueId !== issue.id),
       );
     }
   }
@@ -694,6 +839,7 @@ export function App() {
           issueFilterStatus,
           issueFilterPriority,
           issueFilterAssigneeId,
+          issueFilterLabelId,
         )
       ) {
         setIssues((currentIssues) => [issue, ...currentIssues]);
@@ -748,7 +894,8 @@ export function App() {
     issueFilterProjectId !== "" ||
     issueFilterStatus !== "" ||
     issueFilterPriority !== "" ||
-    issueFilterAssigneeId !== "";
+    issueFilterAssigneeId !== "" ||
+    issueFilterLabelId !== "";
 
   if (isBooting) {
     return (
@@ -893,6 +1040,60 @@ export function App() {
           ) : (
             <div className="project-empty">No team members yet</div>
           )}
+        </section>
+
+        <section className="labels-panel" aria-label="Labels">
+          <header className="section-header">
+            <div>
+              <p className="eyebrow">Labels</p>
+              <h2>Workspace labels</h2>
+            </div>
+            {isLoadingLabels ? <span className="muted">Loading</span> : null}
+          </header>
+
+          {labelsError ? <p className="form-error">{labelsError}</p> : null}
+
+          {labels.length > 0 ? (
+            <div className="label-list">
+              {labels.map((label) => (
+                <span
+                  className="label-chip"
+                  key={label.id}
+                  style={{
+                    backgroundColor: `${label.color}1a`,
+                    borderColor: label.color,
+                  }}
+                >
+                  {label.name}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <div className="labels-empty">No labels yet</div>
+          )}
+
+          <form className="label-form" onSubmit={handleCreateLabel}>
+            <label>
+              <span>Name</span>
+              <input
+                maxLength={40}
+                onChange={(event) => setLabelName(event.target.value)}
+                placeholder="frontend"
+                value={labelName}
+              />
+            </label>
+            <label>
+              <span>Color</span>
+              <input
+                onChange={(event) => setLabelColor(event.target.value)}
+                type="color"
+                value={labelColor}
+              />
+            </label>
+            <button disabled={isCreatingLabel || labelName.trim() === ""} type="submit">
+              {isCreatingLabel ? "Creating..." : "Create label"}
+            </button>
+          </form>
         </section>
 
         <section className="projects-layout" aria-label="Projects">
@@ -1179,6 +1380,21 @@ export function App() {
                 </select>
               </label>
 
+              <label>
+                <span>Label</span>
+                <select
+                  onChange={(event) => setIssueFilterLabelId(event.target.value)}
+                  value={issueFilterLabelId}
+                >
+                  <option value="">All labels</option>
+                  {labels.map((label) => (
+                    <option key={label.id} value={label.id}>
+                      {label.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
               <button
                 className="small-button"
                 disabled={!hasIssueFilters}
@@ -1187,6 +1403,7 @@ export function App() {
                   setIssueFilterStatus("");
                   setIssueFilterPriority("");
                   setIssueFilterAssigneeId("");
+                  setIssueFilterLabelId("");
                 }}
                 type="button"
               >
@@ -1216,6 +1433,22 @@ export function App() {
                           ?.title ?? issue.status}{" "}
                         · {memberDisplayName(teamMembers, issue.assignee_id)}
                       </p>
+                      {issue.labels.length > 0 ? (
+                        <div className="issue-label-row">
+                          {issue.labels.map((label) => (
+                            <span
+                              className="label-chip label-chip-small"
+                              key={label.id}
+                              style={{
+                                backgroundColor: `${label.color}1a`,
+                                borderColor: label.color,
+                              }}
+                            >
+                              {label.name}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null}
                     </div>
                     <button
                       className="small-button"
@@ -1391,6 +1624,28 @@ export function App() {
                         {selectedIssue.description || "No description yet."}
                       </p>
                     </div>
+
+                    <div>
+                      <p className="eyebrow">Labels</p>
+                      {selectedIssue.labels.length > 0 ? (
+                        <div className="issue-label-row">
+                          {selectedIssue.labels.map((label) => (
+                            <span
+                              className="label-chip"
+                              key={label.id}
+                              style={{
+                                backgroundColor: `${label.color}1a`,
+                                borderColor: label.color,
+                              }}
+                            >
+                              {label.name}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="issue-detail-description">No labels yet.</p>
+                      )}
+                    </div>
                   </>
                 )}
 
@@ -1525,6 +1780,43 @@ export function App() {
                   </select>
                 </label>
 
+                <div className="issue-label-picker">
+                  <span>Labels</span>
+                  {labels.length > 0 ? (
+                    <div className="label-checkbox-list">
+                      {labels.map((label) => (
+                        <label className="label-checkbox" key={label.id}>
+                          <input
+                            checked={selectedIssue.labels.some(
+                              (issueLabel) => issueLabel.id === label.id,
+                            )}
+                            disabled={labelingIssueIds.includes(selectedIssue.id)}
+                            onChange={(event) => {
+                              void handleSetIssueLabel(
+                                selectedIssue,
+                                label.id,
+                                event.target.checked,
+                              );
+                            }}
+                            type="checkbox"
+                          />
+                          <span
+                            className="label-chip label-chip-small"
+                            style={{
+                              backgroundColor: `${label.color}1a`,
+                              borderColor: label.color,
+                            }}
+                          >
+                            {label.name}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  ) : (
+                    <strong>No labels created</strong>
+                  )}
+                </div>
+
                 <div className="metadata-grid">
                   <div>
                     <span>Project</span>
@@ -1573,6 +1865,22 @@ export function App() {
                       <h3>{issue.title}</h3>
                       {issue.due_date ? <p>Due {issue.due_date}</p> : null}
                       <p>Assignee: {memberDisplayName(teamMembers, issue.assignee_id)}</p>
+                      {issue.labels.length > 0 ? (
+                        <div className="issue-label-row">
+                          {issue.labels.map((label) => (
+                            <span
+                              className="label-chip label-chip-small"
+                              key={label.id}
+                              style={{
+                                backgroundColor: `${label.color}1a`,
+                                borderColor: label.color,
+                              }}
+                            >
+                              {label.name}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null}
                       <div className="issue-card-actions">
                         <button
                           className="small-button"

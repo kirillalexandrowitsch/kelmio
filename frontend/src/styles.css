@@ -107,6 +107,7 @@ a {
 .auth-form input:focus,
 .project-form input:focus,
 .project-form textarea:focus,
+.label-form input:focus,
 .issue-form input:focus,
 .issue-form select:focus,
 .issue-form textarea:focus,
@@ -123,6 +124,7 @@ a {
 
 .auth-form button,
 .project-form button,
+.label-form button,
 .issue-form button,
 .issue-edit-form button,
 .comment-form button,
@@ -151,6 +153,16 @@ a {
 }
 
 .project-form button:hover:not(:disabled) {
+  background: #27362d;
+}
+
+.label-form button {
+  border: 1px solid #18231d;
+  color: #ffffff;
+  background: #18231d;
+}
+
+.label-form button:hover:not(:disabled) {
   background: #27362d;
 }
 
@@ -362,6 +374,7 @@ h1 {
 .issues-panel,
 .issue-form,
 .team-panel,
+.labels-panel,
 .issue-detail-panel {
   border: 1px solid #d7ded8;
   border-radius: 8px;
@@ -409,6 +422,16 @@ h1 {
   align-content: start;
   gap: 14px;
   padding: 18px;
+}
+
+.labels-panel {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid #d7ded8;
+  border-radius: 8px;
+  background: #ffffff;
 }
 
 .section-header {
@@ -544,6 +567,7 @@ h1 {
 }
 
 .project-form label span,
+.label-form label span,
 .issue-form label span,
 .issue-filters label span {
   color: #4e5c54;
@@ -553,6 +577,7 @@ h1 {
 
 .project-form input,
 .project-form textarea,
+.label-form input,
 .issue-form input,
 .issue-form select,
 .issue-form textarea,
@@ -567,6 +592,7 @@ h1 {
 }
 
 .project-form input,
+.label-form input,
 .issue-form input,
 .issue-form select,
 .issue-filters select {
@@ -577,6 +603,49 @@ h1 {
 .issue-form textarea {
   min-height: 92px;
   resize: vertical;
+}
+
+.label-form {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) 88px auto;
+  align-items: end;
+  gap: 10px;
+}
+
+.label-form label {
+  display: grid;
+  gap: 8px;
+}
+
+.label-list,
+.issue-label-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.label-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 5px 9px;
+  border: 1px solid #c8d1cb;
+  border-radius: 999px;
+  color: #17211b;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.label-chip-small {
+  min-height: 22px;
+  padding: 4px 7px;
+  font-size: 11px;
+}
+
+.labels-empty {
+  color: #8a968d;
+  font-size: 14px;
 }
 
 .issue-form label {
@@ -592,7 +661,7 @@ h1 {
 
 .issue-filters {
   display: grid;
-  grid-template-columns: repeat(4, minmax(130px, 1fr)) auto;
+  grid-template-columns: repeat(5, minmax(130px, 1fr)) auto;
   align-items: end;
   gap: 10px;
   padding: 12px;
@@ -1033,6 +1102,7 @@ h1 {
 }
 
 .issue-detail-status span,
+.issue-label-picker > span,
 .metadata-grid span {
   color: #657268;
   font-size: 12px;
@@ -1049,6 +1119,33 @@ h1 {
   color: #17211b;
   background: #ffffff;
   outline: none;
+}
+
+.issue-label-picker {
+  display: grid;
+  gap: 8px;
+}
+
+.issue-label-picker > strong {
+  color: #8a968d;
+  font-size: 13px;
+}
+
+.label-checkbox-list {
+  display: grid;
+  gap: 8px;
+}
+
+.label-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.label-checkbox input {
+  width: 16px;
+  height: 16px;
+  accent-color: #4e795d;
 }
 
 .metadata-grid {

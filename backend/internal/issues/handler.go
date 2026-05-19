@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -72,26 +73,37 @@ type assignIssueRequest struct {
 	AssigneeID string `json:"assignee_id"`
 }
 
+type setIssueLabelsRequest struct {
+	LabelIDs []string `json:"label_ids"`
+}
+
 type createCommentRequest struct {
 	Body string `json:"body"`
 }
 
+type issueLabelResponse struct {
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	Color string `json:"color"`
+}
+
 type issueResponse struct {
-	ID          string    `json:"id"`
-	ProjectID   string    `json:"project_id"`
-	ProjectKey  string    `json:"project_key"`
-	Number      int       `json:"number"`
-	IssueKey    string    `json:"issue_key"`
-	Title       string    `json:"title"`
-	Description string    `json:"description"`
-	IssueType   string    `json:"issue_type"`
-	Status      string    `json:"status"`
-	Priority    string    `json:"priority"`
-	ReporterID  string    `json:"reporter_id"`
-	AssigneeID  *string   `json:"assignee_id"`
-	DueDate     *string   `json:"due_date"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID          string               `json:"id"`
+	ProjectID   string               `json:"project_id"`
+	ProjectKey  string               `json:"project_key"`
+	Number      int                  `json:"number"`
+	IssueKey    string               `json:"issue_key"`
+	Title       string               `json:"title"`
+	Description string               `json:"description"`
+	IssueType   string               `json:"issue_type"`
+	Status      string               `json:"status"`
+	Priority    string               `json:"priority"`
+	ReporterID  string               `json:"reporter_id"`
+	AssigneeID  *string              `json:"assignee_id"`
+	DueDate     *string              `json:"due_date"`
+	Labels      []issueLabelResponse `json:"labels"`
+	CreatedAt   time.Time            `json:"created_at"`
+	UpdatedAt   time.Time            `json:"updated_at"`
 }
 
 type listIssuesResponse struct {
@@ -159,6 +171,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("PATCH /api/v1/issues/{id}", h.update)
 	mux.HandleFunc("POST /api/v1/issues/{id}/transition", h.transition)
 	mux.HandleFunc("POST /api/v1/issues/{id}/assign", h.assign)
+	mux.HandleFunc("PUT /api/v1/issues/{id}/labels", h.setLabels)
 	mux.HandleFunc("GET /api/v1/issues/{id}/comments", h.listComments)
 	mux.HandleFunc("POST /api/v1/issues/{id}/comments", h.createComment)
 	mux.HandleFunc("GET /api/v1/issues/{id}/activity", h.listActivity)
@@ -377,6 +390,51 @@ func (h *Handler) assign(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, issue)
 }
 
+func (h *Handler) setLabels(w http.ResponseWriter, r *http.Request) {
+	user, ok := h.requireUser(w, r)
+	if !ok {
+		return
+	}
+
+	issueID, err := normalizeIssueID(r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	var req setIssueLabelsRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	labelIDs, err := normalizeIssueLabelIDs(req.LabelIDs)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	issue, err := h.setIssueLabels(ctx, user, issueID, labelIDs)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "issue_not_found", "issue was not found")
+			return
+		}
+		if errors.Is(err, errInvalidLabel) {
+			writeError(w, http.StatusBadRequest, "invalid_label", "label is not in this workspace")
+			return
+		}
+
+		writeError(w, http.StatusInternalServerError, "internal_error", "could not update issue labels")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, issue)
+}
+
 func (h *Handler) listComments(w http.ResponseWriter, r *http.Request) {
 	user, ok := h.requireUser(w, r)
 	if !ok {
@@ -500,6 +558,18 @@ func (h *Handler) listIssues(ctx context.Context, workspaceID string, query map[
 	} else {
 		addFilter("i.assignee_id", assigneeID)
 	}
+	labelID := strings.TrimSpace(firstQueryValue(query, "label_id"))
+	if labelID != "" {
+		args = append(args, labelID)
+		conditions = append(conditions, fmt.Sprintf(`
+			EXISTS (
+				SELECT 1
+				FROM issue_labels il_filter
+				WHERE il_filter.issue_id = i.id
+					AND il_filter.label_id = $%d
+			)
+		`, len(args)))
+	}
 
 	sql := fmt.Sprintf(`
 		SELECT
@@ -517,7 +587,23 @@ func (h *Handler) listIssues(ctx context.Context, workspaceID string, query map[
 			i.assignee_id::text,
 			i.due_date::text,
 			i.created_at,
-			i.updated_at
+			i.updated_at,
+			(
+				SELECT COALESCE(
+					jsonb_agg(
+						jsonb_build_object(
+							'id', l.id::text,
+							'name', l.name,
+							'color', l.color
+						)
+						ORDER BY l.name
+					),
+					'[]'::jsonb
+				)
+				FROM issue_labels il
+				JOIN labels l ON l.id = il.label_id
+				WHERE il.issue_id = i.id
+			)
 		FROM issues i
 		JOIN projects p ON p.id = i.project_id
 		WHERE %s
@@ -549,6 +635,7 @@ func (h *Handler) listIssues(ctx context.Context, workspaceID string, query map[
 }
 
 var errInvalidAssignee = errors.New("invalid assignee")
+var errInvalidLabel = errors.New("invalid label")
 
 func (h *Handler) getIssue(ctx context.Context, workspaceID string, issueID string) (issueResponse, error) {
 	return scanIssue(h.db.QueryRow(ctx, `
@@ -567,7 +654,23 @@ func (h *Handler) getIssue(ctx context.Context, workspaceID string, issueID stri
 			i.assignee_id::text,
 			i.due_date::text,
 			i.created_at,
-			i.updated_at
+			i.updated_at,
+			(
+				SELECT COALESCE(
+					jsonb_agg(
+						jsonb_build_object(
+							'id', l.id::text,
+							'name', l.name,
+							'color', l.color
+						)
+						ORDER BY l.name
+					),
+					'[]'::jsonb
+				)
+				FROM issue_labels il
+				JOIN labels l ON l.id = il.label_id
+				WHERE il.issue_id = i.id
+			)
 		FROM issues i
 		JOIN projects p ON p.id = i.project_id
 		WHERE i.id = $1
@@ -665,7 +768,8 @@ func (h *Handler) createIssue(ctx context.Context, user auth.CurrentUser, input 
 			assignee_id::text,
 			due_date::text,
 			created_at,
-			updated_at
+			updated_at,
+			'[]'::jsonb
 	`, input.ProjectID, nextNumber, issueKey, input.Title, input.Description, input.IssueType, input.Status, input.Priority, user.ID, assigneeID, dueDate, projectKey))
 	if err != nil {
 		return issueResponse{}, err
@@ -712,7 +816,23 @@ func (h *Handler) updateIssue(ctx context.Context, user auth.CurrentUser, issueI
 			i.assignee_id::text,
 			i.due_date::text,
 			i.created_at,
-			i.updated_at
+			i.updated_at,
+			(
+				SELECT COALESCE(
+					jsonb_agg(
+						jsonb_build_object(
+							'id', l.id::text,
+							'name', l.name,
+							'color', l.color
+						)
+						ORDER BY l.name
+					),
+					'[]'::jsonb
+				)
+				FROM issue_labels il
+				JOIN labels l ON l.id = il.label_id
+				WHERE il.issue_id = i.id
+			)
 		FROM issues i
 		JOIN projects p ON p.id = i.project_id
 		WHERE i.id = $1
@@ -757,7 +877,23 @@ func (h *Handler) updateIssue(ctx context.Context, user auth.CurrentUser, issueI
 			i.assignee_id::text,
 			i.due_date::text,
 			i.created_at,
-			i.updated_at
+			i.updated_at,
+			(
+				SELECT COALESCE(
+					jsonb_agg(
+						jsonb_build_object(
+							'id', l.id::text,
+							'name', l.name,
+							'color', l.color
+						)
+						ORDER BY l.name
+					),
+					'[]'::jsonb
+				)
+				FROM issue_labels il
+				JOIN labels l ON l.id = il.label_id
+				WHERE il.issue_id = i.id
+			)
 	`, issueID, user.WorkspaceID, input.Title, input.Description, input.IssueType, input.Priority, dueDate))
 	if err != nil {
 		return issueResponse{}, err
@@ -825,7 +961,23 @@ func (h *Handler) transitionIssueStatus(ctx context.Context, user auth.CurrentUs
 			i.assignee_id::text,
 			i.due_date::text,
 			i.created_at,
-			i.updated_at
+			i.updated_at,
+			(
+				SELECT COALESCE(
+					jsonb_agg(
+						jsonb_build_object(
+							'id', l.id::text,
+							'name', l.name,
+							'color', l.color
+						)
+						ORDER BY l.name
+					),
+					'[]'::jsonb
+				)
+				FROM issue_labels il
+				JOIN labels l ON l.id = il.label_id
+				WHERE il.issue_id = i.id
+			)
 	`, issueID, user.WorkspaceID, status))
 	if err != nil {
 		return issueResponse{}, err
@@ -916,7 +1068,23 @@ func (h *Handler) assignIssue(ctx context.Context, user auth.CurrentUser, issueI
 			i.assignee_id::text,
 			i.due_date::text,
 			i.created_at,
-			i.updated_at
+			i.updated_at,
+			(
+				SELECT COALESCE(
+					jsonb_agg(
+						jsonb_build_object(
+							'id', l.id::text,
+							'name', l.name,
+							'color', l.color
+						)
+						ORDER BY l.name
+					),
+					'[]'::jsonb
+				)
+				FROM issue_labels il
+				JOIN labels l ON l.id = il.label_id
+				WHERE il.issue_id = i.id
+			)
 	`, issueID, user.WorkspaceID, nextAssigneeID))
 	if err != nil {
 		return issueResponse{}, err
@@ -928,6 +1096,138 @@ func (h *Handler) assignIssue(ctx context.Context, user auth.CurrentUser, issueI
 		if err := insertIssueActivity(ctx, tx, issue.ID, user.ID, "assignee_changed", map[string]string{
 			"from_assignee_id": previous,
 			"to_assignee_id":   current,
+		}); err != nil {
+			return issueResponse{}, err
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return issueResponse{}, err
+	}
+
+	return issue, nil
+}
+
+func (h *Handler) setIssueLabels(ctx context.Context, user auth.CurrentUser, issueID string, labelIDs []string) (issueResponse, error) {
+	tx, err := h.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return issueResponse{}, err
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	var lockedIssueID string
+	if err := tx.QueryRow(ctx, `
+		SELECT i.id::text
+		FROM issues i
+		JOIN projects p ON p.id = i.project_id
+		WHERE i.id = $1
+			AND p.workspace_id = $2
+			AND p.archived_at IS NULL
+		FOR UPDATE OF i
+	`, issueID, user.WorkspaceID).Scan(&lockedIssueID); err != nil {
+		return issueResponse{}, err
+	}
+
+	previousLabelIDs, err := listIssueLabelIDs(ctx, tx, issueID)
+	if err != nil {
+		return issueResponse{}, err
+	}
+
+	for _, labelID := range labelIDs {
+		var exists bool
+		if err := tx.QueryRow(ctx, `
+			SELECT EXISTS (
+				SELECT 1
+				FROM labels
+				WHERE workspace_id = $1
+					AND id = $2
+			)
+		`, user.WorkspaceID, labelID).Scan(&exists); err != nil {
+			return issueResponse{}, err
+		}
+		if !exists {
+			return issueResponse{}, errInvalidLabel
+		}
+	}
+
+	if _, err := tx.Exec(ctx, `
+		DELETE FROM issue_labels
+		WHERE issue_id = $1
+	`, issueID); err != nil {
+		return issueResponse{}, err
+	}
+
+	for _, labelID := range labelIDs {
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO issue_labels (issue_id, label_id)
+			VALUES ($1, $2)
+		`, issueID, labelID); err != nil {
+			return issueResponse{}, err
+		}
+	}
+
+	previous := sortedStrings(previousLabelIDs)
+	current := sortedStrings(labelIDs)
+	labelsChanged := strings.Join(previous, ",") != strings.Join(current, ",")
+	if labelsChanged {
+		if _, err := tx.Exec(ctx, `
+			UPDATE issues
+			SET updated_at = now()
+			WHERE id = $1
+		`, issueID); err != nil {
+			return issueResponse{}, err
+		}
+	}
+
+	issue, err := scanIssue(tx.QueryRow(ctx, `
+		SELECT
+			i.id::text,
+			i.project_id::text,
+			p.key,
+			i.number,
+			i.issue_key,
+			i.title,
+			i.description,
+			i.issue_type,
+			i.status,
+			i.priority,
+			i.reporter_id::text,
+			i.assignee_id::text,
+			i.due_date::text,
+			i.created_at,
+			i.updated_at,
+			(
+				SELECT COALESCE(
+					jsonb_agg(
+						jsonb_build_object(
+							'id', l.id::text,
+							'name', l.name,
+							'color', l.color
+						)
+						ORDER BY l.name
+					),
+					'[]'::jsonb
+				)
+				FROM issue_labels il
+				JOIN labels l ON l.id = il.label_id
+				WHERE il.issue_id = i.id
+			)
+		FROM issues i
+		JOIN projects p ON p.id = i.project_id
+		WHERE i.id = $1
+			AND p.workspace_id = $2
+			AND p.archived_at IS NULL
+	`, issueID, user.WorkspaceID))
+	if err != nil {
+		return issueResponse{}, err
+	}
+
+	if labelsChanged {
+		if err := insertIssueActivity(ctx, tx, issue.ID, user.ID, "labels_changed", map[string]string{
+			"from_label_ids": strings.Join(previous, ","),
+			"to_label_ids":   strings.Join(current, ","),
 		}); err != nil {
 			return issueResponse{}, err
 		}
@@ -1204,6 +1504,32 @@ func normalizeOptionalUserID(id string) (string, error) {
 	return id, nil
 }
 
+func normalizeIssueLabelIDs(labelIDs []string) ([]string, error) {
+	if len(labelIDs) > 20 {
+		return nil, errors.New("label_ids must contain 20 labels or fewer")
+	}
+
+	normalized := make([]string, 0, len(labelIDs))
+	seen := make(map[string]bool, len(labelIDs))
+	for _, labelID := range labelIDs {
+		labelID = strings.ToLower(strings.TrimSpace(labelID))
+		if labelID == "" {
+			continue
+		}
+		if !uuidPattern.MatchString(labelID) {
+			return nil, errors.New("label_ids contains an invalid label id")
+		}
+		if seen[labelID] {
+			continue
+		}
+
+		seen[labelID] = true
+		normalized = append(normalized, labelID)
+	}
+
+	return normalized, nil
+}
+
 func normalizeCommentBody(body string) (string, error) {
 	body = strings.TrimSpace(body)
 	if body == "" {
@@ -1282,6 +1608,41 @@ func stringOrEmpty(value *string) string {
 	return *value
 }
 
+func sortedStrings(values []string) []string {
+	sorted := append([]string(nil), values...)
+	sort.Strings(sorted)
+	return sorted
+}
+
+func listIssueLabelIDs(ctx context.Context, tx pgx.Tx, issueID string) ([]string, error) {
+	rows, err := tx.Query(ctx, `
+		SELECT label_id::text
+		FROM issue_labels
+		WHERE issue_id = $1
+		ORDER BY label_id ASC
+	`, issueID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	labelIDs := make([]string, 0)
+	for rows.Next() {
+		var labelID string
+		if err := rows.Scan(&labelID); err != nil {
+			return nil, err
+		}
+
+		labelIDs = append(labelIDs, labelID)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return labelIDs, nil
+}
+
 func changedIssueFields(previous issueResponse, current issueResponse) []string {
 	fields := make([]string, 0, 5)
 
@@ -1312,6 +1673,7 @@ func scanIssue(row rowScanner) (issueResponse, error) {
 	var issue issueResponse
 	var assigneeID pgtype.Text
 	var dueDate pgtype.Text
+	var labelsJSON []byte
 
 	if err := row.Scan(
 		&issue.ID,
@@ -1329,14 +1691,36 @@ func scanIssue(row rowScanner) (issueResponse, error) {
 		&dueDate,
 		&issue.CreatedAt,
 		&issue.UpdatedAt,
+		&labelsJSON,
 	); err != nil {
 		return issueResponse{}, err
 	}
 
 	issue.AssigneeID = nullableText(assigneeID)
 	issue.DueDate = nullableText(dueDate)
+	labels, err := decodeIssueLabels(labelsJSON)
+	if err != nil {
+		return issueResponse{}, err
+	}
+	issue.Labels = labels
 
 	return issue, nil
+}
+
+func decodeIssueLabels(labelsJSON []byte) ([]issueLabelResponse, error) {
+	if len(labelsJSON) == 0 {
+		return []issueLabelResponse{}, nil
+	}
+
+	var labels []issueLabelResponse
+	if err := json.Unmarshal(labelsJSON, &labels); err != nil {
+		return nil, err
+	}
+	if labels == nil {
+		return []issueLabelResponse{}, nil
+	}
+
+	return labels, nil
 }
 
 func scanIssueComment(row rowScanner) (issueCommentResponse, error) {
