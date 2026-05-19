@@ -151,6 +151,7 @@ type CreateIssueInput = {
   priority: IssuePriority;
   assignee_id: string;
   due_date: string;
+  label_ids: string[];
 };
 
 type CreateLabelInput = {

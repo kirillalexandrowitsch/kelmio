@@ -11,6 +11,11 @@ func TestNormalizeCreateIssueDefaults(t *testing.T) {
 	got, err := normalizeCreateIssue(createIssueRequest{
 		ProjectID: " project-id ",
 		Title:     " First issue ",
+		LabelIDs: []string{
+			" 6D5257D4-002E-44DA-8925-D9108699C504 ",
+			"6d5257d4-002e-44da-8925-d9108699c504",
+			"F2D59348-61A3-491A-9EB1-5AEC91FBDF1E",
+		},
 	})
 	if err != nil {
 		t.Fatalf("normalize create issue: %v", err)
@@ -30,6 +35,13 @@ func TestNormalizeCreateIssueDefaults(t *testing.T) {
 	}
 	if got.Priority != "medium" {
 		t.Fatalf("Priority = %q, want %q", got.Priority, "medium")
+	}
+	wantLabelIDs := strings.Join([]string{
+		"6d5257d4-002e-44da-8925-d9108699c504",
+		"f2d59348-61a3-491a-9eb1-5aec91fbdf1e",
+	}, ",")
+	if strings.Join(got.LabelIDs, ",") != wantLabelIDs {
+		t.Fatalf("LabelIDs = %q, want %q", strings.Join(got.LabelIDs, ","), wantLabelIDs)
 	}
 }
 
@@ -66,6 +78,14 @@ func TestNormalizeCreateIssueValidation(t *testing.T) {
 				ProjectID: "project-id",
 				Title:     "First issue",
 				DueDate:   "2026/05/18",
+			},
+		},
+		{
+			name: "bad label id",
+			req: createIssueRequest{
+				ProjectID: "project-id",
+				Title:     "First issue",
+				LabelIDs:  []string{"not-a-uuid"},
 			},
 		},
 	}

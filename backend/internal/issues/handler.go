@@ -47,14 +47,15 @@ type Handler struct {
 }
 
 type createIssueRequest struct {
-	ProjectID   string `json:"project_id"`
-	Title       string `json:"title"`
-	Description string `json:"description"`
-	IssueType   string `json:"issue_type"`
-	Status      string `json:"status"`
-	Priority    string `json:"priority"`
-	AssigneeID  string `json:"assignee_id"`
-	DueDate     string `json:"due_date"`
+	ProjectID   string   `json:"project_id"`
+	Title       string   `json:"title"`
+	Description string   `json:"description"`
+	IssueType   string   `json:"issue_type"`
+	Status      string   `json:"status"`
+	Priority    string   `json:"priority"`
+	AssigneeID  string   `json:"assignee_id"`
+	DueDate     string   `json:"due_date"`
+	LabelIDs    []string `json:"label_ids"`
 }
 
 type updateIssueRequest struct {
@@ -147,6 +148,7 @@ type normalizedCreateIssue struct {
 	Priority    string
 	AssigneeID  string
 	DueDate     string
+	LabelIDs    []string
 }
 
 type normalizedUpdateIssue struct {
@@ -224,6 +226,10 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 		}
 		if errors.Is(err, errInvalidAssignee) {
 			writeError(w, http.StatusBadRequest, "invalid_assignee", "assignee is not a workspace member")
+			return
+		}
+		if errors.Is(err, errInvalidLabel) {
+			writeError(w, http.StatusBadRequest, "invalid_label", "label is not in this workspace")
 			return
 		}
 
@@ -718,6 +724,10 @@ func (h *Handler) createIssue(ctx context.Context, user auth.CurrentUser, input 
 		}
 	}
 
+	if err := verifyWorkspaceLabels(ctx, tx, user.WorkspaceID, input.LabelIDs); err != nil {
+		return issueResponse{}, err
+	}
+
 	var nextNumber int
 	if err := tx.QueryRow(ctx, `
 		SELECT COALESCE(MAX(number), 0) + 1
@@ -773,6 +783,22 @@ func (h *Handler) createIssue(ctx context.Context, user auth.CurrentUser, input 
 	`, input.ProjectID, nextNumber, issueKey, input.Title, input.Description, input.IssueType, input.Status, input.Priority, user.ID, assigneeID, dueDate, projectKey))
 	if err != nil {
 		return issueResponse{}, err
+	}
+
+	for _, labelID := range input.LabelIDs {
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO issue_labels (issue_id, label_id)
+			VALUES ($1, $2)
+		`, issue.ID, labelID); err != nil {
+			return issueResponse{}, err
+		}
+	}
+
+	if len(input.LabelIDs) > 0 {
+		issue, err = getIssueInTx(ctx, tx, user.WorkspaceID, issue.ID)
+		if err != nil {
+			return issueResponse{}, err
+		}
 	}
 
 	if err := insertIssueActivity(ctx, tx, issue.ID, user.ID, "issue_created", map[string]string{
@@ -1135,21 +1161,8 @@ func (h *Handler) setIssueLabels(ctx context.Context, user auth.CurrentUser, iss
 		return issueResponse{}, err
 	}
 
-	for _, labelID := range labelIDs {
-		var exists bool
-		if err := tx.QueryRow(ctx, `
-			SELECT EXISTS (
-				SELECT 1
-				FROM labels
-				WHERE workspace_id = $1
-					AND id = $2
-			)
-		`, user.WorkspaceID, labelID).Scan(&exists); err != nil {
-			return issueResponse{}, err
-		}
-		if !exists {
-			return issueResponse{}, errInvalidLabel
-		}
+	if err := verifyWorkspaceLabels(ctx, tx, user.WorkspaceID, labelIDs); err != nil {
+		return issueResponse{}, err
 	}
 
 	if _, err := tx.Exec(ctx, `
@@ -1394,6 +1407,11 @@ func (h *Handler) requireUser(w http.ResponseWriter, r *http.Request) (auth.Curr
 }
 
 func normalizeCreateIssue(req createIssueRequest) (normalizedCreateIssue, error) {
+	labelIDs, err := normalizeIssueLabelIDs(req.LabelIDs)
+	if err != nil {
+		return normalizedCreateIssue{}, err
+	}
+
 	input := normalizedCreateIssue{
 		ProjectID:   strings.TrimSpace(req.ProjectID),
 		Title:       strings.TrimSpace(req.Title),
@@ -1403,6 +1421,7 @@ func normalizeCreateIssue(req createIssueRequest) (normalizedCreateIssue, error)
 		Priority:    withDefault(strings.TrimSpace(req.Priority), "medium"),
 		AssigneeID:  strings.TrimSpace(req.AssigneeID),
 		DueDate:     strings.TrimSpace(req.DueDate),
+		LabelIDs:    labelIDs,
 	}
 
 	if input.ProjectID == "" {
@@ -1641,6 +1660,69 @@ func listIssueLabelIDs(ctx context.Context, tx pgx.Tx, issueID string) ([]string
 	}
 
 	return labelIDs, nil
+}
+
+func verifyWorkspaceLabels(ctx context.Context, tx pgx.Tx, workspaceID string, labelIDs []string) error {
+	for _, labelID := range labelIDs {
+		var exists bool
+		if err := tx.QueryRow(ctx, `
+			SELECT EXISTS (
+				SELECT 1
+				FROM labels
+				WHERE workspace_id = $1
+					AND id = $2
+			)
+		`, workspaceID, labelID).Scan(&exists); err != nil {
+			return err
+		}
+		if !exists {
+			return errInvalidLabel
+		}
+	}
+
+	return nil
+}
+
+func getIssueInTx(ctx context.Context, tx pgx.Tx, workspaceID string, issueID string) (issueResponse, error) {
+	return scanIssue(tx.QueryRow(ctx, `
+		SELECT
+			i.id::text,
+			i.project_id::text,
+			p.key,
+			i.number,
+			i.issue_key,
+			i.title,
+			i.description,
+			i.issue_type,
+			i.status,
+			i.priority,
+			i.reporter_id::text,
+			i.assignee_id::text,
+			i.due_date::text,
+			i.created_at,
+			i.updated_at,
+			(
+				SELECT COALESCE(
+					jsonb_agg(
+						jsonb_build_object(
+							'id', l.id::text,
+							'name', l.name,
+							'color', l.color
+						)
+						ORDER BY l.name
+					),
+					'[]'::jsonb
+				)
+				FROM issue_labels il
+				JOIN labels l ON l.id = il.label_id
+				WHERE il.issue_id = i.id
+			)
+		FROM issues i
+		JOIN projects p ON p.id = i.project_id
+		WHERE i.id = $1
+			AND p.workspace_id = $2
+			AND p.archived_at IS NULL
+	`, issueID, workspaceID))
 }
 
 func changedIssueFields(previous issueResponse, current issueResponse) []string {

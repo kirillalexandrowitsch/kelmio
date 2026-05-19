@@ -221,6 +221,7 @@ export function App() {
   const [issueStatus, setIssueStatus] = useState<IssueStatus>("todo");
   const [issueAssigneeId, setIssueAssigneeId] = useState("");
   const [issueDueDate, setIssueDueDate] = useState("");
+  const [newIssueLabelIds, setNewIssueLabelIds] = useState<string[]>([]);
   const [issueFilterProjectId, setIssueFilterProjectId] = useState("");
   const [issueFilterStatus, setIssueFilterStatus] = useState<IssueStatus | "">("");
   const [issueFilterPriority, setIssueFilterPriority] = useState<
@@ -544,6 +545,7 @@ export function App() {
     setIssueFilterPriority("");
     setIssueFilterAssigneeId("");
     setIssueFilterLabelId("");
+    setNewIssueLabelIds([]);
     setTransitioningIssueIds([]);
     setAssigningIssueIds([]);
     setLabelingIssueIds([]);
@@ -873,6 +875,14 @@ export function App() {
     }
   }
 
+  function handleCreateIssueLabel(labelId: string, shouldAttach: boolean) {
+    setNewIssueLabelIds((currentIds) =>
+      shouldAttach
+        ? Array.from(new Set([...currentIds, labelId]))
+        : currentIds.filter((currentId) => currentId !== labelId),
+    );
+  }
+
   async function handleSelectIssue(issueId: string) {
     const issuePreview = issues.find((issue) => issue.id === issueId);
     if (issuePreview) {
@@ -908,6 +918,7 @@ export function App() {
         priority: issuePriority,
         assignee_id: issueAssigneeId,
         due_date: issueDueDate,
+        label_ids: newIssueLabelIds,
       });
 
       if (
@@ -931,6 +942,7 @@ export function App() {
       setIssueStatus("todo");
       setIssueAssigneeId("");
       setIssueDueDate("");
+      setNewIssueLabelIds([]);
     } catch (err) {
       if (err instanceof ApiError) {
         setIssueFormError(err.message);
@@ -1430,6 +1442,36 @@ export function App() {
                 ))}
               </select>
             </label>
+
+            <div className="issue-label-picker">
+              <span>Labels</span>
+              {labels.length > 0 ? (
+                <div className="label-checkbox-list">
+                  {labels.map((label) => (
+                    <label className="label-checkbox" key={label.id}>
+                      <input
+                        checked={newIssueLabelIds.includes(label.id)}
+                        onChange={(event) =>
+                          handleCreateIssueLabel(label.id, event.target.checked)
+                        }
+                        type="checkbox"
+                      />
+                      <span
+                        className="label-chip label-chip-small"
+                        style={{
+                          backgroundColor: `${label.color}1a`,
+                          borderColor: label.color,
+                        }}
+                      >
+                        {label.name}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              ) : (
+                <strong>No labels created</strong>
+              )}
+            </div>
 
             <div className="field-grid">
               <label>
