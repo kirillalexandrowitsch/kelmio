@@ -355,6 +355,7 @@ h1 {
 .project-form,
 .issues-panel,
 .issue-form,
+.team-panel,
 .issue-detail-panel {
   border: 1px solid #d7ded8;
   border-radius: 8px;
@@ -397,6 +398,13 @@ h1 {
   padding: 18px;
 }
 
+.team-panel {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  padding: 18px;
+}
+
 .section-header {
   display: flex;
   align-items: flex-start;
@@ -419,6 +427,62 @@ h1 {
 .project-list {
   display: grid;
   gap: 8px;
+}
+
+.team-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 8px;
+}
+
+.team-member-row {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid #edf0ed;
+  border-radius: 8px;
+  background: #fbfcfb;
+}
+
+.member-avatar {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border-radius: 999px;
+  color: #18231d;
+  background: #cce8d4;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.team-member-row h3,
+.team-member-row p {
+  margin: 0;
+}
+
+.team-member-row h3 {
+  font-size: 14px;
+}
+
+.team-member-row p {
+  margin-top: 3px;
+  color: #657268;
+  font-size: 13px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.member-role {
+  padding: 6px 9px;
+  border: 1px solid #c8d1cb;
+  border-radius: 999px;
+  color: #4e5c54;
+  background: #ffffff;
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .project-row {
@@ -1030,7 +1094,8 @@ h1 {
   }
 
   .field-grid,
-  .issue-row {
+  .issue-row,
+  .team-member-row {
     grid-template-columns: 1fr;
   }
 }

@@ -10,6 +10,7 @@ import {
   IssueStatus,
   IssueType,
   Project,
+  TeamMember,
   createIssue,
   createIssueComment,
   createProject,
@@ -19,6 +20,7 @@ import {
   listIssueComments,
   listIssues,
   listProjects,
+  listTeamMembers,
   login,
   logout,
   transitionIssue,
@@ -98,6 +100,26 @@ function activityDescription(activity: IssueActivity) {
   return "";
 }
 
+function memberInitials(displayName: string) {
+  const initials = displayName
+    .trim()
+    .split(/\s+/)
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+
+  return initials || "TM";
+}
+
+function memberDisplayName(members: TeamMember[], memberId: string | null) {
+  if (!memberId) {
+    return "Unassigned";
+  }
+
+  return members.find((member) => member.id === memberId)?.display_name ?? memberId;
+}
+
 function formatDateTime(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
@@ -119,6 +141,9 @@ export function App() {
   const [projectFormError, setProjectFormError] = useState("");
   const [isLoadingProjects, setIsLoadingProjects] = useState(false);
   const [isCreatingProject, setIsCreatingProject] = useState(false);
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [teamMembersError, setTeamMembersError] = useState("");
+  const [isLoadingTeamMembers, setIsLoadingTeamMembers] = useState(false);
   const [projectKey, setProjectKey] = useState("");
   const [projectName, setProjectName] = useState("");
   const [projectDescription, setProjectDescription] = useState("");
@@ -133,6 +158,7 @@ export function App() {
   const [issueType, setIssueType] = useState<IssueType>("task");
   const [issuePriority, setIssuePriority] = useState<IssuePriority>("medium");
   const [issueStatus, setIssueStatus] = useState<IssueStatus>("todo");
+  const [issueAssigneeId, setIssueAssigneeId] = useState("");
   const [issueDueDate, setIssueDueDate] = useState("");
   const [issueFilterProjectId, setIssueFilterProjectId] = useState("");
   const [issueFilterStatus, setIssueFilterStatus] = useState<IssueStatus | "">("");
@@ -213,6 +239,38 @@ export function App() {
       .finally(() => {
         if (isMounted) {
           setIsLoadingProjects(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) {
+      setTeamMembers([]);
+      return;
+    }
+
+    let isMounted = true;
+    setTeamMembersError("");
+    setIsLoadingTeamMembers(true);
+
+    listTeamMembers()
+      .then((response) => {
+        if (isMounted) {
+          setTeamMembers(response.members);
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setTeamMembersError("Could not load team members.");
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsLoadingTeamMembers(false);
         }
       });
 
@@ -348,9 +406,11 @@ export function App() {
     await logout();
     setUser(null);
     setProjects([]);
+    setTeamMembers([]);
     setIssues([]);
     setProjectsError("");
     setProjectFormError("");
+    setTeamMembersError("");
     setIssuesError("");
     setIssueFormError("");
     setIssueFilterProjectId("");
@@ -475,6 +535,7 @@ export function App() {
         issue_type: issueType,
         status: issueStatus,
         priority: issuePriority,
+        assignee_id: issueAssigneeId,
         due_date: issueDueDate,
       });
 
@@ -494,6 +555,7 @@ export function App() {
       setIssueType("task");
       setIssuePriority("medium");
       setIssueStatus("todo");
+      setIssueAssigneeId("");
       setIssueDueDate("");
     } catch (err) {
       if (err instanceof ApiError) {
@@ -645,8 +707,41 @@ export function App() {
           </article>
           <article>
             <span>Team members</span>
-            <strong>1</strong>
+            <strong>{teamMembers.length}</strong>
           </article>
+        </section>
+
+        <section className="team-panel" aria-label="Team members">
+          <header className="section-header">
+            <div>
+              <p className="eyebrow">Team</p>
+              <h2>Workspace members</h2>
+            </div>
+            {isLoadingTeamMembers ? <span className="muted">Loading</span> : null}
+          </header>
+
+          {teamMembersError ? <p className="form-error">{teamMembersError}</p> : null}
+
+          {teamMembers.length > 0 ? (
+            <div className="team-list">
+              {teamMembers.map((member) => (
+                <article className="team-member-row" key={member.id}>
+                  <span className="member-avatar">
+                    {memberInitials(member.display_name)}
+                  </span>
+                  <div>
+                    <h3>{member.display_name}</h3>
+                    <p>
+                      @{member.username} · {member.email}
+                    </p>
+                  </div>
+                  <span className="member-role">{member.role}</span>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <div className="project-empty">No team members yet</div>
+          )}
         </section>
 
         <section className="projects-layout" aria-label="Projects">
@@ -772,6 +867,21 @@ export function App() {
                 rows={3}
                 value={issueDescription}
               />
+            </label>
+
+            <label>
+              <span>Assignee</span>
+              <select
+                onChange={(event) => setIssueAssigneeId(event.target.value)}
+                value={issueAssigneeId}
+              >
+                <option value="">Unassigned</option>
+                {teamMembers.map((member) => (
+                  <option key={member.id} value={member.id}>
+                    {member.display_name}
+                  </option>
+                ))}
+              </select>
             </label>
 
             <div className="field-grid">
@@ -1126,10 +1236,12 @@ export function App() {
                     <span>Project</span>
                     <strong>{selectedIssue.project_key}</strong>
                   </div>
-                  <div>
-                    <span>Assignee</span>
-                    <strong>{selectedIssue.assignee_id ?? "Unassigned"}</strong>
-                  </div>
+	                  <div>
+	                    <span>Assignee</span>
+	                    <strong>
+	                      {memberDisplayName(teamMembers, selectedIssue.assignee_id)}
+	                    </strong>
+	                  </div>
                   <div>
                     <span>Due date</span>
                     <strong>{selectedIssue.due_date ?? "No due date"}</strong>

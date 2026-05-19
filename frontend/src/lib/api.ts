@@ -25,6 +25,16 @@ export type Project = {
   archived_at: string | null;
 };
 
+export type TeamMember = {
+  id: string;
+  email: string;
+  username: string;
+  display_name: string;
+  role: "admin" | "member";
+  is_active: boolean;
+  joined_at: string;
+};
+
 export type IssueStatus = "backlog" | "todo" | "in_progress" | "blocked" | "done";
 export type IssuePriority = "low" | "medium" | "high" | "critical";
 export type IssueType = "task" | "bug" | "story";
@@ -71,6 +81,10 @@ type ListProjectsResponse = {
   projects: Project[];
 };
 
+type ListTeamMembersResponse = {
+  members: TeamMember[];
+};
+
 type ListIssuesResponse = {
   issues: Issue[];
 };
@@ -103,6 +117,7 @@ type CreateIssueInput = {
   issue_type: IssueType;
   status: IssueStatus;
   priority: IssuePriority;
+  assignee_id: string;
   due_date: string;
 };
 
@@ -145,6 +160,10 @@ export async function createProject(input: CreateProjectInput) {
     method: "POST",
     body: JSON.stringify(input),
   });
+}
+
+export async function listTeamMembers() {
+  return request<ListTeamMembersResponse>("/api/v1/team/members");
 }
 
 export async function listIssues(filters: IssueFilters = {}) {

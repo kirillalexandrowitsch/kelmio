@@ -55,6 +55,13 @@ curl -i -b /tmp/team-task-tracker.cookies \
   -X POST http://localhost:8080/api/v1/auth/logout
 ```
 
+Team API smoke test:
+
+```sh
+curl -b /tmp/team-task-tracker.cookies \
+  http://localhost:8080/api/v1/team/members
+```
+
 Projects API smoke test:
 
 ```sh
