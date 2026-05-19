@@ -4,6 +4,7 @@ import {
   ApiError,
   CurrentUser,
   Issue,
+  IssueActivity,
   IssueComment,
   IssuePriority,
   IssueStatus,
@@ -14,6 +15,7 @@ import {
   createProject,
   getIssue,
   getCurrentUser,
+  listIssueActivity,
   listIssueComments,
   listIssues,
   listProjects,
@@ -60,6 +62,40 @@ function issueMatchesFilters(
   }
 
   return true;
+}
+
+function statusLabel(status: string) {
+  return columns.find((column) => column.status === status)?.title ?? status;
+}
+
+function activityTitle(activity: IssueActivity) {
+  if (activity.action === "issue_created") {
+    return "Created issue";
+  }
+  if (activity.action === "status_changed") {
+    return "Changed status";
+  }
+  if (activity.action === "comment_added") {
+    return "Added comment";
+  }
+
+  return activity.action.replaceAll("_", " ");
+}
+
+function activityDescription(activity: IssueActivity) {
+  if (activity.action === "status_changed") {
+    return `${statusLabel(activity.payload.from_status)} -> ${statusLabel(
+      activity.payload.to_status,
+    )}`;
+  }
+  if (activity.action === "comment_added") {
+    return activity.payload.preview ? `"${activity.payload.preview}"` : "";
+  }
+  if (activity.action === "issue_created") {
+    return activity.payload.title ?? "";
+  }
+
+  return "";
 }
 
 function formatDateTime(value: string) {
@@ -112,6 +148,9 @@ export function App() {
   const [commentBody, setCommentBody] = useState("");
   const [isLoadingComments, setIsLoadingComments] = useState(false);
   const [isCreatingComment, setIsCreatingComment] = useState(false);
+  const [issueActivity, setIssueActivity] = useState<IssueActivity[]>([]);
+  const [activityError, setActivityError] = useState("");
+  const [isLoadingActivity, setIsLoadingActivity] = useState(false);
   const selectedIssueId = selectedIssue?.id ?? "";
 
   useEffect(() => {
@@ -253,6 +292,39 @@ export function App() {
     };
   }, [selectedIssueId]);
 
+  useEffect(() => {
+    if (!selectedIssueId) {
+      setIssueActivity([]);
+      setActivityError("");
+      return;
+    }
+
+    let isMounted = true;
+    setActivityError("");
+    setIsLoadingActivity(true);
+
+    listIssueActivity(selectedIssueId)
+      .then((response) => {
+        if (isMounted) {
+          setIssueActivity(response.activity);
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setActivityError("Could not load activity.");
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsLoadingActivity(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedIssueId]);
+
   async function handleLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
@@ -290,6 +362,8 @@ export function App() {
     setIssueComments([]);
     setCommentsError("");
     setCommentBody("");
+    setIssueActivity([]);
+    setActivityError("");
   }
 
   async function handleCreateProject(event: FormEvent<HTMLFormElement>) {
@@ -316,6 +390,17 @@ export function App() {
       }
     } finally {
       setIsCreatingProject(false);
+    }
+  }
+
+  async function refreshIssueActivity(issueId: string) {
+    setActivityError("");
+
+    try {
+      const response = await listIssueActivity(issueId);
+      setIssueActivity(response.activity);
+    } catch {
+      setActivityError("Could not load activity.");
     }
   }
 
@@ -346,6 +431,9 @@ export function App() {
       setSelectedIssue((currentIssue) =>
         currentIssue?.id === updatedIssue.id ? updatedIssue : currentIssue,
       );
+      if (selectedIssue?.id === updatedIssue.id) {
+        await refreshIssueActivity(updatedIssue.id);
+      }
     } catch {
       setIssuesError("Could not update issue status.");
     } finally {
@@ -431,6 +519,7 @@ export function App() {
       const comment = await createIssueComment(selectedIssue.id, commentBody);
       setIssueComments((currentComments) => [...currentComments, comment]);
       setCommentBody("");
+      await refreshIssueActivity(selectedIssue.id);
     } catch (err) {
       if (err instanceof ApiError) {
         setCommentsError(err.message);
@@ -967,9 +1056,49 @@ export function App() {
                     >
                       {isCreatingComment ? "Posting..." : "Post comment"}
                     </button>
-                  </form>
-                </section>
-              </div>
+	                  </form>
+	                </section>
+
+	                <section className="activity-section" aria-label="Issue activity">
+	                  <header className="comments-header">
+	                    <div>
+	                      <p className="eyebrow">Activity</p>
+	                      <h3>{issueActivity.length}</h3>
+	                    </div>
+	                    {isLoadingActivity ? (
+	                      <span className="muted">Loading activity</span>
+	                    ) : null}
+	                  </header>
+
+	                  {activityError ? (
+	                    <p className="form-error">{activityError}</p>
+	                  ) : null}
+
+	                  {issueActivity.length > 0 ? (
+	                    <div className="activity-list">
+	                      {issueActivity.map((activity) => (
+	                        <article className="activity-card" key={activity.id}>
+	                          <span className="activity-dot" aria-hidden="true" />
+	                          <div>
+	                            <header>
+	                              <strong>{activityTitle(activity)}</strong>
+	                              <span>{formatDateTime(activity.created_at)}</span>
+	                            </header>
+	                            <p>
+	                              {activity.actor_display_name ?? "System"}
+	                              {activityDescription(activity)
+	                                ? ` · ${activityDescription(activity)}`
+	                                : ""}
+	                            </p>
+	                          </div>
+	                        </article>
+	                      ))}
+	                    </div>
+	                  ) : (
+	                    <div className="comments-empty">No activity yet</div>
+	                  )}
+	                </section>
+	              </div>
 
               <aside className="issue-detail-sidebar">
                 <label className="issue-detail-status">

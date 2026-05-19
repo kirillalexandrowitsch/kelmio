@@ -773,6 +773,13 @@ h1 {
   border-top: 1px solid #edf0ed;
 }
 
+.activity-section {
+  display: grid;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid #edf0ed;
+}
+
 .comments-header {
   display: flex;
   align-items: flex-start;
@@ -831,6 +838,53 @@ h1 {
   border-radius: 8px;
   color: #8a968d;
   font-size: 14px;
+}
+
+.activity-list {
+  display: grid;
+  gap: 10px;
+}
+
+.activity-card {
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr);
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #edf0ed;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.activity-dot {
+  width: 10px;
+  height: 10px;
+  margin-top: 5px;
+  border: 2px solid #4e795d;
+  border-radius: 999px;
+  background: #cce8d4;
+}
+
+.activity-card header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.activity-card strong {
+  font-size: 13px;
+}
+
+.activity-card span {
+  color: #657268;
+  font-size: 12px;
+}
+
+.activity-card p {
+  margin: 4px 0 0;
+  color: #657268;
+  font-size: 13px;
+  line-height: 1.45;
 }
 
 .comment-form {

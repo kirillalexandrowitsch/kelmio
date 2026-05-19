@@ -100,6 +100,20 @@ type listCommentsResponse struct {
 	Comments []issueCommentResponse `json:"comments"`
 }
 
+type issueActivityResponse struct {
+	ID               string            `json:"id"`
+	IssueID          string            `json:"issue_id"`
+	Action           string            `json:"action"`
+	ActorID          *string           `json:"actor_id"`
+	ActorDisplayName *string           `json:"actor_display_name"`
+	Payload          map[string]string `json:"payload"`
+	CreatedAt        time.Time         `json:"created_at"`
+}
+
+type listActivityResponse struct {
+	Activity []issueActivityResponse `json:"activity"`
+}
+
 type normalizedCreateIssue struct {
 	ProjectID   string
 	Title       string
@@ -125,6 +139,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/issues/{id}/transition", h.transition)
 	mux.HandleFunc("GET /api/v1/issues/{id}/comments", h.listComments)
 	mux.HandleFunc("POST /api/v1/issues/{id}/comments", h.createComment)
+	mux.HandleFunc("GET /api/v1/issues/{id}/activity", h.listActivity)
 }
 
 func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
@@ -240,7 +255,7 @@ func (h *Handler) transition(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
-	issue, err := h.transitionIssueStatus(ctx, user.WorkspaceID, issueID, status)
+	issue, err := h.transitionIssueStatus(ctx, user, issueID, status)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			writeError(w, http.StatusNotFound, "issue_not_found", "issue was not found")
@@ -305,7 +320,7 @@ func (h *Handler) createComment(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
-	comment, err := h.createIssueComment(ctx, user.WorkspaceID, issueID, user.ID, body)
+	comment, err := h.createIssueComment(ctx, user, issueID, body)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			writeError(w, http.StatusNotFound, "issue_not_found", "issue was not found")
@@ -317,6 +332,40 @@ func (h *Handler) createComment(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusCreated, comment)
+}
+
+func (h *Handler) listActivity(w http.ResponseWriter, r *http.Request) {
+	user, ok := h.requireUser(w, r)
+	if !ok {
+		return
+	}
+
+	issueID, err := normalizeIssueID(r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	if _, err := h.getIssue(ctx, user.WorkspaceID, issueID); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "issue_not_found", "issue was not found")
+			return
+		}
+
+		writeError(w, http.StatusInternalServerError, "internal_error", "could not load issue")
+		return
+	}
+
+	activity, err := h.listIssueActivity(ctx, user.WorkspaceID, issueID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "internal_error", "could not list activity")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, listActivityResponse{Activity: activity})
 }
 
 func (h *Handler) listIssues(ctx context.Context, workspaceID string, query map[string][]string) ([]issueResponse, error) {
@@ -508,6 +557,15 @@ func (h *Handler) createIssue(ctx context.Context, user auth.CurrentUser, input 
 		return issueResponse{}, err
 	}
 
+	if err := insertIssueActivity(ctx, tx, issue.ID, user.ID, "issue_created", map[string]string{
+		"issue_key": issue.IssueKey,
+		"title":     issue.Title,
+		"status":    issue.Status,
+		"priority":  issue.Priority,
+	}); err != nil {
+		return issueResponse{}, err
+	}
+
 	if err := tx.Commit(ctx); err != nil {
 		return issueResponse{}, err
 	}
@@ -515,8 +573,29 @@ func (h *Handler) createIssue(ctx context.Context, user auth.CurrentUser, input 
 	return issue, nil
 }
 
-func (h *Handler) transitionIssueStatus(ctx context.Context, workspaceID string, issueID string, status string) (issueResponse, error) {
-	return scanIssue(h.db.QueryRow(ctx, `
+func (h *Handler) transitionIssueStatus(ctx context.Context, user auth.CurrentUser, issueID string, status string) (issueResponse, error) {
+	tx, err := h.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return issueResponse{}, err
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	var previousStatus string
+	if err := tx.QueryRow(ctx, `
+		SELECT i.status
+		FROM issues i
+		JOIN projects p ON p.id = i.project_id
+		WHERE i.id = $1
+			AND p.workspace_id = $2
+			AND p.archived_at IS NULL
+		FOR UPDATE OF i
+	`, issueID, user.WorkspaceID).Scan(&previousStatus); err != nil {
+		return issueResponse{}, err
+	}
+
+	issue, err := scanIssue(tx.QueryRow(ctx, `
 		UPDATE issues i
 		SET status = $3,
 			updated_at = now()
@@ -541,7 +620,25 @@ func (h *Handler) transitionIssueStatus(ctx context.Context, workspaceID string,
 			i.due_date::text,
 			i.created_at,
 			i.updated_at
-	`, issueID, workspaceID, status))
+	`, issueID, user.WorkspaceID, status))
+	if err != nil {
+		return issueResponse{}, err
+	}
+
+	if previousStatus != issue.Status {
+		if err := insertIssueActivity(ctx, tx, issue.ID, user.ID, "status_changed", map[string]string{
+			"from_status": previousStatus,
+			"to_status":   issue.Status,
+		}); err != nil {
+			return issueResponse{}, err
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return issueResponse{}, err
+	}
+
+	return issue, nil
 }
 
 func (h *Handler) listIssueComments(ctx context.Context, workspaceID string, issueID string) ([]issueCommentResponse, error) {
@@ -586,8 +683,16 @@ func (h *Handler) listIssueComments(ctx context.Context, workspaceID string, iss
 	return comments, nil
 }
 
-func (h *Handler) createIssueComment(ctx context.Context, workspaceID string, issueID string, authorID string, body string) (issueCommentResponse, error) {
-	return scanIssueComment(h.db.QueryRow(ctx, `
+func (h *Handler) createIssueComment(ctx context.Context, user auth.CurrentUser, issueID string, body string) (issueCommentResponse, error) {
+	tx, err := h.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return issueCommentResponse{}, err
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	comment, err := scanIssueComment(tx.QueryRow(ctx, `
 		WITH target_issue AS (
 			SELECT i.id
 			FROM issues i
@@ -612,7 +717,66 @@ func (h *Handler) createIssueComment(ctx context.Context, workspaceID string, is
 			inserted.updated_at
 		FROM inserted
 		JOIN users u ON u.id = inserted.author_id
-	`, issueID, workspaceID, authorID, body))
+	`, issueID, user.WorkspaceID, user.ID, body))
+	if err != nil {
+		return issueCommentResponse{}, err
+	}
+
+	if err := insertIssueActivity(ctx, tx, issueID, user.ID, "comment_added", map[string]string{
+		"comment_id": comment.ID,
+		"preview":    commentPreview(comment.Body),
+	}); err != nil {
+		return issueCommentResponse{}, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return issueCommentResponse{}, err
+	}
+
+	return comment, nil
+}
+
+func (h *Handler) listIssueActivity(ctx context.Context, workspaceID string, issueID string) ([]issueActivityResponse, error) {
+	rows, err := h.db.Query(ctx, `
+		SELECT
+			al.id::text,
+			al.entity_id::text,
+			al.action,
+			al.actor_id::text,
+			u.display_name,
+			al.payload::text,
+			al.created_at
+		FROM activity_log al
+		JOIN issues i ON i.id = al.entity_id
+		JOIN projects p ON p.id = i.project_id
+		LEFT JOIN users u ON u.id = al.actor_id
+		WHERE al.entity_type = 'issue'
+			AND al.entity_id = $1
+			AND p.workspace_id = $2
+			AND p.archived_at IS NULL
+		ORDER BY al.created_at DESC
+		LIMIT 100
+	`, issueID, workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	activity := make([]issueActivityResponse, 0)
+	for rows.Next() {
+		entry, err := scanIssueActivity(rows)
+		if err != nil {
+			return nil, err
+		}
+
+		activity = append(activity, entry)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return activity, nil
 }
 
 func (h *Handler) requireUser(w http.ResponseWriter, r *http.Request) (auth.CurrentUser, bool) {
@@ -705,6 +869,40 @@ func normalizeCommentBody(body string) (string, error) {
 	return body, nil
 }
 
+func commentPreview(body string) string {
+	const maxPreviewLength = 120
+	body = strings.TrimSpace(body)
+	runes := []rune(body)
+	if len(runes) <= maxPreviewLength {
+		return body
+	}
+
+	return string(runes[:maxPreviewLength])
+}
+
+func activityPayloadJSON(payload map[string]string) (string, error) {
+	encodedPayload, err := json.Marshal(payload)
+	if err != nil {
+		return "", err
+	}
+
+	return string(encodedPayload), nil
+}
+
+func insertIssueActivity(ctx context.Context, tx pgx.Tx, issueID string, actorID string, action string, payload map[string]string) error {
+	encodedPayload, err := activityPayloadJSON(payload)
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.Exec(ctx, `
+		INSERT INTO activity_log (entity_type, entity_id, action, actor_id, payload)
+		VALUES ('issue', $1, $2, $3, $4::jsonb)
+	`, issueID, action, actorID, encodedPayload)
+
+	return err
+}
+
 func withDefault(value string, fallback string) string {
 	if value == "" {
 		return fallback
@@ -771,6 +969,34 @@ func scanIssueComment(row rowScanner) (issueCommentResponse, error) {
 	}
 
 	return comment, nil
+}
+
+func scanIssueActivity(row rowScanner) (issueActivityResponse, error) {
+	var entry issueActivityResponse
+	var actorID pgtype.Text
+	var actorDisplayName pgtype.Text
+	var payloadText string
+
+	if err := row.Scan(
+		&entry.ID,
+		&entry.IssueID,
+		&entry.Action,
+		&actorID,
+		&actorDisplayName,
+		&payloadText,
+		&entry.CreatedAt,
+	); err != nil {
+		return issueActivityResponse{}, err
+	}
+
+	entry.ActorID = nullableText(actorID)
+	entry.ActorDisplayName = nullableText(actorDisplayName)
+	entry.Payload = map[string]string{}
+	if err := json.Unmarshal([]byte(payloadText), &entry.Payload); err != nil {
+		return issueActivityResponse{}, err
+	}
+
+	return entry, nil
 }
 
 func nullableText(value pgtype.Text) *string {

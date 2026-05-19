@@ -103,6 +103,9 @@ curl -i -b /tmp/team-task-tracker.cookies \
 curl -b /tmp/team-task-tracker.cookies \
   "http://localhost:8080/api/v1/issues/$ISSUE_ID/comments"
 
+curl -b /tmp/team-task-tracker.cookies \
+  "http://localhost:8080/api/v1/issues/$ISSUE_ID/activity"
+
 curl -i -b /tmp/team-task-tracker.cookies \
   -H 'Content-Type: application/json' \
   -d '{"status":"in_progress"}' \

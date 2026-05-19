@@ -212,3 +212,36 @@ func TestNormalizeCommentBodyValidation(t *testing.T) {
 		})
 	}
 }
+
+func TestCommentPreview(t *testing.T) {
+	t.Parallel()
+
+	shortBody := "  Short comment  "
+	if got := commentPreview(shortBody); got != "Short comment" {
+		t.Fatalf("short preview = %q, want %q", got, "Short comment")
+	}
+
+	longBody := strings.Repeat("x", 130)
+	if got := commentPreview(longBody); len(got) != 120 {
+		t.Fatalf("long preview length = %d, want %d", len(got), 120)
+	}
+}
+
+func TestActivityPayloadJSON(t *testing.T) {
+	t.Parallel()
+
+	got, err := activityPayloadJSON(map[string]string{
+		"from_status": "todo",
+		"to_status":   "done",
+	})
+	if err != nil {
+		t.Fatalf("activity payload json: %v", err)
+	}
+
+	if !strings.Contains(got, `"from_status":"todo"`) {
+		t.Fatalf("payload %q does not contain from_status", got)
+	}
+	if !strings.Contains(got, `"to_status":"done"`) {
+		t.Fatalf("payload %q does not contain to_status", got)
+	}
+}

@@ -57,6 +57,16 @@ export type IssueComment = {
   updated_at: string;
 };
 
+export type IssueActivity = {
+  id: string;
+  issue_id: string;
+  action: "issue_created" | "status_changed" | "comment_added" | string;
+  actor_id: string | null;
+  actor_display_name: string | null;
+  payload: Record<string, string>;
+  created_at: string;
+};
+
 type ListProjectsResponse = {
   projects: Project[];
 };
@@ -67,6 +77,10 @@ type ListIssuesResponse = {
 
 type ListIssueCommentsResponse = {
   comments: IssueComment[];
+};
+
+type ListIssueActivityResponse = {
+  activity: IssueActivity[];
 };
 
 export type IssueFilters = {
@@ -159,6 +173,12 @@ export async function getIssue(issueId: string) {
 export async function listIssueComments(issueId: string) {
   return request<ListIssueCommentsResponse>(
     `/api/v1/issues/${encodeURIComponent(issueId)}/comments`,
+  );
+}
+
+export async function listIssueActivity(issueId: string) {
+  return request<ListIssueActivityResponse>(
+    `/api/v1/issues/${encodeURIComponent(issueId)}/activity`,
   );
 }
 
