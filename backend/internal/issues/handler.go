@@ -60,6 +60,10 @@ type transitionIssueRequest struct {
 	Status string `json:"status"`
 }
 
+type assignIssueRequest struct {
+	AssigneeID string `json:"assignee_id"`
+}
+
 type createCommentRequest struct {
 	Body string `json:"body"`
 }
@@ -137,6 +141,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/issues", h.create)
 	mux.HandleFunc("GET /api/v1/issues/{id}", h.get)
 	mux.HandleFunc("POST /api/v1/issues/{id}/transition", h.transition)
+	mux.HandleFunc("POST /api/v1/issues/{id}/assign", h.assign)
 	mux.HandleFunc("GET /api/v1/issues/{id}/comments", h.listComments)
 	mux.HandleFunc("POST /api/v1/issues/{id}/comments", h.createComment)
 	mux.HandleFunc("GET /api/v1/issues/{id}/activity", h.listActivity)
@@ -263,6 +268,51 @@ func (h *Handler) transition(w http.ResponseWriter, r *http.Request) {
 		}
 
 		writeError(w, http.StatusInternalServerError, "internal_error", "could not update issue status")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, issue)
+}
+
+func (h *Handler) assign(w http.ResponseWriter, r *http.Request) {
+	user, ok := h.requireUser(w, r)
+	if !ok {
+		return
+	}
+
+	issueID, err := normalizeIssueID(r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	var req assignIssueRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	assigneeID, err := normalizeOptionalUserID(req.AssigneeID)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	issue, err := h.assignIssue(ctx, user, issueID, assigneeID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "issue_not_found", "issue was not found")
+			return
+		}
+		if errors.Is(err, errInvalidAssignee) {
+			writeError(w, http.StatusBadRequest, "invalid_assignee", "assignee is not a workspace member")
+			return
+		}
+
+		writeError(w, http.StatusInternalServerError, "internal_error", "could not assign issue")
 		return
 	}
 
@@ -641,6 +691,99 @@ func (h *Handler) transitionIssueStatus(ctx context.Context, user auth.CurrentUs
 	return issue, nil
 }
 
+func (h *Handler) assignIssue(ctx context.Context, user auth.CurrentUser, issueID string, assigneeID string) (issueResponse, error) {
+	tx, err := h.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return issueResponse{}, err
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	var previousAssigneeID pgtype.Text
+	if err := tx.QueryRow(ctx, `
+		SELECT i.assignee_id::text
+		FROM issues i
+		JOIN projects p ON p.id = i.project_id
+		WHERE i.id = $1
+			AND p.workspace_id = $2
+			AND p.archived_at IS NULL
+		FOR UPDATE OF i
+	`, issueID, user.WorkspaceID).Scan(&previousAssigneeID); err != nil {
+		return issueResponse{}, err
+	}
+
+	if assigneeID != "" {
+		var exists bool
+		if err := tx.QueryRow(ctx, `
+			SELECT EXISTS (
+				SELECT 1
+				FROM workspace_members
+				WHERE workspace_id = $1
+					AND user_id = $2
+			)
+		`, user.WorkspaceID, assigneeID).Scan(&exists); err != nil {
+			return issueResponse{}, err
+		}
+
+		if !exists {
+			return issueResponse{}, errInvalidAssignee
+		}
+	}
+
+	var nextAssigneeID any
+	if assigneeID != "" {
+		nextAssigneeID = assigneeID
+	}
+
+	issue, err := scanIssue(tx.QueryRow(ctx, `
+		UPDATE issues i
+		SET assignee_id = $3::uuid,
+			updated_at = now()
+		FROM projects p
+		WHERE i.project_id = p.id
+			AND i.id = $1
+			AND p.workspace_id = $2
+			AND p.archived_at IS NULL
+		RETURNING
+			i.id::text,
+			i.project_id::text,
+			p.key,
+			i.number,
+			i.issue_key,
+			i.title,
+			i.description,
+			i.issue_type,
+			i.status,
+			i.priority,
+			i.reporter_id::text,
+			i.assignee_id::text,
+			i.due_date::text,
+			i.created_at,
+			i.updated_at
+	`, issueID, user.WorkspaceID, nextAssigneeID))
+	if err != nil {
+		return issueResponse{}, err
+	}
+
+	previous := textOrEmpty(previousAssigneeID)
+	current := stringOrEmpty(issue.AssigneeID)
+	if previous != current {
+		if err := insertIssueActivity(ctx, tx, issue.ID, user.ID, "assignee_changed", map[string]string{
+			"from_assignee_id": previous,
+			"to_assignee_id":   current,
+		}); err != nil {
+			return issueResponse{}, err
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return issueResponse{}, err
+	}
+
+	return issue, nil
+}
+
 func (h *Handler) listIssueComments(ctx context.Context, workspaceID string, issueID string) ([]issueCommentResponse, error) {
 	rows, err := h.db.Query(ctx, `
 		SELECT
@@ -857,6 +1000,18 @@ func normalizeIssueID(id string) (string, error) {
 	return id, nil
 }
 
+func normalizeOptionalUserID(id string) (string, error) {
+	id = strings.ToLower(strings.TrimSpace(id))
+	if id == "" {
+		return "", nil
+	}
+	if !uuidPattern.MatchString(id) {
+		return "", errors.New("assignee_id is invalid")
+	}
+
+	return id, nil
+}
+
 func normalizeCommentBody(body string) (string, error) {
 	body = strings.TrimSpace(body)
 	if body == "" {
@@ -917,6 +1072,22 @@ func firstQueryValue(query map[string][]string, key string) string {
 	}
 
 	return values[0]
+}
+
+func textOrEmpty(value pgtype.Text) string {
+	if !value.Valid {
+		return ""
+	}
+
+	return value.String
+}
+
+func stringOrEmpty(value *string) string {
+	if value == nil {
+		return ""
+	}
+
+	return *value
 }
 
 type rowScanner interface {

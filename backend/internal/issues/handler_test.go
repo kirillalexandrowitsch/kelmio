@@ -170,6 +170,36 @@ func TestNormalizeIssueIDValidation(t *testing.T) {
 	}
 }
 
+func TestNormalizeOptionalUserID(t *testing.T) {
+	t.Parallel()
+
+	got, err := normalizeOptionalUserID(" F2D59348-61A3-491A-9EB1-5AEC91FBDF1E ")
+	if err != nil {
+		t.Fatalf("normalize optional user id: %v", err)
+	}
+
+	want := "f2d59348-61a3-491a-9eb1-5aec91fbdf1e"
+	if got != want {
+		t.Fatalf("user id = %q, want %q", got, want)
+	}
+
+	empty, err := normalizeOptionalUserID("   ")
+	if err != nil {
+		t.Fatalf("normalize empty optional user id: %v", err)
+	}
+	if empty != "" {
+		t.Fatalf("empty user id = %q, want empty string", empty)
+	}
+}
+
+func TestNormalizeOptionalUserIDValidation(t *testing.T) {
+	t.Parallel()
+
+	if _, err := normalizeOptionalUserID("not-a-uuid"); err == nil {
+		t.Fatal("expected error")
+	}
+}
+
 func TestNormalizeCommentBody(t *testing.T) {
 	t.Parallel()
 

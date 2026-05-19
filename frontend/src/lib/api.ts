@@ -70,7 +70,12 @@ export type IssueComment = {
 export type IssueActivity = {
   id: string;
   issue_id: string;
-  action: "issue_created" | "status_changed" | "comment_added" | string;
+  action:
+    | "issue_created"
+    | "status_changed"
+    | "assignee_changed"
+    | "comment_added"
+    | string;
   actor_id: string | null;
   actor_display_name: string | null;
   payload: Record<string, string>;
@@ -212,6 +217,13 @@ export async function transitionIssue(issueId: string, status: IssueStatus) {
   return request<Issue>(`/api/v1/issues/${encodeURIComponent(issueId)}/transition`, {
     method: "POST",
     body: JSON.stringify({ status }),
+  });
+}
+
+export async function assignIssue(issueId: string, assigneeId: string) {
+  return request<Issue>(`/api/v1/issues/${encodeURIComponent(issueId)}/assign`, {
+    method: "POST",
+    body: JSON.stringify({ assignee_id: assigneeId }),
   });
 }
 

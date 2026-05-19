@@ -11,6 +11,7 @@ import {
   IssueType,
   Project,
   TeamMember,
+  assignIssue,
   createIssue,
   createIssueComment,
   createProject,
@@ -77,6 +78,9 @@ function activityTitle(activity: IssueActivity) {
   if (activity.action === "status_changed") {
     return "Changed status";
   }
+  if (activity.action === "assignee_changed") {
+    return "Changed assignee";
+  }
   if (activity.action === "comment_added") {
     return "Added comment";
   }
@@ -84,11 +88,17 @@ function activityTitle(activity: IssueActivity) {
   return activity.action.replaceAll("_", " ");
 }
 
-function activityDescription(activity: IssueActivity) {
+function activityDescription(activity: IssueActivity, members: TeamMember[]) {
   if (activity.action === "status_changed") {
     return `${statusLabel(activity.payload.from_status)} -> ${statusLabel(
       activity.payload.to_status,
     )}`;
+  }
+  if (activity.action === "assignee_changed") {
+    return `${memberDisplayName(
+      members,
+      activity.payload.from_assignee_id || null,
+    )} -> ${memberDisplayName(members, activity.payload.to_assignee_id || null)}`;
   }
   if (activity.action === "comment_added") {
     return activity.payload.preview ? `"${activity.payload.preview}"` : "";
@@ -166,6 +176,7 @@ export function App() {
     IssuePriority | ""
   >("");
   const [transitioningIssueIds, setTransitioningIssueIds] = useState<string[]>([]);
+  const [assigningIssueIds, setAssigningIssueIds] = useState<string[]>([]);
   const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null);
   const [selectedIssueError, setSelectedIssueError] = useState("");
   const [isLoadingSelectedIssue, setIsLoadingSelectedIssue] = useState(false);
@@ -417,6 +428,7 @@ export function App() {
     setIssueFilterStatus("");
     setIssueFilterPriority("");
     setTransitioningIssueIds([]);
+    setAssigningIssueIds([]);
     setSelectedIssue(null);
     setSelectedIssueError("");
     setIssueComments([]);
@@ -498,6 +510,34 @@ export function App() {
       setIssuesError("Could not update issue status.");
     } finally {
       setTransitioningIssueIds((currentIds) =>
+        currentIds.filter((currentIssueId) => currentIssueId !== issueId),
+      );
+    }
+  }
+
+  async function handleAssignIssue(issueId: string, assigneeId: string) {
+    setSelectedIssueError("");
+    setAssigningIssueIds((currentIds) =>
+      currentIds.includes(issueId) ? currentIds : [...currentIds, issueId],
+    );
+
+    try {
+      const updatedIssue = await assignIssue(issueId, assigneeId);
+      setIssues((currentIssues) =>
+        currentIssues.map((issue) =>
+          issue.id === updatedIssue.id ? updatedIssue : issue,
+        ),
+      );
+      setSelectedIssue((currentIssue) =>
+        currentIssue?.id === updatedIssue.id ? updatedIssue : currentIssue,
+      );
+      if (selectedIssue?.id === updatedIssue.id) {
+        await refreshIssueActivity(updatedIssue.id);
+      }
+    } catch {
+      setSelectedIssueError("Could not update assignee.");
+    } finally {
+      setAssigningIssueIds((currentIds) =>
         currentIds.filter((currentIssueId) => currentIssueId !== issueId),
       );
     }
@@ -1196,9 +1236,9 @@ export function App() {
 	                            </header>
 	                            <p>
 	                              {activity.actor_display_name ?? "System"}
-	                              {activityDescription(activity)
-	                                ? ` · ${activityDescription(activity)}`
-	                                : ""}
+                              {activityDescription(activity, teamMembers)
+                                ? ` · ${activityDescription(activity, teamMembers)}`
+                                : ""}
 	                            </p>
 	                          </div>
 	                        </article>
@@ -1227,6 +1267,24 @@ export function App() {
                       <option key={column.status} value={column.status}>
                         {column.title}
                       </option>
+	                    ))}
+	                  </select>
+	                </label>
+
+                <label className="issue-detail-status">
+                  <span>Assignee</span>
+                  <select
+                    disabled={assigningIssueIds.includes(selectedIssue.id)}
+                    onChange={(event) => {
+                      void handleAssignIssue(selectedIssue.id, event.target.value);
+                    }}
+                    value={selectedIssue.assignee_id ?? ""}
+                  >
+                    <option value="">Unassigned</option>
+                    {teamMembers.map((member) => (
+                      <option key={member.id} value={member.id}>
+                        {member.display_name}
+                      </option>
                     ))}
                   </select>
                 </label>
@@ -1236,12 +1294,6 @@ export function App() {
                     <span>Project</span>
                     <strong>{selectedIssue.project_key}</strong>
                   </div>
-	                  <div>
-	                    <span>Assignee</span>
-	                    <strong>
-	                      {memberDisplayName(teamMembers, selectedIssue.assignee_id)}
-	                    </strong>
-	                  </div>
                   <div>
                     <span>Due date</span>
                     <strong>{selectedIssue.due_date ?? "No due date"}</strong>

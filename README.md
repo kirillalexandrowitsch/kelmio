@@ -117,6 +117,11 @@ curl -i -b /tmp/team-task-tracker.cookies \
   -H 'Content-Type: application/json' \
   -d '{"status":"in_progress"}' \
   "http://localhost:8080/api/v1/issues/$ISSUE_ID/transition"
+
+curl -i -b /tmp/team-task-tracker.cookies \
+  -H 'Content-Type: application/json' \
+  -d '{"assignee_id":"f2d59348-61a3-491a-9eb1-5aec91fbdf1e"}' \
+  "http://localhost:8080/api/v1/issues/$ISSUE_ID/assign"
 ```
 
 Для локального запуска frontend без Docker:
