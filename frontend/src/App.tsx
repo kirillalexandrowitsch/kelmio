@@ -21,6 +21,7 @@ import {
   createIssueComment,
   createProject,
   createTeamMember,
+  deleteLabel,
   getIssue,
   getCurrentUser,
   listIssueActivity,
@@ -240,6 +241,7 @@ export function App() {
   const [labelName, setLabelName] = useState("");
   const [labelColor, setLabelColor] = useState("#4e795d");
   const [isCreatingLabel, setIsCreatingLabel] = useState(false);
+  const [deletingLabelIds, setDeletingLabelIds] = useState<string[]>([]);
   const [projectKey, setProjectKey] = useState("");
   const [projectName, setProjectName] = useState("");
   const [projectDescription, setProjectDescription] = useState("");
@@ -591,6 +593,7 @@ export function App() {
     setLabelsError("");
     setLabelName("");
     setLabelColor("#4e795d");
+    setDeletingLabelIds([]);
     setIssuesError("");
     setIssueFormError("");
     setIssueFilterQuery("");
@@ -769,6 +772,52 @@ export function App() {
       }
     } finally {
       setIsCreatingLabel(false);
+    }
+  }
+
+  async function handleDeleteLabel(label: Label) {
+    setLabelsError("");
+    setDeletingLabelIds((currentIds) =>
+      currentIds.includes(label.id) ? currentIds : [...currentIds, label.id],
+    );
+
+    try {
+      await deleteLabel(label.id);
+      setLabels((currentLabels) =>
+        currentLabels.filter((currentLabel) => currentLabel.id !== label.id),
+      );
+      setIssueFilterLabelId((currentLabelId) =>
+        currentLabelId === label.id ? "" : currentLabelId,
+      );
+      setNewIssueLabelIds((currentLabelIds) =>
+        currentLabelIds.filter((currentLabelId) => currentLabelId !== label.id),
+      );
+      setIssues((currentIssues) =>
+        currentIssues.map((issue) => ({
+          ...issue,
+          labels: issue.labels.filter((issueLabel) => issueLabel.id !== label.id),
+        })),
+      );
+      setSelectedIssue((currentIssue) =>
+        currentIssue
+          ? {
+              ...currentIssue,
+              labels: currentIssue.labels.filter(
+                (issueLabel) => issueLabel.id !== label.id,
+              ),
+            }
+          : currentIssue,
+      );
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setLabelsError(err.message);
+      } else {
+        setLabelsError("Could not delete label.");
+      }
+    } finally {
+      setDeletingLabelIds((currentIds) =>
+        currentIds.filter((currentLabelId) => currentLabelId !== label.id),
+      );
     }
   }
 
@@ -1494,18 +1543,33 @@ export function App() {
 
           {labels.length > 0 ? (
             <div className="label-list">
-              {labels.map((label) => (
-                <span
-                  className="label-chip"
-                  key={label.id}
-                  style={{
-                    backgroundColor: `${label.color}1a`,
-                    borderColor: label.color,
-                  }}
-                >
-                  {label.name}
-                </span>
-              ))}
+              {labels.map((label) => {
+                const isDeletingLabel = deletingLabelIds.includes(label.id);
+
+                return (
+                  <div className="label-management-row" key={label.id}>
+                    <span
+                      className="label-chip"
+                      style={{
+                        backgroundColor: `${label.color}1a`,
+                        borderColor: label.color,
+                      }}
+                    >
+                      {label.name}
+                    </span>
+                    <button
+                      className="small-button danger-button"
+                      disabled={isDeletingLabel}
+                      onClick={() => {
+                        void handleDeleteLabel(label);
+                      }}
+                      type="button"
+                    >
+                      {isDeletingLabel ? "Deleting..." : "Delete"}
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           ) : (
             <div className="labels-empty">No labels yet</div>

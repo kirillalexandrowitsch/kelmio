@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -16,6 +17,7 @@ import (
 )
 
 var colorPattern = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
+var uuidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 
 type Handler struct {
 	db   *pgxpool.Pool
@@ -47,6 +49,7 @@ func NewHandler(db *pgxpool.Pool, authHandler *auth.Handler) *Handler {
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/labels", h.list)
 	mux.HandleFunc("POST /api/v1/labels", h.create)
+	mux.HandleFunc("DELETE /api/v1/labels/{id}", h.delete)
 }
 
 func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
@@ -130,6 +133,44 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, label)
 }
 
+func (h *Handler) delete(w http.ResponseWriter, r *http.Request) {
+	user, ok := h.requireUser(w, r)
+	if !ok {
+		return
+	}
+
+	labelID, err := normalizeLabelID(r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	if err := h.deleteLabel(ctx, user.WorkspaceID, labelID); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "label_not_found", "label was not found")
+			return
+		}
+
+		writeError(w, http.StatusInternalServerError, "internal_error", "could not delete label")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) deleteLabel(ctx context.Context, workspaceID string, labelID string) error {
+	var deletedLabelID string
+	return h.db.QueryRow(ctx, `
+		DELETE FROM labels
+		WHERE id = $1
+			AND workspace_id = $2
+		RETURNING id::text
+	`, labelID, workspaceID).Scan(&deletedLabelID)
+}
+
 func (h *Handler) requireUser(w http.ResponseWriter, r *http.Request) (auth.CurrentUser, bool) {
 	user, err := h.auth.CurrentUser(r)
 	if err != nil {
@@ -168,6 +209,18 @@ func normalizeCreateLabel(req createLabelRequest) (string, string, error) {
 func normalizeLabelName(name string) string {
 	parts := strings.Fields(strings.ToLower(strings.TrimSpace(name)))
 	return strings.Join(parts, "-")
+}
+
+func normalizeLabelID(id string) (string, error) {
+	id = strings.ToLower(strings.TrimSpace(id))
+	if id == "" {
+		return "", errors.New("label id is required")
+	}
+	if !uuidPattern.MatchString(id) {
+		return "", errors.New("label id is invalid")
+	}
+
+	return id, nil
 }
 
 func decodeJSON(w http.ResponseWriter, r *http.Request, dest any) error {

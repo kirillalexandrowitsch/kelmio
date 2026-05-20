@@ -250,6 +250,12 @@ export async function createLabel(input: CreateLabelInput) {
   });
 }
 
+export async function deleteLabel(labelId: string) {
+  await request<void>(`/api/v1/labels/${encodeURIComponent(labelId)}`, {
+    method: "DELETE",
+  });
+}
+
 export async function listIssues(filters: IssueFilters = {}) {
   const params = new URLSearchParams();
   if (filters.query) {

@@ -85,6 +85,15 @@ curl -i -b /tmp/team-task-tracker.cookies \
 
 curl -b /tmp/team-task-tracker.cookies \
   http://localhost:8080/api/v1/labels
+
+DELETE_LABEL_ID="$(curl -s -b /tmp/team-task-tracker.cookies \
+  -H 'Content-Type: application/json' \
+  -d "{\"name\":\"temp-label-$(date +%s)\",\"color\":\"#923c2d\"}" \
+  http://localhost:8080/api/v1/labels \
+  | node -e 'let data=""; process.stdin.on("data", c => data += c); process.stdin.on("end", () => console.log(JSON.parse(data).id));')"
+
+curl -i -X DELETE -b /tmp/team-task-tracker.cookies \
+  "http://localhost:8080/api/v1/labels/$DELETE_LABEL_ID"
 ```
 
 Projects API smoke test:

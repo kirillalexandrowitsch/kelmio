@@ -65,3 +65,39 @@ func TestNormalizeCreateLabelValidation(t *testing.T) {
 		})
 	}
 }
+
+func TestNormalizeLabelID(t *testing.T) {
+	t.Parallel()
+
+	got, err := normalizeLabelID(" 6D5257D4-002E-44DA-8925-D9108699C504 ")
+	if err != nil {
+		t.Fatalf("normalizeLabelID() error = %v", err)
+	}
+
+	want := "6d5257d4-002e-44da-8925-d9108699c504"
+	if got != want {
+		t.Fatalf("normalizeLabelID() = %q, want %q", got, want)
+	}
+}
+
+func TestNormalizeLabelIDValidation(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		id   string
+	}{
+		{name: "missing id", id: ""},
+		{name: "bad id", id: "not-a-uuid"},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			if _, err := normalizeLabelID(tt.id); err == nil {
+				t.Fatal("expected error")
+			}
+		})
+	}
+}
