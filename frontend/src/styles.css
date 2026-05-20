@@ -385,6 +385,45 @@ h1 {
   font-size: 28px;
 }
 
+.dashboard-actions {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.dashboard-action-card {
+  display: grid;
+  align-content: space-between;
+  gap: 18px;
+  min-height: 184px;
+  padding: 18px;
+  border: 1px solid #d7ded8;
+  border-radius: 8px;
+  background:
+    linear-gradient(150deg, rgba(204, 232, 212, 0.46), transparent 58%),
+    #ffffff;
+}
+
+.dashboard-action-card h2,
+.dashboard-action-card p {
+  margin: 0;
+}
+
+.dashboard-action-card h2 {
+  font-size: 18px;
+}
+
+.dashboard-action-card div > p:last-child {
+  margin-top: 8px;
+  color: #657268;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.dashboard-action-card .small-button {
+  width: max-content;
+}
+
 .projects-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 340px;
@@ -1288,6 +1327,7 @@ h1 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .dashboard-actions,
   .projects-layout,
   .issues-layout,
   .team-member-row,
@@ -1311,6 +1351,7 @@ h1 {
   .topbar,
   .topbar-actions,
   .summary-grid,
+  .dashboard-actions,
   .projects-layout,
   .issues-layout,
   .board,

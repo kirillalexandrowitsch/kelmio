@@ -1167,6 +1167,72 @@ export function App() {
         </section>
 
         <section
+          className="dashboard-actions"
+          aria-label="Dashboard quick actions"
+          hidden={activeSection !== "dashboard"}
+        >
+          <article className="dashboard-action-card">
+            <div>
+              <p className="eyebrow">Planning</p>
+              <h2>Projects</h2>
+              <p>Create or review project spaces before adding team work.</p>
+            </div>
+            <button
+              className="small-button"
+              onClick={() => setActiveSection("projects")}
+              type="button"
+            >
+              Open projects
+            </button>
+          </article>
+
+          <article className="dashboard-action-card">
+            <div>
+              <p className="eyebrow">Execution</p>
+              <h2>Issues</h2>
+              <p>Create tasks, inspect details, update status, comments, and labels.</p>
+            </div>
+            <button
+              className="small-button"
+              onClick={() => setActiveSection("issues")}
+              type="button"
+            >
+              Open issues
+            </button>
+          </article>
+
+          <article className="dashboard-action-card">
+            <div>
+              <p className="eyebrow">People</p>
+              <h2>Team</h2>
+              <p>Review workspace members and manage roles when you are an admin.</p>
+            </div>
+            <button
+              className="small-button"
+              onClick={() => setActiveSection("team")}
+              type="button"
+            >
+              Open team
+            </button>
+          </article>
+
+          <article className="dashboard-action-card">
+            <div>
+              <p className="eyebrow">Taxonomy</p>
+              <h2>Labels</h2>
+              <p>Keep issue categories clean so filtering and board scans stay useful.</p>
+            </div>
+            <button
+              className="small-button"
+              onClick={() => setActiveSection("labels")}
+              type="button"
+            >
+              Open labels
+            </button>
+          </article>
+        </section>
+
+        <section
           className="team-panel"
           aria-label="Team members"
           hidden={activeSection !== "team"}
