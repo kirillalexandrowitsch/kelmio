@@ -63,6 +63,16 @@ const issueSortLabels: Record<IssueSort, string> = {
   due_date_asc: "Due date soonest",
 };
 
+type AppSection = "dashboard" | "projects" | "issues" | "team" | "labels";
+
+const appSections = [
+  { id: "dashboard", title: "Dashboard" },
+  { id: "projects", title: "Projects" },
+  { id: "issues", title: "Issues" },
+  { id: "team", title: "Team" },
+  { id: "labels", title: "Labels" },
+] satisfies Array<{ id: AppSection; title: string }>;
+
 function issueMatchesFilters(
   issue: Issue,
   projectId: string,
@@ -200,6 +210,7 @@ export function App() {
   const [error, setError] = useState("");
   const [isBooting, setIsBooting] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [activeSection, setActiveSection] = useState<AppSection>("dashboard");
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectsError, setProjectsError] = useState("");
   const [projectFormError, setProjectFormError] = useState("");
@@ -545,6 +556,7 @@ export function App() {
   async function handleLogout() {
     await logout();
     setUser(null);
+    setActiveSection("dashboard");
     setProjects([]);
     setTeamMembers([]);
     setLabels([]);
@@ -914,6 +926,8 @@ export function App() {
   }
 
   async function handleSelectIssue(issueId: string) {
+    setActiveSection("issues");
+
     const issuePreview = issues.find((issue) => issue.id === issueId);
     if (issuePreview) {
       setSelectedIssue(issuePreview);
@@ -1023,6 +1037,14 @@ export function App() {
     : issueSort === "created_desc"
       ? "Showing latest issues across all projects"
       : `Showing issues sorted by ${issueSortLabels[issueSort].toLowerCase()}`;
+  const activeSectionTitle =
+    appSections.find((section) => section.id === activeSection)?.title ?? "Dashboard";
+  const activeSectionSubtitle =
+    activeSection === "dashboard" ? "Local workspace" : "Workspace section";
+  const activeSectionHeading =
+    activeSection === "dashboard"
+      ? `Good to see you, ${user?.display_name ?? "there"}`
+      : activeSectionTitle;
 
   if (isBooting) {
     return (
@@ -1098,20 +1120,24 @@ export function App() {
         </div>
 
         <nav className="nav-list" aria-label="Main navigation">
-          <a aria-current="page" href="/">
-            Dashboard
-          </a>
-          <a href="/">Projects</a>
-          <a href="/">Issues</a>
-          <a href="/">Team</a>
+          {appSections.map((section) => (
+            <button
+              aria-current={activeSection === section.id ? "page" : undefined}
+              key={section.id}
+              onClick={() => setActiveSection(section.id)}
+              type="button"
+            >
+              {section.title}
+            </button>
+          ))}
         </nav>
       </aside>
 
       <section className="workspace">
         <header className="topbar">
           <div>
-            <p className="eyebrow">Dashboard</p>
-            <h1>Good to see you, {user.display_name}</h1>
+            <p className="eyebrow">{activeSectionSubtitle}</p>
+            <h1>{activeSectionHeading}</h1>
           </div>
           <div className="topbar-actions">
             <div className="status-pill">{user.workspace.role}</div>
@@ -1121,7 +1147,11 @@ export function App() {
           </div>
         </header>
 
-        <section className="summary-grid" aria-label="Project summary">
+        <section
+          className="summary-grid"
+          aria-label="Project summary"
+          hidden={activeSection !== "dashboard"}
+        >
           <article>
             <span>Projects</span>
             <strong>{projects.length}</strong>
@@ -1136,7 +1166,11 @@ export function App() {
           </article>
         </section>
 
-        <section className="team-panel" aria-label="Team members">
+        <section
+          className="team-panel"
+          aria-label="Team members"
+          hidden={activeSection !== "team"}
+        >
           <header className="section-header">
             <div>
               <p className="eyebrow">Team</p>
@@ -1286,7 +1320,11 @@ export function App() {
           ) : null}
         </section>
 
-        <section className="labels-panel" aria-label="Labels">
+        <section
+          className="labels-panel"
+          aria-label="Labels"
+          hidden={activeSection !== "labels"}
+        >
           <header className="section-header">
             <div>
               <p className="eyebrow">Labels</p>
@@ -1340,7 +1378,11 @@ export function App() {
           </form>
         </section>
 
-        <section className="projects-layout" aria-label="Projects">
+        <section
+          className="projects-layout"
+          aria-label="Projects"
+          hidden={activeSection !== "projects"}
+        >
           <div className="projects-panel">
             <header className="section-header">
               <div>
@@ -1421,7 +1463,11 @@ export function App() {
           ) : null}
         </section>
 
-        <section className="issues-layout" aria-label="Issues">
+        <section
+          className="issues-layout"
+          aria-label="Issues"
+          hidden={activeSection !== "issues"}
+        >
           <form className="issue-form" onSubmit={handleCreateIssue}>
             <header className="section-header">
               <div>
@@ -1762,7 +1808,11 @@ export function App() {
           </div>
         </section>
 
-        <section className="issue-detail-panel" aria-label="Issue details">
+        <section
+          className="issue-detail-panel"
+          aria-label="Issue details"
+          hidden={activeSection !== "issues"}
+        >
           <header className="section-header">
             <div>
               <p className="eyebrow">Issue details</p>
@@ -2138,7 +2188,11 @@ export function App() {
           )}
         </section>
 
-        <section className="board" aria-label="Task board preview">
+        <section
+          className="board"
+          aria-label="Task board preview"
+          hidden={activeSection !== "dashboard"}
+        >
           {columns.map((column) => (
             <article className="board-column" key={column.title}>
               <header>
