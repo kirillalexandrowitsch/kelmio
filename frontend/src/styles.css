@@ -636,12 +636,18 @@ h1 {
 
 .project-row {
   display: grid;
-  grid-template-columns: 76px minmax(0, 1fr);
+  grid-template-columns: 76px minmax(0, 1fr) auto;
+  align-items: center;
   gap: 12px;
   padding: 12px;
   border: 1px solid #edf0ed;
   border-radius: 8px;
   background: #fbfcfb;
+}
+
+.project-row-actions {
+  display: flex;
+  justify-content: flex-end;
 }
 
 .project-key {

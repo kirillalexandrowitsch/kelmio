@@ -14,6 +14,7 @@ import {
   Project,
   TeamMember,
   archiveIssue,
+  archiveProject,
   assignIssue,
   createLabel,
   createIssue,
@@ -220,6 +221,7 @@ export function App() {
   const [projectFormError, setProjectFormError] = useState("");
   const [isLoadingProjects, setIsLoadingProjects] = useState(false);
   const [isCreatingProject, setIsCreatingProject] = useState(false);
+  const [archivingProjectIds, setArchivingProjectIds] = useState<string[]>([]);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [teamMembersError, setTeamMembersError] = useState("");
   const [teamMemberFormError, setTeamMemberFormError] = useState("");
@@ -327,6 +329,7 @@ export function App() {
     let isMounted = true;
     setProjectsError("");
     setProjectFormError("");
+    setArchivingProjectIds([]);
     setIsLoadingProjects(true);
 
     listProjects()
@@ -334,11 +337,20 @@ export function App() {
         if (isMounted) {
           setProjects(response.projects);
           setSelectedProjectId((currentProjectId) => {
-            if (currentProjectId) {
+            if (
+              currentProjectId &&
+              response.projects.some((project) => project.id === currentProjectId)
+            ) {
               return currentProjectId;
             }
             return response.projects[0]?.id ?? "";
           });
+          setIssueFilterProjectId((currentProjectId) =>
+            currentProjectId &&
+            !response.projects.some((project) => project.id === currentProjectId)
+              ? ""
+              : currentProjectId,
+          );
         }
       })
       .catch(() => {
@@ -628,6 +640,48 @@ export function App() {
       }
     } finally {
       setIsCreatingProject(false);
+    }
+  }
+
+  async function handleArchiveProject(project: Project) {
+    setProjectsError("");
+    setArchivingProjectIds((currentIds) =>
+      currentIds.includes(project.id) ? currentIds : [...currentIds, project.id],
+    );
+
+    try {
+      await archiveProject(project.id);
+      const nextProjects = projects.filter(
+        (currentProject) => currentProject.id !== project.id,
+      );
+
+      setProjects((currentProjects) =>
+        currentProjects.filter((currentProject) => currentProject.id !== project.id),
+      );
+      setSelectedProjectId((currentProjectId) =>
+        currentProjectId === project.id ? nextProjects[0]?.id ?? "" : currentProjectId,
+      );
+      setIssueFilterProjectId((currentProjectId) =>
+        currentProjectId === project.id ? "" : currentProjectId,
+      );
+      setIssues((currentIssues) =>
+        currentIssues.filter((issue) => issue.project_id !== project.id),
+      );
+      setSelectedIssue((currentIssue) =>
+        currentIssue?.project_id === project.id ? null : currentIssue,
+      );
+      if (selectedIssue?.project_id === project.id) {
+        setIssueComments([]);
+        setIssueActivity([]);
+        setCommentBody("");
+        setIsEditingIssueDetails(false);
+      }
+    } catch {
+      setProjectsError("Could not archive project.");
+    } finally {
+      setArchivingProjectIds((currentIds) =>
+        currentIds.filter((currentProjectId) => currentProjectId !== project.id),
+      );
     }
   }
 
@@ -1506,6 +1560,22 @@ export function App() {
                       <h3>{project.name}</h3>
                       <p>{project.description || "No description"}</p>
                     </div>
+                    {user.workspace.role === "admin" ? (
+                      <div className="project-row-actions">
+                        <button
+                          className="small-button danger-button"
+                          disabled={archivingProjectIds.includes(project.id)}
+                          onClick={() => {
+                            void handleArchiveProject(project);
+                          }}
+                          type="button"
+                        >
+                          {archivingProjectIds.includes(project.id)
+                            ? "Archiving"
+                            : "Archive"}
+                        </button>
+                      </div>
+                    ) : null}
                   </article>
                 ))}
               </div>

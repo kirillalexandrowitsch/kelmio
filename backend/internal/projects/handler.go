@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -16,6 +17,7 @@ import (
 )
 
 var projectKeyPattern = regexp.MustCompile(`^[A-Z][A-Z0-9]{1,9}$`)
+var uuidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 
 type Handler struct {
 	db   *pgxpool.Pool
@@ -52,6 +54,7 @@ func NewHandler(db *pgxpool.Pool, authHandler *auth.Handler) *Handler {
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/projects", h.list)
 	mux.HandleFunc("POST /api/v1/projects", h.create)
+	mux.HandleFunc("POST /api/v1/projects/{id}/archive", h.archive)
 }
 
 func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
@@ -74,6 +77,7 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 			archived_at
 		FROM projects
 		WHERE workspace_id = $1
+			AND archived_at IS NULL
 		ORDER BY created_at DESC
 	`, user.WorkspaceID)
 	if err != nil {
@@ -173,6 +177,51 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, project)
 }
 
+func (h *Handler) archive(w http.ResponseWriter, r *http.Request) {
+	user, ok := h.requireUser(w, r)
+	if !ok {
+		return
+	}
+
+	if user.Role != "admin" {
+		writeError(w, http.StatusForbidden, "forbidden", "admin role is required")
+		return
+	}
+
+	projectID, err := normalizeProjectID(r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	if err := h.archiveProject(ctx, user.WorkspaceID, projectID); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "project_not_found", "project was not found")
+			return
+		}
+
+		writeError(w, http.StatusInternalServerError, "internal_error", "could not archive project")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) archiveProject(ctx context.Context, workspaceID string, projectID string) error {
+	var archivedProjectID string
+	return h.db.QueryRow(ctx, `
+		UPDATE projects
+		SET archived_at = now()
+		WHERE id = $1
+			AND workspace_id = $2
+			AND archived_at IS NULL
+		RETURNING id::text
+	`, projectID, workspaceID).Scan(&archivedProjectID)
+}
+
 func (h *Handler) requireUser(w http.ResponseWriter, r *http.Request) (auth.CurrentUser, bool) {
 	user, err := h.auth.CurrentUser(r)
 	if err != nil {
@@ -190,6 +239,18 @@ func (h *Handler) requireUser(w http.ResponseWriter, r *http.Request) (auth.Curr
 
 func normalizeProjectKey(key string) string {
 	return strings.ToUpper(strings.TrimSpace(key))
+}
+
+func normalizeProjectID(id string) (string, error) {
+	id = strings.ToLower(strings.TrimSpace(id))
+	if id == "" {
+		return "", errors.New("project id is required")
+	}
+	if !uuidPattern.MatchString(id) {
+		return "", errors.New("project id is invalid")
+	}
+
+	return id, nil
 }
 
 func validateProjectInput(key string, name string) error {

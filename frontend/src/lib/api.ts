@@ -212,6 +212,12 @@ export async function createProject(input: CreateProjectInput) {
   });
 }
 
+export async function archiveProject(projectId: string) {
+  await request<void>(`/api/v1/projects/${encodeURIComponent(projectId)}/archive`, {
+    method: "POST",
+  });
+}
+
 export async function listTeamMembers() {
   return request<ListTeamMembersResponse>("/api/v1/team/members");
 }

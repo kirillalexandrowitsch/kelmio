@@ -102,6 +102,15 @@ curl -i -b /tmp/team-task-tracker.cookies \
 
 curl -b /tmp/team-task-tracker.cookies \
   http://localhost:8080/api/v1/projects
+
+ARCHIVE_PROJECT_ID="$(curl -s -b /tmp/team-task-tracker.cookies \
+  -H 'Content-Type: application/json' \
+  -d "{\"key\":\"TMP$(date +%s | tail -c 5)\",\"name\":\"Temporary Project\",\"description\":\"Archive smoke project\"}" \
+  http://localhost:8080/api/v1/projects \
+  | node -e 'let data=""; process.stdin.on("data", c => data += c); process.stdin.on("end", () => console.log(JSON.parse(data).id));')"
+
+curl -i -X POST -b /tmp/team-task-tracker.cookies \
+  "http://localhost:8080/api/v1/projects/$ARCHIVE_PROJECT_ID/archive"
 ```
 
 Issues API smoke test:
