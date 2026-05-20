@@ -122,6 +122,9 @@ curl -b /tmp/team-task-tracker.cookies \
   "http://localhost:8080/api/v1/issues?q=first"
 
 curl -b /tmp/team-task-tracker.cookies \
+  "http://localhost:8080/api/v1/issues?sort=priority_desc"
+
+curl -b /tmp/team-task-tracker.cookies \
   "http://localhost:8080/api/v1/issues?project_id=$PROJECT_ID&status=todo&priority=high"
 
 curl -b /tmp/team-task-tracker.cookies \

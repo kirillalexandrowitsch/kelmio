@@ -343,6 +343,53 @@ func TestIssueSearchPatternEscapesWildcards(t *testing.T) {
 	}
 }
 
+func TestIssueListOrderClause(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		sortValue string
+		want      string
+	}{
+		{
+			name:      "default",
+			sortValue: "",
+			want:      "i.created_at DESC, i.id DESC",
+		},
+		{
+			name:      "created asc",
+			sortValue: "created_asc",
+			want:      "i.created_at ASC, i.id ASC",
+		},
+		{
+			name:      "priority desc",
+			sortValue: "priority_desc",
+			want:      "CASE i.priority WHEN 'critical' THEN 4 WHEN 'high' THEN 3 WHEN 'medium' THEN 2 WHEN 'low' THEN 1 ELSE 0 END DESC, i.created_at DESC",
+		},
+		{
+			name:      "due date asc",
+			sortValue: "due_date_asc",
+			want:      "i.due_date ASC NULLS LAST, i.created_at DESC",
+		},
+		{
+			name:      "invalid fallback",
+			sortValue: "created_at; drop table issues;",
+			want:      "i.created_at DESC, i.id DESC",
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := issueListOrderClause(tt.sortValue); got != tt.want {
+				t.Fatalf("order clause = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestNormalizeCommentBody(t *testing.T) {
 	t.Parallel()
 

@@ -748,7 +748,7 @@ h1 {
 
 .issue-filters {
   display: grid;
-  grid-template-columns: minmax(180px, 1.4fr) repeat(5, minmax(130px, 1fr)) auto;
+  grid-template-columns: minmax(180px, 1.4fr) repeat(6, minmax(130px, 1fr)) auto;
   align-items: end;
   gap: 10px;
   padding: 12px;

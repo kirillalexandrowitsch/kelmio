@@ -7,6 +7,7 @@ import {
   IssueActivity,
   IssueComment,
   IssuePriority,
+  IssueSort,
   IssueStatus,
   IssueType,
   Label,
@@ -53,6 +54,13 @@ const issueTypeLabels: Record<IssueType, string> = {
   task: "Task",
   bug: "Bug",
   story: "Story",
+};
+
+const issueSortLabels: Record<IssueSort, string> = {
+  created_desc: "Newest first",
+  created_asc: "Oldest first",
+  priority_desc: "Priority high to low",
+  due_date_asc: "Due date soonest",
 };
 
 function issueMatchesFilters(
@@ -233,6 +241,7 @@ export function App() {
   const [issueDueDate, setIssueDueDate] = useState("");
   const [newIssueLabelIds, setNewIssueLabelIds] = useState<string[]>([]);
   const [issueFilterQuery, setIssueFilterQuery] = useState("");
+  const [issueSort, setIssueSort] = useState<IssueSort>("created_desc");
   const [issueFilterProjectId, setIssueFilterProjectId] = useState("");
   const [issueFilterStatus, setIssueFilterStatus] = useState<IssueStatus | "">("");
   const [issueFilterPriority, setIssueFilterPriority] = useState<
@@ -410,6 +419,7 @@ export function App() {
 
     listIssues({
       query: issueFilterQuery || undefined,
+      sort: issueSort,
       projectId: issueFilterProjectId || undefined,
       status: issueFilterStatus || undefined,
       priority: issueFilterPriority || undefined,
@@ -438,6 +448,7 @@ export function App() {
   }, [
     user,
     issueFilterQuery,
+    issueSort,
     issueFilterProjectId,
     issueFilterStatus,
     issueFilterPriority,
@@ -554,6 +565,7 @@ export function App() {
     setIssuesError("");
     setIssueFormError("");
     setIssueFilterQuery("");
+    setIssueSort("created_desc");
     setIssueFilterProjectId("");
     setIssueFilterStatus("");
     setIssueFilterPriority("");
@@ -1006,6 +1018,11 @@ export function App() {
     issueFilterAssigneeId !== "" ||
     issueFilterLabelId !== "" ||
     issueFilterQuery.trim() !== "";
+  const issueListSummary = hasIssueFilters
+    ? `${issues.length} issues match current filters`
+    : issueSort === "created_desc"
+      ? "Showing latest issues across all projects"
+      : `Showing issues sorted by ${issueSortLabels[issueSort].toLowerCase()}`;
 
   if (isBooting) {
     return (
@@ -1582,6 +1599,20 @@ export function App() {
               </label>
 
               <label>
+                <span>Sort</span>
+                <select
+                  onChange={(event) => setIssueSort(event.target.value as IssueSort)}
+                  value={issueSort}
+                >
+                  {Object.entries(issueSortLabels).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label>
                 <span>Project</span>
                 <select
                   onChange={(event) => setIssueFilterProjectId(event.target.value)}
@@ -1678,11 +1709,7 @@ export function App() {
               </button>
             </section>
 
-            <p className="filter-summary">
-              {hasIssueFilters
-                ? `${issues.length} issues match current filters`
-                : "Showing latest issues across all projects"}
-            </p>
+            <p className="filter-summary">{issueListSummary}</p>
 
             {issuesError ? <p className="form-error">{issuesError}</p> : null}
 

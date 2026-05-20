@@ -588,6 +588,7 @@ func (h *Handler) listIssues(ctx context.Context, workspaceID string, query map[
 		`, len(args), len(args), len(args)))
 	}
 
+	orderClause := issueListOrderClause(firstQueryValue(query, "sort"))
 	sql := fmt.Sprintf(`
 		SELECT
 			i.id::text,
@@ -624,9 +625,9 @@ func (h *Handler) listIssues(ctx context.Context, workspaceID string, query map[
 		FROM issues i
 		JOIN projects p ON p.id = i.project_id
 		WHERE %s
-		ORDER BY i.created_at DESC
+		ORDER BY %s
 		LIMIT 100
-	`, strings.Join(conditions, " AND "))
+	`, strings.Join(conditions, " AND "), orderClause)
 
 	rows, err := h.db.Query(ctx, sql, args...)
 	if err != nil {
@@ -1630,6 +1631,19 @@ func issueSearchPattern(query string) string {
 	).Replace(query)
 
 	return "%" + escapedQuery + "%"
+}
+
+func issueListOrderClause(sortValue string) string {
+	switch strings.TrimSpace(sortValue) {
+	case "created_asc":
+		return "i.created_at ASC, i.id ASC"
+	case "priority_desc":
+		return "CASE i.priority WHEN 'critical' THEN 4 WHEN 'high' THEN 3 WHEN 'medium' THEN 2 WHEN 'low' THEN 1 ELSE 0 END DESC, i.created_at DESC"
+	case "due_date_asc":
+		return "i.due_date ASC NULLS LAST, i.created_at DESC"
+	default:
+		return "i.created_at DESC, i.id DESC"
+	}
 }
 
 func textOrEmpty(value pgtype.Text) string {

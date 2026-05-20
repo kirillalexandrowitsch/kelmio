@@ -44,6 +44,7 @@ export type Label = {
 export type IssueStatus = "backlog" | "todo" | "in_progress" | "blocked" | "done";
 export type IssuePriority = "low" | "medium" | "high" | "critical";
 export type IssueType = "task" | "bug" | "story";
+export type IssueSort = "created_desc" | "created_asc" | "priority_desc" | "due_date_asc";
 
 export type Issue = {
   id: string;
@@ -130,6 +131,7 @@ type ListIssueActivityResponse = {
 
 export type IssueFilters = {
   query?: string;
+  sort?: IssueSort;
   projectId?: string;
   status?: IssueStatus;
   priority?: IssuePriority;
@@ -245,6 +247,9 @@ export async function listIssues(filters: IssueFilters = {}) {
   const params = new URLSearchParams();
   if (filters.query) {
     params.set("q", filters.query);
+  }
+  if (filters.sort) {
+    params.set("sort", filters.sort);
   }
   if (filters.projectId) {
     params.set("project_id", filters.projectId);
