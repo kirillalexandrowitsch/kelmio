@@ -333,6 +333,16 @@ func TestNormalizeIssueLabelIDsValidation(t *testing.T) {
 	}
 }
 
+func TestIssueSearchPatternEscapesWildcards(t *testing.T) {
+	t.Parallel()
+
+	got := issueSearchPattern(`UI-1 100% ready_part \ done`)
+	want := `%UI-1 100\% ready\_part \\ done%`
+	if got != want {
+		t.Fatalf("pattern = %q, want %q", got, want)
+	}
+}
+
 func TestNormalizeCommentBody(t *testing.T) {
 	t.Parallel()
 

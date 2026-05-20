@@ -129,6 +129,7 @@ type ListIssueActivityResponse = {
 };
 
 export type IssueFilters = {
+  query?: string;
   projectId?: string;
   status?: IssueStatus;
   priority?: IssuePriority;
@@ -242,6 +243,9 @@ export async function createLabel(input: CreateLabelInput) {
 
 export async function listIssues(filters: IssueFilters = {}) {
   const params = new URLSearchParams();
+  if (filters.query) {
+    params.set("q", filters.query);
+  }
   if (filters.projectId) {
     params.set("project_id", filters.projectId);
   }

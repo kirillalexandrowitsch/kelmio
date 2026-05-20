@@ -116,6 +116,7 @@ a {
 .issue-edit-form input:focus,
 .issue-edit-form select:focus,
 .issue-edit-form textarea:focus,
+.issue-filters input:focus,
 .issue-filters select:focus,
 .issue-card select:focus,
 .issue-detail-status select:focus,
@@ -645,6 +646,7 @@ h1 {
 .issue-form input,
 .issue-form select,
 .issue-form textarea,
+.issue-filters input,
 .issue-filters select {
   width: 100%;
   padding: 10px 12px;
@@ -661,6 +663,7 @@ h1 {
 .label-form input,
 .issue-form input,
 .issue-form select,
+.issue-filters input,
 .issue-filters select {
   min-height: 40px;
 }
@@ -745,7 +748,7 @@ h1 {
 
 .issue-filters {
   display: grid;
-  grid-template-columns: repeat(5, minmax(130px, 1fr)) auto;
+  grid-template-columns: minmax(180px, 1.4fr) repeat(5, minmax(130px, 1fr)) auto;
   align-items: end;
   gap: 10px;
   padding: 12px;

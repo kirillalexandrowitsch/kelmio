@@ -62,6 +62,7 @@ function issueMatchesFilters(
   priority: IssuePriority | "",
   assigneeId: string,
   labelId: string,
+  query: string,
 ) {
   if (projectId && issue.project_id !== projectId) {
     return false;
@@ -79,6 +80,15 @@ function issueMatchesFilters(
     return false;
   }
   if (labelId && !issue.labels.some((label) => label.id === labelId)) {
+    return false;
+  }
+  const normalizedQuery = query.trim().toLowerCase();
+  if (
+    normalizedQuery &&
+    !issue.issue_key.toLowerCase().includes(normalizedQuery) &&
+    !issue.title.toLowerCase().includes(normalizedQuery) &&
+    !issue.description.toLowerCase().includes(normalizedQuery)
+  ) {
     return false;
   }
 
@@ -222,6 +232,7 @@ export function App() {
   const [issueAssigneeId, setIssueAssigneeId] = useState("");
   const [issueDueDate, setIssueDueDate] = useState("");
   const [newIssueLabelIds, setNewIssueLabelIds] = useState<string[]>([]);
+  const [issueFilterQuery, setIssueFilterQuery] = useState("");
   const [issueFilterProjectId, setIssueFilterProjectId] = useState("");
   const [issueFilterStatus, setIssueFilterStatus] = useState<IssueStatus | "">("");
   const [issueFilterPriority, setIssueFilterPriority] = useState<
@@ -398,6 +409,7 @@ export function App() {
     setIsLoadingIssues(true);
 
     listIssues({
+      query: issueFilterQuery || undefined,
       projectId: issueFilterProjectId || undefined,
       status: issueFilterStatus || undefined,
       priority: issueFilterPriority || undefined,
@@ -425,6 +437,7 @@ export function App() {
     };
   }, [
     user,
+    issueFilterQuery,
     issueFilterProjectId,
     issueFilterStatus,
     issueFilterPriority,
@@ -540,6 +553,7 @@ export function App() {
     setLabelColor("#4e795d");
     setIssuesError("");
     setIssueFormError("");
+    setIssueFilterQuery("");
     setIssueFilterProjectId("");
     setIssueFilterStatus("");
     setIssueFilterPriority("");
@@ -722,6 +736,7 @@ export function App() {
             issueFilterPriority,
             issueFilterAssigneeId,
             issueFilterLabelId,
+            issueFilterQuery,
           )
         ) {
           return currentIssues.filter((issue) => issue.id !== updatedIssue.id);
@@ -762,6 +777,7 @@ export function App() {
             issueFilterPriority,
             issueFilterAssigneeId,
             issueFilterLabelId,
+            issueFilterQuery,
           )
         ) {
           return currentIssues.filter((issue) => issue.id !== updatedIssue.id);
@@ -803,6 +819,7 @@ export function App() {
             issueFilterPriority,
             issueFilterAssigneeId,
             issueFilterLabelId,
+            issueFilterQuery,
           )
         ) {
           return currentIssues.filter((issue) => issue.id !== updatedIssue.id);
@@ -853,6 +870,7 @@ export function App() {
             issueFilterPriority,
             issueFilterAssigneeId,
             issueFilterLabelId,
+            issueFilterQuery,
           )
         ) {
           return currentIssues.filter((currentIssue) => currentIssue.id !== updatedIssue.id);
@@ -929,6 +947,7 @@ export function App() {
           issueFilterPriority,
           issueFilterAssigneeId,
           issueFilterLabelId,
+          issueFilterQuery,
         )
       ) {
         setIssues((currentIssues) => [issue, ...currentIssues]);
@@ -985,7 +1004,8 @@ export function App() {
     issueFilterStatus !== "" ||
     issueFilterPriority !== "" ||
     issueFilterAssigneeId !== "" ||
-    issueFilterLabelId !== "";
+    issueFilterLabelId !== "" ||
+    issueFilterQuery.trim() !== "";
 
   if (isBooting) {
     return (
@@ -1553,6 +1573,15 @@ export function App() {
 
             <section className="issue-filters" aria-label="Issue filters">
               <label>
+                <span>Search</span>
+                <input
+                  onChange={(event) => setIssueFilterQuery(event.target.value)}
+                  placeholder="Key, title, description"
+                  value={issueFilterQuery}
+                />
+              </label>
+
+              <label>
                 <span>Project</span>
                 <select
                   onChange={(event) => setIssueFilterProjectId(event.target.value)}
@@ -1636,6 +1665,7 @@ export function App() {
                 className="small-button"
                 disabled={!hasIssueFilters}
                 onClick={() => {
+                  setIssueFilterQuery("");
                   setIssueFilterProjectId("");
                   setIssueFilterStatus("");
                   setIssueFilterPriority("");

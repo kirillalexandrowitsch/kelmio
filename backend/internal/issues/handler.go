@@ -576,6 +576,17 @@ func (h *Handler) listIssues(ctx context.Context, workspaceID string, query map[
 			)
 		`, len(args)))
 	}
+	searchQuery := strings.TrimSpace(firstQueryValue(query, "q"))
+	if searchQuery != "" {
+		args = append(args, issueSearchPattern(searchQuery))
+		conditions = append(conditions, fmt.Sprintf(`
+			(
+				i.issue_key ILIKE $%d ESCAPE '\'
+				OR i.title ILIKE $%d ESCAPE '\'
+				OR i.description ILIKE $%d ESCAPE '\'
+			)
+		`, len(args), len(args), len(args)))
+	}
 
 	sql := fmt.Sprintf(`
 		SELECT
@@ -1609,6 +1620,16 @@ func firstQueryValue(query map[string][]string, key string) string {
 	}
 
 	return values[0]
+}
+
+func issueSearchPattern(query string) string {
+	escapedQuery := strings.NewReplacer(
+		`\`, `\\`,
+		`%`, `\%`,
+		`_`, `\_`,
+	).Replace(query)
+
+	return "%" + escapedQuery + "%"
 }
 
 func textOrEmpty(value pgtype.Text) string {
