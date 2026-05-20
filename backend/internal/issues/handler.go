@@ -174,6 +174,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/issues/{id}/transition", h.transition)
 	mux.HandleFunc("POST /api/v1/issues/{id}/assign", h.assign)
 	mux.HandleFunc("PUT /api/v1/issues/{id}/labels", h.setLabels)
+	mux.HandleFunc("POST /api/v1/issues/{id}/archive", h.archive)
 	mux.HandleFunc("GET /api/v1/issues/{id}/comments", h.listComments)
 	mux.HandleFunc("POST /api/v1/issues/{id}/comments", h.createComment)
 	mux.HandleFunc("GET /api/v1/issues/{id}/activity", h.listActivity)
@@ -441,6 +442,34 @@ func (h *Handler) setLabels(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, issue)
 }
 
+func (h *Handler) archive(w http.ResponseWriter, r *http.Request) {
+	user, ok := h.requireUser(w, r)
+	if !ok {
+		return
+	}
+
+	issueID, err := normalizeIssueID(r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	if err := h.archiveIssue(ctx, user, issueID); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "issue_not_found", "issue was not found")
+			return
+		}
+
+		writeError(w, http.StatusInternalServerError, "internal_error", "could not archive issue")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (h *Handler) listComments(w http.ResponseWriter, r *http.Request) {
 	user, ok := h.requireUser(w, r)
 	if !ok {
@@ -542,7 +571,11 @@ func (h *Handler) listActivity(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) listIssues(ctx context.Context, workspaceID string, query map[string][]string) ([]issueResponse, error) {
 	args := []any{workspaceID}
-	conditions := []string{"p.workspace_id = $1"}
+	conditions := []string{
+		"p.workspace_id = $1",
+		"p.archived_at IS NULL",
+		"i.archived_at IS NULL",
+	}
 
 	addFilter := func(column string, value string) {
 		value = strings.TrimSpace(value)
@@ -691,9 +724,10 @@ func (h *Handler) getIssue(ctx context.Context, workspaceID string, issueID stri
 			)
 		FROM issues i
 		JOIN projects p ON p.id = i.project_id
-		WHERE i.id = $1
-			AND p.workspace_id = $2
-			AND p.archived_at IS NULL
+	WHERE i.id = $1
+		AND p.workspace_id = $2
+		AND p.archived_at IS NULL
+		AND i.archived_at IS NULL
 	`, issueID, workspaceID))
 }
 
@@ -873,10 +907,11 @@ func (h *Handler) updateIssue(ctx context.Context, user auth.CurrentUser, issueI
 			)
 		FROM issues i
 		JOIN projects p ON p.id = i.project_id
-		WHERE i.id = $1
-			AND p.workspace_id = $2
-			AND p.archived_at IS NULL
-		FOR UPDATE OF i
+	WHERE i.id = $1
+		AND p.workspace_id = $2
+		AND p.archived_at IS NULL
+		AND i.archived_at IS NULL
+	FOR UPDATE OF i
 	`, issueID, user.WorkspaceID))
 	if err != nil {
 		return issueResponse{}, err
@@ -897,10 +932,11 @@ func (h *Handler) updateIssue(ctx context.Context, user auth.CurrentUser, issueI
 			updated_at = now()
 		FROM projects p
 		WHERE i.project_id = p.id
-			AND i.id = $1
-			AND p.workspace_id = $2
-			AND p.archived_at IS NULL
-		RETURNING
+		AND i.id = $1
+		AND p.workspace_id = $2
+		AND p.archived_at IS NULL
+		AND i.archived_at IS NULL
+	RETURNING
 			i.id::text,
 			i.project_id::text,
 			p.key,
@@ -967,10 +1003,11 @@ func (h *Handler) transitionIssueStatus(ctx context.Context, user auth.CurrentUs
 		SELECT i.status
 		FROM issues i
 		JOIN projects p ON p.id = i.project_id
-		WHERE i.id = $1
-			AND p.workspace_id = $2
-			AND p.archived_at IS NULL
-		FOR UPDATE OF i
+	WHERE i.id = $1
+		AND p.workspace_id = $2
+		AND p.archived_at IS NULL
+		AND i.archived_at IS NULL
+	FOR UPDATE OF i
 	`, issueID, user.WorkspaceID).Scan(&previousStatus); err != nil {
 		return issueResponse{}, err
 	}
@@ -981,10 +1018,11 @@ func (h *Handler) transitionIssueStatus(ctx context.Context, user auth.CurrentUs
 			updated_at = now()
 		FROM projects p
 		WHERE i.project_id = p.id
-			AND i.id = $1
-			AND p.workspace_id = $2
-			AND p.archived_at IS NULL
-		RETURNING
+		AND i.id = $1
+		AND p.workspace_id = $2
+		AND p.archived_at IS NULL
+		AND i.archived_at IS NULL
+	RETURNING
 			i.id::text,
 			i.project_id::text,
 			p.key,
@@ -1051,10 +1089,11 @@ func (h *Handler) assignIssue(ctx context.Context, user auth.CurrentUser, issueI
 		SELECT i.assignee_id::text
 		FROM issues i
 		JOIN projects p ON p.id = i.project_id
-		WHERE i.id = $1
-			AND p.workspace_id = $2
-			AND p.archived_at IS NULL
-		FOR UPDATE OF i
+	WHERE i.id = $1
+		AND p.workspace_id = $2
+		AND p.archived_at IS NULL
+		AND i.archived_at IS NULL
+	FOR UPDATE OF i
 	`, issueID, user.WorkspaceID).Scan(&previousAssigneeID); err != nil {
 		return issueResponse{}, err
 	}
@@ -1088,10 +1127,11 @@ func (h *Handler) assignIssue(ctx context.Context, user auth.CurrentUser, issueI
 			updated_at = now()
 		FROM projects p
 		WHERE i.project_id = p.id
-			AND i.id = $1
-			AND p.workspace_id = $2
-			AND p.archived_at IS NULL
-		RETURNING
+		AND i.id = $1
+		AND p.workspace_id = $2
+		AND p.archived_at IS NULL
+		AND i.archived_at IS NULL
+	RETURNING
 			i.id::text,
 			i.project_id::text,
 			p.key,
@@ -1160,10 +1200,11 @@ func (h *Handler) setIssueLabels(ctx context.Context, user auth.CurrentUser, iss
 		SELECT i.id::text
 		FROM issues i
 		JOIN projects p ON p.id = i.project_id
-		WHERE i.id = $1
-			AND p.workspace_id = $2
-			AND p.archived_at IS NULL
-		FOR UPDATE OF i
+	WHERE i.id = $1
+		AND p.workspace_id = $2
+		AND p.archived_at IS NULL
+		AND i.archived_at IS NULL
+	FOR UPDATE OF i
 	`, issueID, user.WorkspaceID).Scan(&lockedIssueID); err != nil {
 		return issueResponse{}, err
 	}
@@ -1241,9 +1282,10 @@ func (h *Handler) setIssueLabels(ctx context.Context, user auth.CurrentUser, iss
 			)
 		FROM issues i
 		JOIN projects p ON p.id = i.project_id
-		WHERE i.id = $1
-			AND p.workspace_id = $2
-			AND p.archived_at IS NULL
+	WHERE i.id = $1
+		AND p.workspace_id = $2
+		AND p.archived_at IS NULL
+		AND i.archived_at IS NULL
 	`, issueID, user.WorkspaceID))
 	if err != nil {
 		return issueResponse{}, err
@@ -1265,6 +1307,41 @@ func (h *Handler) setIssueLabels(ctx context.Context, user auth.CurrentUser, iss
 	return issue, nil
 }
 
+func (h *Handler) archiveIssue(ctx context.Context, user auth.CurrentUser, issueID string) error {
+	tx, err := h.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	var archivedIssueID string
+	var issueKey string
+	if err := tx.QueryRow(ctx, `
+		UPDATE issues i
+		SET archived_at = now(),
+			updated_at = now()
+		FROM projects p
+		WHERE i.project_id = p.id
+			AND i.id = $1
+			AND p.workspace_id = $2
+			AND p.archived_at IS NULL
+			AND i.archived_at IS NULL
+		RETURNING i.id::text, i.issue_key
+	`, issueID, user.WorkspaceID).Scan(&archivedIssueID, &issueKey); err != nil {
+		return err
+	}
+
+	if err := insertIssueActivity(ctx, tx, archivedIssueID, user.ID, "issue_archived", map[string]string{
+		"issue_key": issueKey,
+	}); err != nil {
+		return err
+	}
+
+	return tx.Commit(ctx)
+}
+
 func (h *Handler) listIssueComments(ctx context.Context, workspaceID string, issueID string) ([]issueCommentResponse, error) {
 	rows, err := h.db.Query(ctx, `
 		SELECT
@@ -1279,10 +1356,11 @@ func (h *Handler) listIssueComments(ctx context.Context, workspaceID string, iss
 		JOIN issues i ON i.id = c.issue_id
 		JOIN projects p ON p.id = i.project_id
 		JOIN users u ON u.id = c.author_id
-		WHERE c.issue_id = $1
-			AND p.workspace_id = $2
-			AND p.archived_at IS NULL
-		ORDER BY c.created_at ASC
+	WHERE c.issue_id = $1
+		AND p.workspace_id = $2
+		AND p.archived_at IS NULL
+		AND i.archived_at IS NULL
+	ORDER BY c.created_at ASC
 		LIMIT 100
 	`, issueID, workspaceID)
 	if err != nil {
@@ -1321,10 +1399,11 @@ func (h *Handler) createIssueComment(ctx context.Context, user auth.CurrentUser,
 			SELECT i.id
 			FROM issues i
 			JOIN projects p ON p.id = i.project_id
-			WHERE i.id = $1
-				AND p.workspace_id = $2
-				AND p.archived_at IS NULL
-		),
+	WHERE i.id = $1
+		AND p.workspace_id = $2
+		AND p.archived_at IS NULL
+		AND i.archived_at IS NULL
+),
 		inserted AS (
 			INSERT INTO comments (issue_id, author_id, body)
 			SELECT id, $3, $4
@@ -1374,11 +1453,12 @@ func (h *Handler) listIssueActivity(ctx context.Context, workspaceID string, iss
 		JOIN issues i ON i.id = al.entity_id
 		JOIN projects p ON p.id = i.project_id
 		LEFT JOIN users u ON u.id = al.actor_id
-		WHERE al.entity_type = 'issue'
-			AND al.entity_id = $1
-			AND p.workspace_id = $2
-			AND p.archived_at IS NULL
-		ORDER BY al.created_at DESC
+	WHERE al.entity_type = 'issue'
+		AND al.entity_id = $1
+		AND p.workspace_id = $2
+		AND p.archived_at IS NULL
+		AND i.archived_at IS NULL
+	ORDER BY al.created_at DESC
 		LIMIT 100
 	`, issueID, workspaceID)
 	if err != nil {
@@ -1754,9 +1834,10 @@ func getIssueInTx(ctx context.Context, tx pgx.Tx, workspaceID string, issueID st
 			)
 		FROM issues i
 		JOIN projects p ON p.id = i.project_id
-		WHERE i.id = $1
-			AND p.workspace_id = $2
-			AND p.archived_at IS NULL
+	WHERE i.id = $1
+		AND p.workspace_id = $2
+		AND p.archived_at IS NULL
+		AND i.archived_at IS NULL
 	`, issueID, workspaceID))
 }
 

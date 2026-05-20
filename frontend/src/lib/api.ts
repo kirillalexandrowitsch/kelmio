@@ -84,6 +84,7 @@ export type IssueActivity = {
     | "status_changed"
     | "assignee_changed"
     | "labels_changed"
+    | "issue_archived"
     | "comment_added"
     | string;
   actor_id: string | null;
@@ -319,6 +320,12 @@ export async function setIssueLabels(issueId: string, labelIds: string[]) {
   return request<Issue>(`/api/v1/issues/${encodeURIComponent(issueId)}/labels`, {
     method: "PUT",
     body: JSON.stringify({ label_ids: labelIds }),
+  });
+}
+
+export async function archiveIssue(issueId: string) {
+  await request<void>(`/api/v1/issues/${encodeURIComponent(issueId)}/archive`, {
+    method: "POST",
   });
 }
 

@@ -357,6 +357,17 @@ h1 {
   background: #f6f8f6;
 }
 
+.danger-button {
+  border-color: #d9aaa2;
+  color: #923c2d;
+  background: #fff7f5;
+}
+
+.danger-button:hover:not(:disabled) {
+  border-color: #b96a5d;
+  background: #fff1ef;
+}
+
 .summary-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -830,6 +841,11 @@ h1 {
   border: 1px solid #edf0ed;
   border-radius: 8px;
   background: #fbfcfb;
+}
+
+.issue-row-actions {
+  display: grid;
+  gap: 8px;
 }
 
 .issue-key {

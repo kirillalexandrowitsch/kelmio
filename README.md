@@ -177,6 +177,15 @@ curl -i -X PUT -b /tmp/team-task-tracker.cookies \
 
 curl -b /tmp/team-task-tracker.cookies \
   "http://localhost:8080/api/v1/issues?label_id=$LABEL_ID"
+
+ARCHIVE_ISSUE_ID="$(curl -s -b /tmp/team-task-tracker.cookies \
+  -H 'Content-Type: application/json' \
+  -d "{\"project_id\":\"$PROJECT_ID\",\"title\":\"Archive smoke task\",\"priority\":\"low\"}" \
+  http://localhost:8080/api/v1/issues \
+  | node -e 'let data=""; process.stdin.on("data", c => data += c); process.stdin.on("end", () => console.log(JSON.parse(data).id));')"
+
+curl -i -X POST -b /tmp/team-task-tracker.cookies \
+  "http://localhost:8080/api/v1/issues/$ARCHIVE_ISSUE_ID/archive"
 ```
 
 Для локального запуска frontend без Docker:

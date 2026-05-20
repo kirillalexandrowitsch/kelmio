@@ -13,6 +13,7 @@ import {
   Label,
   Project,
   TeamMember,
+  archiveIssue,
   assignIssue,
   createLabel,
   createIssue,
@@ -132,6 +133,9 @@ function activityTitle(activity: IssueActivity) {
   }
   if (activity.action === "labels_changed") {
     return "Changed labels";
+  }
+  if (activity.action === "issue_archived") {
+    return "Archived issue";
   }
   if (activity.action === "comment_added") {
     return "Added comment";
@@ -263,6 +267,7 @@ export function App() {
   const [transitioningIssueIds, setTransitioningIssueIds] = useState<string[]>([]);
   const [assigningIssueIds, setAssigningIssueIds] = useState<string[]>([]);
   const [labelingIssueIds, setLabelingIssueIds] = useState<string[]>([]);
+  const [archivingIssueIds, setArchivingIssueIds] = useState<string[]>([]);
   const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null);
   const [selectedIssueError, setSelectedIssueError] = useState("");
   const [isLoadingSelectedIssue, setIsLoadingSelectedIssue] = useState(false);
@@ -587,6 +592,7 @@ export function App() {
     setTransitioningIssueIds([]);
     setAssigningIssueIds([]);
     setLabelingIssueIds([]);
+    setArchivingIssueIds([]);
     setSelectedIssue(null);
     setSelectedIssueError("");
     setIsEditingIssueDetails(false);
@@ -912,6 +918,37 @@ export function App() {
       setSelectedIssueError("Could not update labels.");
     } finally {
       setLabelingIssueIds((currentIds) =>
+        currentIds.filter((currentIssueId) => currentIssueId !== issue.id),
+      );
+    }
+  }
+
+  async function handleArchiveIssue(issue: Issue) {
+    setIssuesError("");
+    setSelectedIssueError("");
+    setArchivingIssueIds((currentIds) =>
+      currentIds.includes(issue.id) ? currentIds : [...currentIds, issue.id],
+    );
+
+    try {
+      await archiveIssue(issue.id);
+      setIssues((currentIssues) =>
+        currentIssues.filter((currentIssue) => currentIssue.id !== issue.id),
+      );
+      setSelectedIssue((currentIssue) =>
+        currentIssue?.id === issue.id ? null : currentIssue,
+      );
+      if (selectedIssue?.id === issue.id) {
+        setIssueComments([]);
+        setIssueActivity([]);
+        setCommentBody("");
+        setIsEditingIssueDetails(false);
+      }
+    } catch {
+      setIssuesError("Could not archive issue.");
+      setSelectedIssueError("Could not archive issue.");
+    } finally {
+      setArchivingIssueIds((currentIds) =>
         currentIds.filter((currentIssueId) => currentIssueId !== issue.id),
       );
     }
@@ -1856,15 +1893,29 @@ export function App() {
                         </div>
                       ) : null}
                     </div>
-                    <button
-                      className="small-button"
-                      onClick={() => {
-                        void handleSelectIssue(issue.id);
-                      }}
-                      type="button"
-                    >
-                      Open
-                    </button>
+                    <div className="issue-row-actions">
+                      <button
+                        className="small-button"
+                        onClick={() => {
+                          void handleSelectIssue(issue.id);
+                        }}
+                        type="button"
+                      >
+                        Open
+                      </button>
+                      <button
+                        className="small-button danger-button"
+                        disabled={archivingIssueIds.includes(issue.id)}
+                        onClick={() => {
+                          void handleArchiveIssue(issue);
+                        }}
+                        type="button"
+                      >
+                        {archivingIssueIds.includes(issue.id)
+                          ? "Archiving"
+                          : "Archive"}
+                      </button>
+                    </div>
                   </article>
                 ))}
               </div>
@@ -1913,6 +1964,18 @@ export function App() {
                   type="button"
                 >
                   Close
+                </button>
+                <button
+                  className="ghost-button danger-button"
+                  disabled={archivingIssueIds.includes(selectedIssue.id)}
+                  onClick={() => {
+                    void handleArchiveIssue(selectedIssue);
+                  }}
+                  type="button"
+                >
+                  {archivingIssueIds.includes(selectedIssue.id)
+                    ? "Archiving"
+                    : "Archive"}
                 </button>
               </div>
             ) : null}
@@ -2304,6 +2367,18 @@ export function App() {
                           type="button"
                         >
                           Open
+                        </button>
+                        <button
+                          className="small-button danger-button"
+                          disabled={archivingIssueIds.includes(issue.id)}
+                          onClick={() => {
+                            void handleArchiveIssue(issue);
+                          }}
+                          type="button"
+                        >
+                          {archivingIssueIds.includes(issue.id)
+                            ? "Archiving"
+                            : "Archive"}
                         </button>
                         <label>
                           <span>Status</span>
