@@ -1193,6 +1193,13 @@ h1 {
   gap: 3px;
 }
 
+.comment-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
 .comment-card strong {
   font-size: 13px;
 }

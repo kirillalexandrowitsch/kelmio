@@ -184,6 +184,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/issues/{id}/comments", h.listComments)
 	mux.HandleFunc("POST /api/v1/issues/{id}/comments", h.createComment)
 	mux.HandleFunc("PATCH /api/v1/issues/{id}/comments/{commentID}", h.updateComment)
+	mux.HandleFunc("DELETE /api/v1/issues/{id}/comments/{commentID}", h.deleteComment)
 	mux.HandleFunc("GET /api/v1/issues/{id}/activity", h.listActivity)
 }
 
@@ -591,6 +592,44 @@ func (h *Handler) updateComment(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, comment)
+}
+
+func (h *Handler) deleteComment(w http.ResponseWriter, r *http.Request) {
+	user, ok := h.requireUser(w, r)
+	if !ok {
+		return
+	}
+
+	issueID, err := normalizeIssueID(r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	commentID, err := normalizeCommentID(r.PathValue("commentID"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	if err := h.deleteIssueComment(ctx, user, issueID, commentID); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "comment_not_found", "comment was not found")
+			return
+		}
+		if errors.Is(err, errCommentForbidden) {
+			writeError(w, http.StatusForbidden, "forbidden", "only the comment author or an admin can delete this comment")
+			return
+		}
+
+		writeError(w, http.StatusInternalServerError, "internal_error", "could not delete comment")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *Handler) listActivity(w http.ResponseWriter, r *http.Request) {
@@ -1558,6 +1597,57 @@ func (h *Handler) updateIssueComment(ctx context.Context, user auth.CurrentUser,
 	}
 
 	return comment, nil
+}
+
+func (h *Handler) deleteIssueComment(ctx context.Context, user auth.CurrentUser, issueID string, commentID string) error {
+	tx, err := h.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	var authorID string
+	var body string
+	if err := tx.QueryRow(ctx, `
+		SELECT c.author_id::text, c.body
+		FROM comments c
+		JOIN issues i ON i.id = c.issue_id
+		JOIN projects p ON p.id = i.project_id
+		WHERE c.id = $1
+			AND c.issue_id = $2
+			AND p.workspace_id = $3
+			AND p.archived_at IS NULL
+			AND i.archived_at IS NULL
+	`, commentID, issueID, user.WorkspaceID).Scan(&authorID, &body); err != nil {
+		return err
+	}
+
+	if !canEditComment(user, authorID) {
+		return errCommentForbidden
+	}
+
+	if err := insertIssueActivity(ctx, tx, issueID, user.ID, "comment_deleted", map[string]string{
+		"comment_id": commentID,
+		"preview":    commentPreview(body),
+	}); err != nil {
+		return err
+	}
+
+	commandTag, err := tx.Exec(ctx, `
+		DELETE FROM comments
+		WHERE id = $1
+			AND issue_id = $2
+	`, commentID, issueID)
+	if err != nil {
+		return err
+	}
+	if commandTag.RowsAffected() == 0 {
+		return pgx.ErrNoRows
+	}
+
+	return tx.Commit(ctx)
 }
 
 func (h *Handler) listIssueActivity(ctx context.Context, workspaceID string, issueID string) ([]issueActivityResponse, error) {

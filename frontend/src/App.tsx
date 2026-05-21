@@ -22,6 +22,7 @@ import {
   createProject,
   createTeamMember,
   deleteLabel,
+  deleteIssueComment,
   getIssue,
   getCurrentUser,
   listIssueActivity,
@@ -146,6 +147,9 @@ function activityTitle(activity: IssueActivity) {
   if (activity.action === "comment_updated") {
     return "Updated comment";
   }
+  if (activity.action === "comment_deleted") {
+    return "Deleted comment";
+  }
 
   return activity.action.replaceAll("_", " ");
 }
@@ -166,6 +170,9 @@ function activityDescription(activity: IssueActivity, members: TeamMember[]) {
     return activity.payload.preview ? `"${activity.payload.preview}"` : "";
   }
   if (activity.action === "comment_updated") {
+    return activity.payload.preview ? `"${activity.payload.preview}"` : "";
+  }
+  if (activity.action === "comment_deleted") {
     return activity.payload.preview ? `"${activity.payload.preview}"` : "";
   }
   if (activity.action === "issue_created") {
@@ -298,6 +305,7 @@ export function App() {
   const [editingCommentId, setEditingCommentId] = useState("");
   const [editCommentBody, setEditCommentBody] = useState("");
   const [updatingCommentIds, setUpdatingCommentIds] = useState<string[]>([]);
+  const [deletingCommentIds, setDeletingCommentIds] = useState<string[]>([]);
   const [issueActivity, setIssueActivity] = useState<IssueActivity[]>([]);
   const [activityError, setActivityError] = useState("");
   const [isLoadingActivity, setIsLoadingActivity] = useState(false);
@@ -504,6 +512,7 @@ export function App() {
       setEditingCommentId("");
       setEditCommentBody("");
       setUpdatingCommentIds([]);
+      setDeletingCommentIds([]);
       return;
     }
 
@@ -512,6 +521,7 @@ export function App() {
     setEditingCommentId("");
     setEditCommentBody("");
     setUpdatingCommentIds([]);
+    setDeletingCommentIds([]);
     setIsLoadingComments(true);
 
     listIssueComments(selectedIssueId)
@@ -634,6 +644,7 @@ export function App() {
     setEditingCommentId("");
     setEditCommentBody("");
     setUpdatingCommentIds([]);
+    setDeletingCommentIds([]);
     setIssueActivity([]);
     setActivityError("");
   }
@@ -699,6 +710,7 @@ export function App() {
         setEditingCommentId("");
         setEditCommentBody("");
         setUpdatingCommentIds([]);
+        setDeletingCommentIds([]);
         setIsEditingIssueDetails(false);
       }
     } catch {
@@ -1070,6 +1082,7 @@ export function App() {
         setEditingCommentId("");
         setEditCommentBody("");
         setUpdatingCommentIds([]);
+        setDeletingCommentIds([]);
         setIsEditingIssueDetails(false);
       }
     } catch {
@@ -1103,6 +1116,7 @@ export function App() {
     setEditingCommentId("");
     setEditCommentBody("");
     setUpdatingCommentIds([]);
+    setDeletingCommentIds([]);
     setIsLoadingSelectedIssue(true);
 
     try {
@@ -1239,6 +1253,42 @@ export function App() {
       }
     } finally {
       setUpdatingCommentIds((currentIds) =>
+        currentIds.filter((currentCommentId) => currentCommentId !== comment.id),
+      );
+    }
+  }
+
+  async function handleDeleteComment(comment: IssueComment) {
+    if (!selectedIssue) {
+      return;
+    }
+    if (!window.confirm("Delete this comment? This cannot be undone.")) {
+      return;
+    }
+
+    setCommentsError("");
+    setDeletingCommentIds((currentIds) =>
+      currentIds.includes(comment.id) ? currentIds : [...currentIds, comment.id],
+    );
+
+    try {
+      await deleteIssueComment(selectedIssue.id, comment.id);
+      setIssueComments((currentComments) =>
+        currentComments.filter((currentComment) => currentComment.id !== comment.id),
+      );
+      if (editingCommentId === comment.id) {
+        setEditingCommentId("");
+        setEditCommentBody("");
+      }
+      await refreshIssueActivity(selectedIssue.id);
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setCommentsError(err.message);
+      } else {
+        setCommentsError("Could not delete comment.");
+      }
+    } finally {
+      setDeletingCommentIds((currentIds) =>
         currentIds.filter((currentCommentId) => currentCommentId !== comment.id),
       );
     }
@@ -2177,6 +2227,7 @@ export function App() {
                     setEditingCommentId("");
                     setEditCommentBody("");
                     setUpdatingCommentIds([]);
+                    setDeletingCommentIds([]);
                   }}
                   type="button"
                 >
@@ -2361,6 +2412,9 @@ export function App() {
                         const isUpdatingComment = updatingCommentIds.includes(
                           comment.id,
                         );
+                        const isDeletingComment = deletingCommentIds.includes(
+                          comment.id,
+                        );
                         const canEditComment =
                           comment.author_id === user.id ||
                           user.workspace.role === "admin";
@@ -2381,20 +2435,32 @@ export function App() {
                                 </span>
                               </div>
                               {canEditComment ? (
-                                <button
-                                  className="small-button"
-                                  disabled={isUpdatingComment}
-                                  onClick={() => {
-                                    if (isEditingComment) {
-                                      cancelEditingComment();
-                                    } else {
-                                      startEditingComment(comment);
-                                    }
-                                  }}
-                                  type="button"
-                                >
-                                  {isEditingComment ? "Cancel" : "Edit"}
-                                </button>
+                                <div className="comment-actions">
+                                  <button
+                                    className="small-button"
+                                    disabled={isUpdatingComment || isDeletingComment}
+                                    onClick={() => {
+                                      if (isEditingComment) {
+                                        cancelEditingComment();
+                                      } else {
+                                        startEditingComment(comment);
+                                      }
+                                    }}
+                                    type="button"
+                                  >
+                                    {isEditingComment ? "Cancel" : "Edit"}
+                                  </button>
+                                  <button
+                                    className="small-button danger-button"
+                                    disabled={isUpdatingComment || isDeletingComment}
+                                    onClick={() => {
+                                      void handleDeleteComment(comment);
+                                    }}
+                                    type="button"
+                                  >
+                                    {isDeletingComment ? "Deleting..." : "Delete"}
+                                  </button>
+                                </div>
                               ) : null}
                             </header>
 

@@ -87,6 +87,7 @@ export type IssueActivity = {
     | "issue_archived"
     | "comment_added"
     | "comment_updated"
+    | "comment_deleted"
     | string;
   actor_id: string | null;
   actor_display_name: string | null;
@@ -364,6 +365,17 @@ export async function updateIssueComment(
     {
       method: "PATCH",
       body: JSON.stringify({ body }),
+    },
+  );
+}
+
+export async function deleteIssueComment(issueId: string, commentId: string) {
+  await request<void>(
+    `/api/v1/issues/${encodeURIComponent(issueId)}/comments/${encodeURIComponent(
+      commentId,
+    )}`,
+    {
+      method: "DELETE",
     },
   );
 }

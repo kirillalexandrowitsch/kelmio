@@ -171,6 +171,15 @@ curl -i -X PATCH -b /tmp/team-task-tracker.cookies \
   -d '{"body":"Looks good after editing the comment."}' \
   "http://localhost:8080/api/v1/issues/$ISSUE_ID/comments/$COMMENT_ID"
 
+DELETE_COMMENT_ID="$(curl -s -b /tmp/team-task-tracker.cookies \
+  -H 'Content-Type: application/json' \
+  -d '{"body":"Temporary comment to delete."}' \
+  "http://localhost:8080/api/v1/issues/$ISSUE_ID/comments" \
+  | node -e 'let data=""; process.stdin.on("data", c => data += c); process.stdin.on("end", () => console.log(JSON.parse(data).id));')"
+
+curl -i -X DELETE -b /tmp/team-task-tracker.cookies \
+  "http://localhost:8080/api/v1/issues/$ISSUE_ID/comments/$DELETE_COMMENT_ID"
+
 curl -b /tmp/team-task-tracker.cookies \
   "http://localhost:8080/api/v1/issues/$ISSUE_ID/activity"
 
