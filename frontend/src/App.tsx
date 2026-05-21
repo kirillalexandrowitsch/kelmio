@@ -6,6 +6,7 @@ import {
   Issue,
   IssueActivity,
   IssueComment,
+  IssueDueFilter,
   IssuePriority,
   IssueSort,
   IssueStatus,
@@ -68,6 +69,13 @@ const issueSortLabels: Record<IssueSort, string> = {
   due_date_asc: "Due date soonest",
 };
 
+const issueDueFilterLabels: Record<IssueDueFilter, string> = {
+  overdue: "Overdue",
+  today: "Due today",
+  due_soon: "Due soon",
+  no_due: "No due date",
+};
+
 type AppSection = "dashboard" | "projects" | "issues" | "team" | "labels";
 type DueTone = "overdue" | "due-soon" | "scheduled" | "done";
 
@@ -86,7 +94,9 @@ function issueMatchesFilters(
   priority: IssuePriority | "",
   assigneeId: string,
   labelId: string,
+  dueFilter: IssueDueFilter | "",
   query: string,
+  today: Date,
 ) {
   if (projectId && issue.project_id !== projectId) {
     return false;
@@ -104,6 +114,9 @@ function issueMatchesFilters(
     return false;
   }
   if (labelId && !issue.labels.some((label) => label.id === labelId)) {
+    return false;
+  }
+  if (!issueMatchesDueFilter(issue, dueFilter, today)) {
     return false;
   }
   const normalizedQuery = query.trim().toLowerCase();
@@ -266,6 +279,41 @@ function issueDueInfo(issue: Issue, today: Date) {
   return { label: `Due ${issue.due_date}`, tone: "scheduled" as DueTone };
 }
 
+function issueMatchesDueFilter(
+  issue: Issue,
+  dueFilter: IssueDueFilter | "",
+  today: Date,
+) {
+  if (dueFilter === "") {
+    return true;
+  }
+  if (dueFilter === "no_due") {
+    return issue.due_date === null;
+  }
+
+  if (issue.status === "done") {
+    return false;
+  }
+
+  const dueDate = parseDateOnly(issue.due_date);
+  if (!dueDate) {
+    return false;
+  }
+
+  const daysUntilDue = Math.round(
+    (dueDate.getTime() - today.getTime()) / (24 * 60 * 60 * 1000),
+  );
+
+  if (dueFilter === "overdue") {
+    return daysUntilDue < 0;
+  }
+  if (dueFilter === "today") {
+    return daysUntilDue === 0;
+  }
+
+  return daysUntilDue > 0 && daysUntilDue <= 7;
+}
+
 function formatDateTime(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
@@ -334,6 +382,7 @@ export function App() {
   >("");
   const [issueFilterAssigneeId, setIssueFilterAssigneeId] = useState("");
   const [issueFilterLabelId, setIssueFilterLabelId] = useState("");
+  const [issueFilterDue, setIssueFilterDue] = useState<IssueDueFilter | "">("");
   const [transitioningIssueIds, setTransitioningIssueIds] = useState<string[]>([]);
   const [assigningIssueIds, setAssigningIssueIds] = useState<string[]>([]);
   const [labelingIssueIds, setLabelingIssueIds] = useState<string[]>([]);
@@ -525,6 +574,7 @@ export function App() {
       priority: issueFilterPriority || undefined,
       assigneeId: issueFilterAssigneeId || undefined,
       labelId: issueFilterLabelId || undefined,
+      due: issueFilterDue || undefined,
     })
       .then((response) => {
         if (isMounted) {
@@ -554,6 +604,7 @@ export function App() {
     issueFilterPriority,
     issueFilterAssigneeId,
     issueFilterLabelId,
+    issueFilterDue,
   ]);
 
   useEffect(() => {
@@ -681,6 +732,7 @@ export function App() {
     setIssueFilterPriority("");
     setIssueFilterAssigneeId("");
     setIssueFilterLabelId("");
+    setIssueFilterDue("");
     setNewIssueLabelIds([]);
     setTransitioningIssueIds([]);
     setAssigningIssueIds([]);
@@ -955,7 +1007,9 @@ export function App() {
             issueFilterPriority,
             issueFilterAssigneeId,
             issueFilterLabelId,
+            issueFilterDue,
             issueFilterQuery,
+            today,
           )
         ) {
           return currentIssues.filter((issue) => issue.id !== updatedIssue.id);
@@ -996,7 +1050,9 @@ export function App() {
             issueFilterPriority,
             issueFilterAssigneeId,
             issueFilterLabelId,
+            issueFilterDue,
             issueFilterQuery,
+            today,
           )
         ) {
           return currentIssues.filter((issue) => issue.id !== updatedIssue.id);
@@ -1038,7 +1094,9 @@ export function App() {
             issueFilterPriority,
             issueFilterAssigneeId,
             issueFilterLabelId,
+            issueFilterDue,
             issueFilterQuery,
+            today,
           )
         ) {
           return currentIssues.filter((issue) => issue.id !== updatedIssue.id);
@@ -1089,7 +1147,9 @@ export function App() {
             issueFilterPriority,
             issueFilterAssigneeId,
             issueFilterLabelId,
+            issueFilterDue,
             issueFilterQuery,
+            today,
           )
         ) {
           return currentIssues.filter((currentIssue) => currentIssue.id !== updatedIssue.id);
@@ -1207,7 +1267,9 @@ export function App() {
           issueFilterPriority,
           issueFilterAssigneeId,
           issueFilterLabelId,
+          issueFilterDue,
           issueFilterQuery,
+          today,
         )
       ) {
         setIssues((currentIssues) => [issue, ...currentIssues]);
@@ -1362,6 +1424,7 @@ export function App() {
     issueFilterPriority !== "" ||
     issueFilterAssigneeId !== "" ||
     issueFilterLabelId !== "" ||
+    issueFilterDue !== "" ||
     issueFilterQuery.trim() !== "";
   const issueListSummary = hasIssueFilters
     ? `${issues.length} issues match current filters`
@@ -2174,6 +2237,23 @@ export function App() {
                 </select>
               </label>
 
+              <label>
+                <span>Due</span>
+                <select
+                  onChange={(event) =>
+                    setIssueFilterDue(event.target.value as IssueDueFilter | "")
+                  }
+                  value={issueFilterDue}
+                >
+                  <option value="">Any due date</option>
+                  {Object.entries(issueDueFilterLabels).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
               <button
                 className="small-button"
                 disabled={!hasIssueFilters}
@@ -2184,6 +2264,7 @@ export function App() {
                   setIssueFilterPriority("");
                   setIssueFilterAssigneeId("");
                   setIssueFilterLabelId("");
+                  setIssueFilterDue("");
                 }}
                 type="button"
               >

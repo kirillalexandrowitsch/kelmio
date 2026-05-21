@@ -687,6 +687,9 @@ func (h *Handler) listIssues(ctx context.Context, workspaceID string, query map[
 	addFilter("i.project_id", firstQueryValue(query, "project_id"))
 	addFilter("i.status", firstQueryValue(query, "status"))
 	addFilter("i.priority", firstQueryValue(query, "priority"))
+	if dueCondition := issueDueFilterCondition(firstQueryValue(query, "due")); dueCondition != "" {
+		conditions = append(conditions, dueCondition)
+	}
 
 	assigneeID := strings.TrimSpace(firstQueryValue(query, "assignee_id"))
 	if assigneeID == "unassigned" {
@@ -1938,6 +1941,21 @@ func issueSearchPattern(query string) string {
 	).Replace(query)
 
 	return "%" + escapedQuery + "%"
+}
+
+func issueDueFilterCondition(dueValue string) string {
+	switch strings.TrimSpace(dueValue) {
+	case "overdue":
+		return "i.status <> 'done' AND i.due_date < CURRENT_DATE"
+	case "today":
+		return "i.status <> 'done' AND i.due_date = CURRENT_DATE"
+	case "due_soon":
+		return "i.status <> 'done' AND i.due_date > CURRENT_DATE AND i.due_date <= CURRENT_DATE + INTERVAL '7 days'"
+	case "no_due":
+		return "i.due_date IS NULL"
+	default:
+		return ""
+	}
 }
 
 func issueListOrderClause(sortValue string) string {

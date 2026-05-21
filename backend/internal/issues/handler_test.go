@@ -345,6 +345,53 @@ func TestIssueSearchPatternEscapesWildcards(t *testing.T) {
 	}
 }
 
+func TestIssueDueFilterCondition(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		dueValue string
+		want     string
+	}{
+		{
+			name:     "overdue",
+			dueValue: "overdue",
+			want:     "i.status <> 'done' AND i.due_date < CURRENT_DATE",
+		},
+		{
+			name:     "today",
+			dueValue: "today",
+			want:     "i.status <> 'done' AND i.due_date = CURRENT_DATE",
+		},
+		{
+			name:     "due soon",
+			dueValue: "due_soon",
+			want:     "i.status <> 'done' AND i.due_date > CURRENT_DATE AND i.due_date <= CURRENT_DATE + INTERVAL '7 days'",
+		},
+		{
+			name:     "no due",
+			dueValue: "no_due",
+			want:     "i.due_date IS NULL",
+		},
+		{
+			name:     "invalid ignored",
+			dueValue: "drop table issues;",
+			want:     "",
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := issueDueFilterCondition(tt.dueValue); got != tt.want {
+				t.Fatalf("condition = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestIssueListOrderClause(t *testing.T) {
 	t.Parallel()
 

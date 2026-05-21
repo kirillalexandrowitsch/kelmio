@@ -45,6 +45,7 @@ export type IssueStatus = "backlog" | "todo" | "in_progress" | "blocked" | "done
 export type IssuePriority = "low" | "medium" | "high" | "critical";
 export type IssueType = "task" | "bug" | "story";
 export type IssueSort = "created_desc" | "created_asc" | "priority_desc" | "due_date_asc";
+export type IssueDueFilter = "overdue" | "today" | "due_soon" | "no_due";
 
 export type Issue = {
   id: string;
@@ -140,6 +141,7 @@ export type IssueFilters = {
   priority?: IssuePriority;
   assigneeId?: string;
   labelId?: string;
+  due?: IssueDueFilter;
 };
 
 type CreateProjectInput = {
@@ -280,6 +282,9 @@ export async function listIssues(filters: IssueFilters = {}) {
   }
   if (filters.labelId) {
     params.set("label_id", filters.labelId);
+  }
+  if (filters.due) {
+    params.set("due", filters.due);
   }
 
   const query = params.toString();
