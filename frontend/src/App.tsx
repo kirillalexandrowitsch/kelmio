@@ -69,6 +69,7 @@ const issueSortLabels: Record<IssueSort, string> = {
 };
 
 type AppSection = "dashboard" | "projects" | "issues" | "team" | "labels";
+type DueTone = "overdue" | "due-soon" | "scheduled" | "done";
 
 const appSections = [
   { id: "dashboard", title: "Dashboard" },
@@ -212,6 +213,57 @@ function memberDisplayName(members: TeamMember[], memberId: string | null) {
 
 function issueLabelIds(issue: Issue) {
   return issue.labels.map((label) => label.id);
+}
+
+function startOfToday() {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+}
+
+function parseDateOnly(value: string | null) {
+  if (!value) {
+    return null;
+  }
+
+  const [year, month, day] = value.split("-").map(Number);
+  if (!year || !month || !day) {
+    return null;
+  }
+
+  return new Date(year, month - 1, day);
+}
+
+function issueDueInfo(issue: Issue, today: Date) {
+  const dueDate = parseDateOnly(issue.due_date);
+  if (!dueDate) {
+    return null;
+  }
+
+  const daysUntilDue = Math.round(
+    (dueDate.getTime() - today.getTime()) / (24 * 60 * 60 * 1000),
+  );
+
+  if (issue.status === "done") {
+    return { label: `Done, due ${issue.due_date}`, tone: "done" as DueTone };
+  }
+  if (daysUntilDue < 0) {
+    const overdueDays = Math.abs(daysUntilDue);
+    return {
+      label: overdueDays === 1 ? "Overdue by 1 day" : `Overdue by ${overdueDays} days`,
+      tone: "overdue" as DueTone,
+    };
+  }
+  if (daysUntilDue === 0) {
+    return { label: "Due today", tone: "due-soon" as DueTone };
+  }
+  if (daysUntilDue === 1) {
+    return { label: "Due tomorrow", tone: "due-soon" as DueTone };
+  }
+  if (daysUntilDue <= 7) {
+    return { label: `Due in ${daysUntilDue} days`, tone: "due-soon" as DueTone };
+  }
+
+  return { label: `Due ${issue.due_date}`, tone: "scheduled" as DueTone };
 }
 
 function formatDateTime(value: string) {
@@ -1294,7 +1346,16 @@ export function App() {
     }
   }
 
-  const openIssuesCount = issues.filter((issue) => issue.status !== "done").length;
+  const today = startOfToday();
+  const openIssues = issues.filter((issue) => issue.status !== "done");
+  const selectedIssueDueInfo = selectedIssue ? issueDueInfo(selectedIssue, today) : null;
+  const overdueIssuesCount = openIssues.filter(
+    (issue) => issueDueInfo(issue, today)?.tone === "overdue",
+  ).length;
+  const dueSoonIssuesCount = openIssues.filter(
+    (issue) => issueDueInfo(issue, today)?.tone === "due-soon",
+  ).length;
+  const openIssuesCount = openIssues.length;
   const hasIssueFilters =
     issueFilterProjectId !== "" ||
     issueFilterStatus !== "" ||
@@ -1429,6 +1490,14 @@ export function App() {
           <article>
             <span>Open issues</span>
             <strong>{openIssuesCount}</strong>
+          </article>
+          <article className={overdueIssuesCount > 0 ? "summary-alert" : undefined}>
+            <span>Overdue</span>
+            <strong>{overdueIssuesCount}</strong>
+          </article>
+          <article className={dueSoonIssuesCount > 0 ? "summary-warning" : undefined}>
+            <span>Due soon</span>
+            <strong>{dueSoonIssuesCount}</strong>
           </article>
           <article>
             <span>Team members</span>
@@ -2128,60 +2197,69 @@ export function App() {
 
             {issues.length > 0 ? (
               <div className="issue-list">
-                {issues.slice(0, 6).map((issue) => (
-                  <article className="issue-row" key={issue.id}>
-                    <span className="issue-key">{issue.issue_key}</span>
-                    <div>
-                      <h3>{issue.title}</h3>
-                      <p>
-                        {issueTypeLabels[issue.issue_type]} ·{" "}
-                        {priorityLabels[issue.priority]} ·{" "}
-                        {columns.find((column) => column.status === issue.status)
-                          ?.title ?? issue.status}{" "}
-                        · {memberDisplayName(teamMembers, issue.assignee_id)}
-                      </p>
-                      {issue.labels.length > 0 ? (
-                        <div className="issue-label-row">
-                          {issue.labels.map((label) => (
-                            <span
-                              className="label-chip label-chip-small"
-                              key={label.id}
-                              style={{
-                                backgroundColor: `${label.color}1a`,
-                                borderColor: label.color,
-                              }}
-                            >
-                              {label.name}
-                            </span>
-                          ))}
-                        </div>
-                      ) : null}
-                    </div>
-                    <div className="issue-row-actions">
-                      <button
-                        className="small-button"
-                        onClick={() => {
-                          void handleSelectIssue(issue.id);
-                        }}
-                        type="button"
-                      >
-                        Open
-                      </button>
-                      <button
-                        className="small-button danger-button"
-                        disabled={archivingIssueIds.includes(issue.id)}
-                        onClick={() => {
-                          void handleArchiveIssue(issue);
-                        }}
-                        type="button"
-                      >
-                        {archivingIssueIds.includes(issue.id)
-                          ? "Archiving"
-                          : "Archive"}
-                      </button>
-                    </div>
-                  </article>
-                ))}
+                {issues.slice(0, 6).map((issue) => {
+                  const dueInfo = issueDueInfo(issue, today);
+
+                  return (
+                    <article className="issue-row" key={issue.id}>
+                      <span className="issue-key">{issue.issue_key}</span>
+                      <div>
+                        <h3>{issue.title}</h3>
+                        <p>
+                          {issueTypeLabels[issue.issue_type]} ·{" "}
+                          {priorityLabels[issue.priority]} ·{" "}
+                          {columns.find((column) => column.status === issue.status)
+                            ?.title ?? issue.status}{" "}
+                          · {memberDisplayName(teamMembers, issue.assignee_id)}
+                        </p>
+                        {dueInfo ? (
+                          <span className={`due-badge due-badge-${dueInfo.tone}`}>
+                            {dueInfo.label}
+                          </span>
+                        ) : null}
+                        {issue.labels.length > 0 ? (
+                          <div className="issue-label-row">
+                            {issue.labels.map((label) => (
+                              <span
+                                className="label-chip label-chip-small"
+                                key={label.id}
+                                style={{
+                                  backgroundColor: `${label.color}1a`,
+                                  borderColor: label.color,
+                                }}
+                              >
+                                {label.name}
+                              </span>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+                      <div className="issue-row-actions">
+                        <button
+                          className="small-button"
+                          onClick={() => {
+                            void handleSelectIssue(issue.id);
+                          }}
+                          type="button"
+                        >
+                          Open
+                        </button>
+                        <button
+                          className="small-button danger-button"
+                          disabled={archivingIssueIds.includes(issue.id)}
+                          onClick={() => {
+                            void handleArchiveIssue(issue);
+                          }}
+                          type="button"
+                        >
+                          {archivingIssueIds.includes(issue.id)
+                            ? "Archiving"
+                            : "Archive"}
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })}
               </div>
             ) : (
               <div className="project-empty">No issues yet</div>
@@ -2654,7 +2732,17 @@ export function App() {
                   </div>
                   <div>
                     <span>Due date</span>
-                    <strong>{selectedIssue.due_date ?? "No due date"}</strong>
+                    {selectedIssueDueInfo ? (
+                      <strong>
+                        <span
+                          className={`due-badge due-badge-${selectedIssueDueInfo.tone}`}
+                        >
+                          {selectedIssueDueInfo.label}
+                        </span>
+                      </strong>
+                    ) : (
+                      <strong>No due date</strong>
+                    )}
                   </div>
                   <div>
                     <span>Created</span>
@@ -2690,79 +2778,89 @@ export function App() {
               <div className="board-card-list">
                 {issues
                   .filter((issue) => issue.status === column.status)
-                  .map((issue) => (
-                    <article className="issue-card" key={issue.id}>
-                      <div className="issue-card-meta">
-                        <span>{issue.issue_key}</span>
-                        <span>{priorityLabels[issue.priority]}</span>
-                      </div>
-                      <h3>{issue.title}</h3>
-                      {issue.due_date ? <p>Due {issue.due_date}</p> : null}
-                      <p>Assignee: {memberDisplayName(teamMembers, issue.assignee_id)}</p>
-                      {issue.labels.length > 0 ? (
-                        <div className="issue-label-row">
-                          {issue.labels.map((label) => (
-                            <span
-                              className="label-chip label-chip-small"
-                              key={label.id}
-                              style={{
-                                backgroundColor: `${label.color}1a`,
-                                borderColor: label.color,
-                              }}
-                            >
-                              {label.name}
-                            </span>
-                          ))}
+                  .map((issue) => {
+                    const dueInfo = issueDueInfo(issue, today);
+
+                    return (
+                      <article className="issue-card" key={issue.id}>
+                        <div className="issue-card-meta">
+                          <span>{issue.issue_key}</span>
+                          <span>{priorityLabels[issue.priority]}</span>
                         </div>
-                      ) : null}
-                      <div className="issue-card-actions">
-                        <button
-                          className="small-button"
-                          onClick={() => {
-                            void handleSelectIssue(issue.id);
-                          }}
-                          type="button"
-                        >
-                          Open
-                        </button>
-                        <button
-                          className="small-button danger-button"
-                          disabled={archivingIssueIds.includes(issue.id)}
-                          onClick={() => {
-                            void handleArchiveIssue(issue);
-                          }}
-                          type="button"
-                        >
-                          {archivingIssueIds.includes(issue.id)
-                            ? "Archiving"
-                            : "Archive"}
-                        </button>
-                        <label>
-                          <span>Status</span>
-                          <select
-                            aria-label={`Status for ${issue.issue_key}`}
-                            disabled={transitioningIssueIds.includes(issue.id)}
-                            onChange={(event) => {
-                              void handleTransitionIssue(
-                                issue.id,
-                                event.target.value as IssueStatus,
-                              );
-                            }}
-                            value={issue.status}
-                          >
-                            {columns.map((nextColumn) => (
-                              <option
-                                key={nextColumn.status}
-                                value={nextColumn.status}
+                        <h3>{issue.title}</h3>
+                        {dueInfo ? (
+                          <span className={`due-badge due-badge-${dueInfo.tone}`}>
+                            {dueInfo.label}
+                          </span>
+                        ) : null}
+                        <p>
+                          Assignee: {memberDisplayName(teamMembers, issue.assignee_id)}
+                        </p>
+                        {issue.labels.length > 0 ? (
+                          <div className="issue-label-row">
+                            {issue.labels.map((label) => (
+                              <span
+                                className="label-chip label-chip-small"
+                                key={label.id}
+                                style={{
+                                  backgroundColor: `${label.color}1a`,
+                                  borderColor: label.color,
+                                }}
                               >
-                                {nextColumn.title}
-                              </option>
+                                {label.name}
+                              </span>
                             ))}
-                          </select>
-                        </label>
-                      </div>
-                    </article>
-                  ))}
+                          </div>
+                        ) : null}
+                        <div className="issue-card-actions">
+                          <button
+                            className="small-button"
+                            onClick={() => {
+                              void handleSelectIssue(issue.id);
+                            }}
+                            type="button"
+                          >
+                            Open
+                          </button>
+                          <button
+                            className="small-button danger-button"
+                            disabled={archivingIssueIds.includes(issue.id)}
+                            onClick={() => {
+                              void handleArchiveIssue(issue);
+                            }}
+                            type="button"
+                          >
+                            {archivingIssueIds.includes(issue.id)
+                              ? "Archiving"
+                              : "Archive"}
+                          </button>
+                          <label>
+                            <span>Status</span>
+                            <select
+                              aria-label={`Status for ${issue.issue_key}`}
+                              disabled={transitioningIssueIds.includes(issue.id)}
+                              onChange={(event) => {
+                                void handleTransitionIssue(
+                                  issue.id,
+                                  event.target.value as IssueStatus,
+                                );
+                              }}
+                              value={issue.status}
+                            >
+                              {columns.map((nextColumn) => (
+                                <option
+                                  key={nextColumn.status}
+                                  value={nextColumn.status}
+                                >
+                                  {nextColumn.title}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        </div>
+                      </article>
+                    );
+                  })}
 
                 {issues.filter((issue) => issue.status === column.status).length ===
                 0 ? (

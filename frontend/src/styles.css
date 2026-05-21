@@ -386,7 +386,7 @@ h1 {
 
 .summary-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -410,6 +410,16 @@ h1 {
 
 .summary-grid strong {
   font-size: 28px;
+}
+
+.summary-alert {
+  border-color: #d9aaa2;
+  background: #fff7f5;
+}
+
+.summary-warning {
+  border-color: #dec66f;
+  background: #fffbea;
 }
 
 .dashboard-actions {
@@ -890,6 +900,11 @@ h1 {
 .issue-row-actions {
   display: grid;
   gap: 8px;
+}
+
+.issue-row > div {
+  display: grid;
+  gap: 6px;
 }
 
 .issue-key {
@@ -1393,6 +1408,46 @@ h1 {
   font-size: 13px;
   line-height: 1.35;
   overflow-wrap: anywhere;
+}
+
+.due-badge {
+  display: inline-flex;
+  width: max-content;
+  max-width: 100%;
+  align-items: center;
+  padding: 5px 8px;
+  border: 1px solid #c8d1cb;
+  border-radius: 999px;
+  color: #28352d;
+  background: #ffffff;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1;
+  text-transform: none;
+}
+
+.due-badge-overdue {
+  border-color: #d9aaa2;
+  color: #923c2d;
+  background: #fff1ef;
+}
+
+.due-badge-due-soon {
+  border-color: #dec66f;
+  color: #66510d;
+  background: #fff8d8;
+}
+
+.due-badge-scheduled {
+  border-color: #b8c5bd;
+  color: #4e5c54;
+  background: #f6f8f6;
+}
+
+.due-badge-done {
+  border-color: #b7cfc0;
+  color: #356145;
+  background: #ecf7ef;
 }
 
 @media (max-width: 900px) {
