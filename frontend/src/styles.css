@@ -111,6 +111,8 @@ a {
 .auth-form input:focus,
 .project-form input:focus,
 .project-form textarea:focus,
+.project-inline-form input:focus,
+.project-inline-form textarea:focus,
 .team-member-form input:focus,
 .team-member-form select:focus,
 .label-form input:focus,
@@ -673,6 +675,8 @@ h1 {
 
 .project-row-actions {
   display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
   justify-content: flex-end;
 }
 
@@ -713,12 +717,14 @@ h1 {
   font-size: 14px;
 }
 
-.project-form label {
+.project-form label,
+.project-inline-form label {
   display: grid;
   gap: 8px;
 }
 
 .project-form label span,
+.project-inline-form label span,
 .team-member-form label span,
 .label-form label span,
 .issue-form label span,
@@ -730,6 +736,8 @@ h1 {
 
 .project-form input,
 .project-form textarea,
+.project-inline-form input,
+.project-inline-form textarea,
 .team-member-form input,
 .team-member-form select,
 .label-form input,
@@ -748,6 +756,7 @@ h1 {
 }
 
 .project-form input,
+.project-inline-form input,
 .team-member-form input,
 .team-member-form select,
 .label-form input,
@@ -759,9 +768,19 @@ h1 {
 }
 
 .project-form textarea,
+.project-inline-form textarea,
 .issue-form textarea {
   min-height: 92px;
   resize: vertical;
+}
+
+.project-inline-form {
+  display: grid;
+  gap: 10px;
+}
+
+.project-inline-form textarea {
+  min-height: 72px;
 }
 
 .team-member-form {

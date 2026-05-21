@@ -36,6 +36,7 @@ import {
   logout,
   setIssueLabels,
   transitionIssue,
+  updateProject,
   updateIssueComment,
   updateTeamMember,
   updateIssue,
@@ -337,6 +338,10 @@ export function App() {
   const [isLoadingProjects, setIsLoadingProjects] = useState(false);
   const [isCreatingProject, setIsCreatingProject] = useState(false);
   const [archivingProjectIds, setArchivingProjectIds] = useState<string[]>([]);
+  const [editingProjectId, setEditingProjectId] = useState("");
+  const [editProjectName, setEditProjectName] = useState("");
+  const [editProjectDescription, setEditProjectDescription] = useState("");
+  const [updatingProjectIds, setUpdatingProjectIds] = useState<string[]>([]);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [teamMembersError, setTeamMembersError] = useState("");
   const [teamMemberFormError, setTeamMemberFormError] = useState("");
@@ -450,6 +455,10 @@ export function App() {
     let isMounted = true;
     setProjectsError("");
     setProjectFormError("");
+    setEditingProjectId("");
+    setEditProjectName("");
+    setEditProjectDescription("");
+    setUpdatingProjectIds([]);
     setArchivingProjectIds([]);
     setIsLoadingProjects(true);
 
@@ -711,6 +720,10 @@ export function App() {
     setIssues([]);
     setProjectsError("");
     setProjectFormError("");
+    setEditingProjectId("");
+    setEditProjectName("");
+    setEditProjectDescription("");
+    setUpdatingProjectIds([]);
     setTeamMembersError("");
     setTeamMemberFormError("");
     setTeamMemberEmail("");
@@ -780,6 +793,53 @@ export function App() {
     }
   }
 
+  function startEditingProject(project: Project) {
+    setProjectsError("");
+    setEditingProjectId(project.id);
+    setEditProjectName(project.name);
+    setEditProjectDescription(project.description);
+  }
+
+  function cancelEditingProject() {
+    setEditingProjectId("");
+    setEditProjectName("");
+    setEditProjectDescription("");
+  }
+
+  async function handleUpdateProject(
+    event: FormEvent<HTMLFormElement>,
+    project: Project,
+  ) {
+    event.preventDefault();
+    setProjectsError("");
+    setUpdatingProjectIds((currentIds) =>
+      currentIds.includes(project.id) ? currentIds : [...currentIds, project.id],
+    );
+
+    try {
+      const updatedProject = await updateProject(project.id, {
+        name: editProjectName,
+        description: editProjectDescription,
+      });
+      setProjects((currentProjects) =>
+        currentProjects.map((currentProject) =>
+          currentProject.id === updatedProject.id ? updatedProject : currentProject,
+        ),
+      );
+      cancelEditingProject();
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setProjectsError(err.message);
+      } else {
+        setProjectsError("Could not update project.");
+      }
+    } finally {
+      setUpdatingProjectIds((currentIds) =>
+        currentIds.filter((currentProjectId) => currentProjectId !== project.id),
+      );
+    }
+  }
+
   async function handleArchiveProject(project: Project) {
     setProjectsError("");
     setArchivingProjectIds((currentIds) =>
@@ -801,6 +861,9 @@ export function App() {
       setIssueFilterProjectId((currentProjectId) =>
         currentProjectId === project.id ? "" : currentProjectId,
       );
+      if (editingProjectId === project.id) {
+        cancelEditingProject();
+      }
       setIssues((currentIssues) =>
         currentIssues.filter((issue) => issue.project_id !== project.id),
       );
@@ -1879,31 +1942,92 @@ export function App() {
 
             {projects.length > 0 ? (
               <div className="project-list">
-                {projects.map((project) => (
-                  <article className="project-row" key={project.id}>
-                    <span className="project-key">{project.key}</span>
-                    <div>
-                      <h3>{project.name}</h3>
-                      <p>{project.description || "No description"}</p>
-                    </div>
-                    {user.workspace.role === "admin" ? (
-                      <div className="project-row-actions">
-                        <button
-                          className="small-button danger-button"
-                          disabled={archivingProjectIds.includes(project.id)}
-                          onClick={() => {
-                            void handleArchiveProject(project);
+                {projects.map((project) => {
+                  const isEditingProject = editingProjectId === project.id;
+                  const isUpdatingProject = updatingProjectIds.includes(project.id);
+                  const isArchivingProject = archivingProjectIds.includes(project.id);
+
+                  return (
+                    <article className="project-row" key={project.id}>
+                      <span className="project-key">{project.key}</span>
+                      {isEditingProject ? (
+                        <form
+                          className="project-inline-form"
+                          onSubmit={(event) => {
+                            void handleUpdateProject(event, project);
                           }}
-                          type="button"
                         >
-                          {archivingProjectIds.includes(project.id)
-                            ? "Archiving"
-                            : "Archive"}
-                        </button>
-                      </div>
-                    ) : null}
-                  </article>
-                ))}
+                          <label>
+                            <span>Name</span>
+                            <input
+                              maxLength={120}
+                              onChange={(event) =>
+                                setEditProjectName(event.target.value)
+                              }
+                              value={editProjectName}
+                            />
+                          </label>
+                          <label>
+                            <span>Description</span>
+                            <textarea
+                              onChange={(event) =>
+                                setEditProjectDescription(event.target.value)
+                              }
+                              rows={2}
+                              value={editProjectDescription}
+                            />
+                          </label>
+                          <div className="project-row-actions">
+                            <button
+                              className="small-button"
+                              disabled={
+                                isUpdatingProject || editProjectName.trim() === ""
+                              }
+                              type="submit"
+                            >
+                              {isUpdatingProject ? "Saving" : "Save"}
+                            </button>
+                            <button
+                              className="ghost-button"
+                              disabled={isUpdatingProject}
+                              onClick={cancelEditingProject}
+                              type="button"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </form>
+                      ) : (
+                        <div>
+                          <h3>{project.name}</h3>
+                          <p>{project.description || "No description"}</p>
+                        </div>
+                      )}
+                      {user.workspace.role === "admin" && !isEditingProject ? (
+                        <div className="project-row-actions">
+                          <button
+                            className="small-button"
+                            disabled={isArchivingProject}
+                            onClick={() => startEditingProject(project)}
+                            type="button"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            className="small-button danger-button"
+                            disabled={isArchivingProject}
+                            onClick={() => {
+                              void handleArchiveProject(project);
+                            }}
+                            type="button"
+                          >
+                            {isArchivingProject ? "Archiving" : "Archive"}
+                          </button>
+                        </div>
+                      ) : null}
+                    </article>
+                  );
+                })}
               </div>
             ) : (
               <div className="project-empty">No projects yet</div>

@@ -1,6 +1,9 @@
 package projects
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestNormalizeProjectKey(t *testing.T) {
 	t.Parallel()
@@ -69,6 +72,35 @@ func TestValidateProjectInput(t *testing.T) {
 			t.Parallel()
 
 			err := validateProjectInput(tt.key, tt.project)
+			if tt.wantErr && err == nil {
+				t.Fatal("expected error")
+			}
+			if !tt.wantErr && err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+func TestValidateProjectDetails(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		project string
+		wantErr bool
+	}{
+		{name: "valid", project: "Core Platform"},
+		{name: "missing name", wantErr: true},
+		{name: "too long", project: "x" + strings.Repeat("a", 120), wantErr: true},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := validateProjectDetails(tt.project)
 			if tt.wantErr && err == nil {
 				t.Fatal("expected error")
 			}

@@ -150,6 +150,11 @@ type CreateProjectInput = {
   description: string;
 };
 
+type UpdateProjectInput = {
+  name: string;
+  description: string;
+};
+
 type CreateIssueInput = {
   project_id: string;
   title: string;
@@ -212,6 +217,13 @@ export async function listProjects() {
 export async function createProject(input: CreateProjectInput) {
   return request<Project>("/api/v1/projects", {
     method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function updateProject(projectId: string, input: UpdateProjectInput) {
+  return request<Project>(`/api/v1/projects/${encodeURIComponent(projectId)}`, {
+    method: "PATCH",
     body: JSON.stringify(input),
   });
 }

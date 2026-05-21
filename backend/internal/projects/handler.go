@@ -30,6 +30,11 @@ type createProjectRequest struct {
 	Description string `json:"description"`
 }
 
+type updateProjectRequest struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
 type projectResponse struct {
 	ID          string     `json:"id"`
 	Key         string     `json:"key"`
@@ -54,6 +59,7 @@ func NewHandler(db *pgxpool.Pool, authHandler *auth.Handler) *Handler {
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/projects", h.list)
 	mux.HandleFunc("POST /api/v1/projects", h.create)
+	mux.HandleFunc("PATCH /api/v1/projects/{id}", h.update)
 	mux.HandleFunc("POST /api/v1/projects/{id}/archive", h.archive)
 }
 
@@ -177,6 +183,53 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, project)
 }
 
+func (h *Handler) update(w http.ResponseWriter, r *http.Request) {
+	user, ok := h.requireUser(w, r)
+	if !ok {
+		return
+	}
+
+	if user.Role != "admin" {
+		writeError(w, http.StatusForbidden, "forbidden", "admin role is required")
+		return
+	}
+
+	projectID, err := normalizeProjectID(r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	var req updateProjectRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	name := strings.TrimSpace(req.Name)
+	description := strings.TrimSpace(req.Description)
+	if err := validateProjectDetails(name); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	project, err := h.updateProject(ctx, user.WorkspaceID, projectID, name, description)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "project_not_found", "project was not found")
+			return
+		}
+
+		writeError(w, http.StatusInternalServerError, "internal_error", "could not update project")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, project)
+}
+
 func (h *Handler) archive(w http.ResponseWriter, r *http.Request) {
 	user, ok := h.requireUser(w, r)
 	if !ok {
@@ -222,6 +275,39 @@ func (h *Handler) archiveProject(ctx context.Context, workspaceID string, projec
 	`, projectID, workspaceID).Scan(&archivedProjectID)
 }
 
+func (h *Handler) updateProject(ctx context.Context, workspaceID string, projectID string, name string, description string) (projectResponse, error) {
+	var project projectResponse
+	err := h.db.QueryRow(ctx, `
+		UPDATE projects
+		SET name = $3,
+			description = $4
+		WHERE id = $1
+			AND workspace_id = $2
+			AND archived_at IS NULL
+		RETURNING
+			id::text,
+			key,
+			name,
+			description,
+			created_by::text,
+			created_at,
+			archived_at
+	`, projectID, workspaceID, name, description).Scan(
+		&project.ID,
+		&project.Key,
+		&project.Name,
+		&project.Description,
+		&project.CreatedBy,
+		&project.CreatedAt,
+		&project.ArchivedAt,
+	)
+	if err != nil {
+		return projectResponse{}, err
+	}
+
+	return project, nil
+}
+
 func (h *Handler) requireUser(w http.ResponseWriter, r *http.Request) (auth.CurrentUser, bool) {
 	user, err := h.auth.CurrentUser(r)
 	if err != nil {
@@ -258,6 +344,10 @@ func validateProjectInput(key string, name string) error {
 		return errors.New("key must be 2-10 characters and contain only uppercase letters or numbers")
 	}
 
+	return validateProjectDetails(name)
+}
+
+func validateProjectDetails(name string) error {
 	if name == "" {
 		return errors.New("name is required")
 	}
