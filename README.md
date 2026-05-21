@@ -162,6 +162,15 @@ curl -i -b /tmp/team-task-tracker.cookies \
 curl -b /tmp/team-task-tracker.cookies \
   "http://localhost:8080/api/v1/issues/$ISSUE_ID/comments"
 
+COMMENT_ID="$(curl -s -b /tmp/team-task-tracker.cookies \
+  "http://localhost:8080/api/v1/issues/$ISSUE_ID/comments" \
+  | node -e 'let data=""; process.stdin.on("data", c => data += c); process.stdin.on("end", () => console.log(JSON.parse(data).comments[0].id));')"
+
+curl -i -X PATCH -b /tmp/team-task-tracker.cookies \
+  -H 'Content-Type: application/json' \
+  -d '{"body":"Looks good after editing the comment."}' \
+  "http://localhost:8080/api/v1/issues/$ISSUE_ID/comments/$COMMENT_ID"
+
 curl -b /tmp/team-task-tracker.cookies \
   "http://localhost:8080/api/v1/issues/$ISSUE_ID/activity"
 

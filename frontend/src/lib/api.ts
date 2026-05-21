@@ -86,6 +86,7 @@ export type IssueActivity = {
     | "labels_changed"
     | "issue_archived"
     | "comment_added"
+    | "comment_updated"
     | string;
   actor_id: string | null;
   actor_display_name: string | null;
@@ -346,6 +347,22 @@ export async function createIssueComment(issueId: string, body: string) {
     `/api/v1/issues/${encodeURIComponent(issueId)}/comments`,
     {
       method: "POST",
+      body: JSON.stringify({ body }),
+    },
+  );
+}
+
+export async function updateIssueComment(
+  issueId: string,
+  commentId: string,
+  body: string,
+) {
+  return request<IssueComment>(
+    `/api/v1/issues/${encodeURIComponent(issueId)}/comments/${encodeURIComponent(
+      commentId,
+    )}`,
+    {
+      method: "PATCH",
       body: JSON.stringify({ body }),
     },
   );

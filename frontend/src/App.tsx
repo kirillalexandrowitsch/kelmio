@@ -34,6 +34,7 @@ import {
   logout,
   setIssueLabels,
   transitionIssue,
+  updateIssueComment,
   updateTeamMember,
   updateIssue,
 } from "./lib/api";
@@ -142,6 +143,9 @@ function activityTitle(activity: IssueActivity) {
   if (activity.action === "comment_added") {
     return "Added comment";
   }
+  if (activity.action === "comment_updated") {
+    return "Updated comment";
+  }
 
   return activity.action.replaceAll("_", " ");
 }
@@ -159,6 +163,9 @@ function activityDescription(activity: IssueActivity, members: TeamMember[]) {
     )} -> ${memberDisplayName(members, activity.payload.to_assignee_id || null)}`;
   }
   if (activity.action === "comment_added") {
+    return activity.payload.preview ? `"${activity.payload.preview}"` : "";
+  }
+  if (activity.action === "comment_updated") {
     return activity.payload.preview ? `"${activity.payload.preview}"` : "";
   }
   if (activity.action === "issue_created") {
@@ -288,6 +295,9 @@ export function App() {
   const [commentBody, setCommentBody] = useState("");
   const [isLoadingComments, setIsLoadingComments] = useState(false);
   const [isCreatingComment, setIsCreatingComment] = useState(false);
+  const [editingCommentId, setEditingCommentId] = useState("");
+  const [editCommentBody, setEditCommentBody] = useState("");
+  const [updatingCommentIds, setUpdatingCommentIds] = useState<string[]>([]);
   const [issueActivity, setIssueActivity] = useState<IssueActivity[]>([]);
   const [activityError, setActivityError] = useState("");
   const [isLoadingActivity, setIsLoadingActivity] = useState(false);
@@ -491,11 +501,17 @@ export function App() {
       setIssueComments([]);
       setCommentsError("");
       setCommentBody("");
+      setEditingCommentId("");
+      setEditCommentBody("");
+      setUpdatingCommentIds([]);
       return;
     }
 
     let isMounted = true;
     setCommentsError("");
+    setEditingCommentId("");
+    setEditCommentBody("");
+    setUpdatingCommentIds([]);
     setIsLoadingComments(true);
 
     listIssueComments(selectedIssueId)
@@ -615,6 +631,9 @@ export function App() {
     setIssueComments([]);
     setCommentsError("");
     setCommentBody("");
+    setEditingCommentId("");
+    setEditCommentBody("");
+    setUpdatingCommentIds([]);
     setIssueActivity([]);
     setActivityError("");
   }
@@ -677,6 +696,9 @@ export function App() {
         setIssueComments([]);
         setIssueActivity([]);
         setCommentBody("");
+        setEditingCommentId("");
+        setEditCommentBody("");
+        setUpdatingCommentIds([]);
         setIsEditingIssueDetails(false);
       }
     } catch {
@@ -1045,6 +1067,9 @@ export function App() {
         setIssueComments([]);
         setIssueActivity([]);
         setCommentBody("");
+        setEditingCommentId("");
+        setEditCommentBody("");
+        setUpdatingCommentIds([]);
         setIsEditingIssueDetails(false);
       }
     } catch {
@@ -1075,6 +1100,9 @@ export function App() {
 
     setSelectedIssueError("");
     setIsEditingIssueDetails(false);
+    setEditingCommentId("");
+    setEditCommentBody("");
+    setUpdatingCommentIds([]);
     setIsLoadingSelectedIssue(true);
 
     try {
@@ -1161,6 +1189,58 @@ export function App() {
       }
     } finally {
       setIsCreatingComment(false);
+    }
+  }
+
+  function startEditingComment(comment: IssueComment) {
+    setCommentsError("");
+    setEditingCommentId(comment.id);
+    setEditCommentBody(comment.body);
+  }
+
+  function cancelEditingComment() {
+    setEditingCommentId("");
+    setEditCommentBody("");
+  }
+
+  async function handleUpdateComment(
+    event: FormEvent<HTMLFormElement>,
+    comment: IssueComment,
+  ) {
+    event.preventDefault();
+    if (!selectedIssue) {
+      return;
+    }
+
+    setCommentsError("");
+    setUpdatingCommentIds((currentIds) =>
+      currentIds.includes(comment.id) ? currentIds : [...currentIds, comment.id],
+    );
+
+    try {
+      const updatedComment = await updateIssueComment(
+        selectedIssue.id,
+        comment.id,
+        editCommentBody,
+      );
+      setIssueComments((currentComments) =>
+        currentComments.map((currentComment) =>
+          currentComment.id === updatedComment.id ? updatedComment : currentComment,
+        ),
+      );
+      setEditingCommentId("");
+      setEditCommentBody("");
+      await refreshIssueActivity(selectedIssue.id);
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setCommentsError(err.message);
+      } else {
+        setCommentsError("Could not update comment.");
+      }
+    } finally {
+      setUpdatingCommentIds((currentIds) =>
+        currentIds.filter((currentCommentId) => currentCommentId !== comment.id),
+      );
     }
   }
 
@@ -2094,6 +2174,9 @@ export function App() {
                     setSelectedIssue(null);
                     setSelectedIssueError("");
                     setIsEditingIssueDetails(false);
+                    setEditingCommentId("");
+                    setEditCommentBody("");
+                    setUpdatingCommentIds([]);
                   }}
                   type="button"
                 >
@@ -2273,15 +2356,89 @@ export function App() {
 
                   {issueComments.length > 0 ? (
                     <div className="comment-list">
-                      {issueComments.map((comment) => (
-                        <article className="comment-card" key={comment.id}>
-                          <header>
-                            <strong>{comment.author_display_name}</strong>
-                            <span>{formatDateTime(comment.created_at)}</span>
-                          </header>
-                          <p>{comment.body}</p>
-                        </article>
-                      ))}
+                      {issueComments.map((comment) => {
+                        const isEditingComment = editingCommentId === comment.id;
+                        const isUpdatingComment = updatingCommentIds.includes(
+                          comment.id,
+                        );
+                        const canEditComment =
+                          comment.author_id === user.id ||
+                          user.workspace.role === "admin";
+                        const wasEdited = comment.updated_at !== comment.created_at;
+
+                        return (
+                          <article className="comment-card" key={comment.id}>
+                            <header>
+                              <div className="comment-author">
+                                <strong>{comment.author_display_name}</strong>
+                                <span>
+                                  {formatDateTime(comment.created_at)}
+                                  {wasEdited
+                                    ? ` · edited ${formatDateTime(
+                                        comment.updated_at,
+                                      )}`
+                                    : ""}
+                                </span>
+                              </div>
+                              {canEditComment ? (
+                                <button
+                                  className="small-button"
+                                  disabled={isUpdatingComment}
+                                  onClick={() => {
+                                    if (isEditingComment) {
+                                      cancelEditingComment();
+                                    } else {
+                                      startEditingComment(comment);
+                                    }
+                                  }}
+                                  type="button"
+                                >
+                                  {isEditingComment ? "Cancel" : "Edit"}
+                                </button>
+                              ) : null}
+                            </header>
+
+                            {isEditingComment ? (
+                              <form
+                                className="comment-edit-form"
+                                onSubmit={(event) => {
+                                  void handleUpdateComment(event, comment);
+                                }}
+                              >
+                                <textarea
+                                  maxLength={4000}
+                                  onChange={(event) =>
+                                    setEditCommentBody(event.target.value)
+                                  }
+                                  rows={3}
+                                  value={editCommentBody}
+                                />
+                                <div className="form-actions">
+                                  <button
+                                    disabled={
+                                      isUpdatingComment ||
+                                      editCommentBody.trim() === ""
+                                    }
+                                    type="submit"
+                                  >
+                                    {isUpdatingComment ? "Saving..." : "Save"}
+                                  </button>
+                                  <button
+                                    className="ghost-button"
+                                    disabled={isUpdatingComment}
+                                    onClick={cancelEditingComment}
+                                    type="button"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              </form>
+                            ) : (
+                              <p>{comment.body}</p>
+                            )}
+                          </article>
+                        );
+                      })}
                     </div>
                   ) : (
                     <div className="comments-empty">No comments yet</div>

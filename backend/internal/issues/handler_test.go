@@ -3,6 +3,8 @@ package issues
 import (
 	"strings"
 	"testing"
+
+	"team-task-tracker/backend/internal/auth"
 )
 
 func TestNormalizeCreateIssueDefaults(t *testing.T) {
@@ -428,6 +430,83 @@ func TestNormalizeCommentBodyValidation(t *testing.T) {
 
 			if _, err := normalizeCommentBody(tt.body); err == nil {
 				t.Fatal("expected error")
+			}
+		})
+	}
+}
+
+func TestNormalizeCommentID(t *testing.T) {
+	t.Parallel()
+
+	got, err := normalizeCommentID(" 6D5257D4-002E-44DA-8925-D9108699C504 ")
+	if err != nil {
+		t.Fatalf("normalizeCommentID() error = %v", err)
+	}
+
+	want := "6d5257d4-002e-44da-8925-d9108699c504"
+	if got != want {
+		t.Fatalf("normalizeCommentID() = %q, want %q", got, want)
+	}
+}
+
+func TestNormalizeCommentIDValidation(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		id   string
+	}{
+		{name: "missing id", id: ""},
+		{name: "bad id", id: "not-a-uuid"},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			if _, err := normalizeCommentID(tt.id); err == nil {
+				t.Fatal("expected error")
+			}
+		})
+	}
+}
+
+func TestCanEditComment(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		user     auth.CurrentUser
+		authorID string
+		want     bool
+	}{
+		{
+			name:     "author can edit",
+			user:     auth.CurrentUser{ID: "user-1", Role: "member"},
+			authorID: "user-1",
+			want:     true,
+		},
+		{
+			name:     "admin can edit another user comment",
+			user:     auth.CurrentUser{ID: "admin-1", Role: "admin"},
+			authorID: "user-1",
+			want:     true,
+		},
+		{
+			name:     "member cannot edit another user comment",
+			user:     auth.CurrentUser{ID: "user-2", Role: "member"},
+			authorID: "user-1",
+			want:     false,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := canEditComment(tt.user, tt.authorID); got != tt.want {
+				t.Fatalf("canEditComment() = %v, want %v", got, tt.want)
 			}
 		})
 	}

@@ -41,6 +41,8 @@ var validIssuePriorities = map[string]bool{
 
 var uuidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 
+var errCommentForbidden = errors.New("comment update is forbidden")
+
 type Handler struct {
 	db   *pgxpool.Pool
 	auth *auth.Handler
@@ -79,6 +81,10 @@ type setIssueLabelsRequest struct {
 }
 
 type createCommentRequest struct {
+	Body string `json:"body"`
+}
+
+type updateCommentRequest struct {
 	Body string `json:"body"`
 }
 
@@ -177,6 +183,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/issues/{id}/archive", h.archive)
 	mux.HandleFunc("GET /api/v1/issues/{id}/comments", h.listComments)
 	mux.HandleFunc("POST /api/v1/issues/{id}/comments", h.createComment)
+	mux.HandleFunc("PATCH /api/v1/issues/{id}/comments/{commentID}", h.updateComment)
 	mux.HandleFunc("GET /api/v1/issues/{id}/activity", h.listActivity)
 }
 
@@ -533,6 +540,57 @@ func (h *Handler) createComment(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusCreated, comment)
+}
+
+func (h *Handler) updateComment(w http.ResponseWriter, r *http.Request) {
+	user, ok := h.requireUser(w, r)
+	if !ok {
+		return
+	}
+
+	issueID, err := normalizeIssueID(r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	commentID, err := normalizeCommentID(r.PathValue("commentID"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	var req updateCommentRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	body, err := normalizeCommentBody(req.Body)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	comment, err := h.updateIssueComment(ctx, user, issueID, commentID, body)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "comment_not_found", "comment was not found")
+			return
+		}
+		if errors.Is(err, errCommentForbidden) {
+			writeError(w, http.StatusForbidden, "forbidden", "only the comment author or an admin can edit this comment")
+			return
+		}
+
+		writeError(w, http.StatusInternalServerError, "internal_error", "could not update comment")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, comment)
 }
 
 func (h *Handler) listActivity(w http.ResponseWriter, r *http.Request) {
@@ -1439,6 +1497,69 @@ func (h *Handler) createIssueComment(ctx context.Context, user auth.CurrentUser,
 	return comment, nil
 }
 
+func (h *Handler) updateIssueComment(ctx context.Context, user auth.CurrentUser, issueID string, commentID string, body string) (issueCommentResponse, error) {
+	tx, err := h.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return issueCommentResponse{}, err
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	var authorID string
+	if err := tx.QueryRow(ctx, `
+		SELECT c.author_id::text
+		FROM comments c
+		JOIN issues i ON i.id = c.issue_id
+		JOIN projects p ON p.id = i.project_id
+		WHERE c.id = $1
+			AND c.issue_id = $2
+			AND p.workspace_id = $3
+			AND p.archived_at IS NULL
+			AND i.archived_at IS NULL
+	`, commentID, issueID, user.WorkspaceID).Scan(&authorID); err != nil {
+		return issueCommentResponse{}, err
+	}
+
+	if !canEditComment(user, authorID) {
+		return issueCommentResponse{}, errCommentForbidden
+	}
+
+	comment, err := scanIssueComment(tx.QueryRow(ctx, `
+		UPDATE comments c
+		SET body = $3,
+			updated_at = now()
+		FROM users u
+		WHERE c.id = $1
+			AND c.issue_id = $2
+			AND u.id = c.author_id
+		RETURNING
+			c.id::text,
+			c.issue_id::text,
+			c.author_id::text,
+			u.display_name,
+			c.body,
+			c.created_at,
+			c.updated_at
+	`, commentID, issueID, body))
+	if err != nil {
+		return issueCommentResponse{}, err
+	}
+
+	if err := insertIssueActivity(ctx, tx, issueID, user.ID, "comment_updated", map[string]string{
+		"comment_id": comment.ID,
+		"preview":    commentPreview(comment.Body),
+	}); err != nil {
+		return issueCommentResponse{}, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return issueCommentResponse{}, err
+	}
+
+	return comment, nil
+}
+
 func (h *Handler) listIssueActivity(ctx context.Context, workspaceID string, issueID string) ([]issueActivityResponse, error) {
 	rows, err := h.db.Query(ctx, `
 		SELECT
@@ -1601,6 +1722,22 @@ func normalizeIssueID(id string) (string, error) {
 	}
 
 	return id, nil
+}
+
+func normalizeCommentID(id string) (string, error) {
+	id = strings.ToLower(strings.TrimSpace(id))
+	if id == "" {
+		return "", errors.New("comment id is required")
+	}
+	if !uuidPattern.MatchString(id) {
+		return "", errors.New("comment id is invalid")
+	}
+
+	return id, nil
+}
+
+func canEditComment(user auth.CurrentUser, authorID string) bool {
+	return user.Role == "admin" || user.ID == authorID
 }
 
 func normalizeOptionalUserID(id string) (string, error) {

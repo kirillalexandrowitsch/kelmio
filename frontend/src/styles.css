@@ -124,7 +124,8 @@ a {
 .issue-filters select:focus,
 .issue-card select:focus,
 .issue-detail-status select:focus,
-.comment-form textarea:focus {
+.comment-form textarea:focus,
+.comment-edit-form textarea:focus {
   border-color: #4e795d;
   box-shadow: 0 0 0 3px rgba(78, 121, 93, 0.15);
 }
@@ -136,6 +137,7 @@ a {
 .issue-form button,
 .issue-edit-form button,
 .comment-form button,
+.comment-edit-form button,
 .ghost-button,
 .small-button {
   min-height: 40px;
@@ -192,12 +194,14 @@ a {
 
 .issue-form button:hover:not(:disabled),
 .issue-edit-form button:hover:not(:disabled),
-.comment-form button:hover:not(:disabled) {
+.comment-form button:hover:not(:disabled),
+.comment-edit-form button:hover:not(:disabled) {
   background: #27362d;
 }
 
 .issue-edit-form button,
-.comment-form button {
+.comment-form button,
+.comment-edit-form button {
   border: 1px solid #18231d;
   color: #ffffff;
   background: #18231d;
@@ -340,8 +344,20 @@ h1 {
   background: #ffffff;
 }
 
+.comment-edit-form .ghost-button {
+  border-color: #b8c5bd;
+  color: #28352d;
+  background: #ffffff;
+}
+
 .ghost-button:hover {
   border-color: #6b7a70;
+}
+
+.comment-edit-form .ghost-button:hover:not(:disabled) {
+  border-color: #6b7a70;
+  color: #28352d;
+  background: #f6f8f6;
 }
 
 .small-button {
@@ -1172,6 +1188,11 @@ h1 {
   gap: 12px;
 }
 
+.comment-author {
+  display: grid;
+  gap: 3px;
+}
+
 .comment-card strong {
   font-size: 13px;
 }
@@ -1187,6 +1208,23 @@ h1 {
   font-size: 13px;
   line-height: 1.5;
   white-space: pre-wrap;
+}
+
+.comment-edit-form {
+  display: grid;
+  gap: 8px;
+}
+
+.comment-edit-form textarea {
+  width: 100%;
+  min-height: 92px;
+  padding: 10px 12px;
+  border: 1px solid #c8d1cb;
+  border-radius: 8px;
+  color: #17211b;
+  background: #ffffff;
+  outline: none;
+  resize: vertical;
 }
 
 .comments-empty {
