@@ -255,6 +255,16 @@ export async function updateTeamMember(memberId: string, input: UpdateTeamMember
   );
 }
 
+export async function resetTeamMemberPassword(memberId: string, password: string) {
+  await request<void>(
+    `/api/v1/team/members/${encodeURIComponent(memberId)}/password`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ password }),
+    },
+  );
+}
+
 export async function listLabels() {
   return request<ListLabelsResponse>("/api/v1/labels");
 }

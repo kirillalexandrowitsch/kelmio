@@ -73,6 +73,11 @@ curl -i -X PATCH -b /tmp/team-task-tracker.cookies \
   -H 'Content-Type: application/json' \
   -d '{"role":"admin","is_active":true}' \
   "http://localhost:8080/api/v1/team/members/$MEMBER_ID"
+
+curl -i -X PATCH -b /tmp/team-task-tracker.cookies \
+  -H 'Content-Type: application/json' \
+  -d '{"password":"member54321"}' \
+  "http://localhost:8080/api/v1/team/members/$MEMBER_ID/password"
 ```
 
 Labels API smoke test:

@@ -34,6 +34,7 @@ import {
   listTeamMembers,
   login,
   logout,
+  resetTeamMemberPassword,
   setIssueLabels,
   transitionIssue,
   updateProject,
@@ -354,6 +355,10 @@ export function App() {
   const [teamMemberRole, setTeamMemberRole] =
     useState<TeamMember["role"]>("member");
   const [updatingTeamMemberIds, setUpdatingTeamMemberIds] = useState<string[]>([]);
+  const [passwordResetMemberId, setPasswordResetMemberId] = useState("");
+  const [teamMemberResetPassword, setTeamMemberResetPassword] = useState("");
+  const [resettingTeamMemberPasswordIds, setResettingTeamMemberPasswordIds] =
+    useState<string[]>([]);
   const [labels, setLabels] = useState<Label[]>([]);
   const [labelsError, setLabelsError] = useState("");
   const [isLoadingLabels, setIsLoadingLabels] = useState(false);
@@ -732,6 +737,9 @@ export function App() {
     setTeamMemberPassword("");
     setTeamMemberRole("member");
     setUpdatingTeamMemberIds([]);
+    setPasswordResetMemberId("");
+    setTeamMemberResetPassword("");
+    setResettingTeamMemberPasswordIds([]);
     setLabelsError("");
     setLabelName("");
     setLabelColor("#4e795d");
@@ -943,6 +951,43 @@ export function App() {
       }
     } finally {
       setUpdatingTeamMemberIds((currentIds) =>
+        currentIds.filter((currentId) => currentId !== memberId),
+      );
+    }
+  }
+
+  function startResetTeamMemberPassword(memberId: string) {
+    setTeamMembersError("");
+    setPasswordResetMemberId(memberId);
+    setTeamMemberResetPassword("");
+  }
+
+  function cancelResetTeamMemberPassword() {
+    setPasswordResetMemberId("");
+    setTeamMemberResetPassword("");
+  }
+
+  async function handleResetTeamMemberPassword(
+    event: FormEvent<HTMLFormElement>,
+    memberId: string,
+  ) {
+    event.preventDefault();
+    setTeamMembersError("");
+    setResettingTeamMemberPasswordIds((currentIds) =>
+      currentIds.includes(memberId) ? currentIds : [...currentIds, memberId],
+    );
+
+    try {
+      await resetTeamMemberPassword(memberId, teamMemberResetPassword);
+      cancelResetTeamMemberPassword();
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setTeamMembersError(err.message);
+      } else {
+        setTeamMembersError("Could not reset team member password.");
+      }
+    } finally {
+      setResettingTeamMemberPasswordIds((currentIds) =>
         currentIds.filter((currentId) => currentId !== memberId),
       );
     }
@@ -1717,6 +1762,9 @@ export function App() {
               {teamMembers.map((member) => {
                 const isSelf = member.id === user.id;
                 const isUpdatingMember = updatingTeamMemberIds.includes(member.id);
+                const isResettingPassword = passwordResetMemberId === member.id;
+                const isSubmittingPasswordReset =
+                  resettingTeamMemberPasswordIds.includes(member.id);
 
                 return (
                   <article className="team-member-row" key={member.id}>
@@ -1760,7 +1808,63 @@ export function App() {
                           />
                           <span>{member.is_active ? "Active" : "Inactive"}</span>
                         </label>
+                        <button
+                          className="small-button"
+                          disabled={isSelf || isUpdatingMember || isSubmittingPasswordReset}
+                          onClick={() => {
+                            if (isResettingPassword) {
+                              cancelResetTeamMemberPassword();
+                            } else {
+                              startResetTeamMemberPassword(member.id);
+                            }
+                          }}
+                          type="button"
+                        >
+                          {isResettingPassword ? "Cancel reset" : "Reset password"}
+                        </button>
                       </div>
+                    ) : null}
+                    {user.workspace.role === "admin" && isResettingPassword ? (
+                      <form
+                        className="member-password-reset"
+                        onSubmit={(event) => {
+                          void handleResetTeamMemberPassword(event, member.id);
+                        }}
+                      >
+                        <label>
+                          <span>New password for @{member.username}</span>
+                          <input
+                            autoComplete="new-password"
+                            minLength={8}
+                            onChange={(event) =>
+                              setTeamMemberResetPassword(event.target.value)
+                            }
+                            placeholder="At least 8 characters"
+                            type="password"
+                            value={teamMemberResetPassword}
+                          />
+                        </label>
+                        <div className="form-actions">
+                          <button
+                            className="small-button"
+                            disabled={
+                              isSubmittingPasswordReset ||
+                              teamMemberResetPassword.length < 8
+                            }
+                            type="submit"
+                          >
+                            {isSubmittingPasswordReset ? "Saving..." : "Save password"}
+                          </button>
+                          <button
+                            className="ghost-button"
+                            disabled={isSubmittingPasswordReset}
+                            onClick={cancelResetTeamMemberPassword}
+                            type="button"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </form>
                     ) : null}
                   </article>
                 );

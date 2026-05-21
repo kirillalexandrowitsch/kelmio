@@ -42,6 +42,10 @@ type updateMemberRequest struct {
 	IsActive *bool  `json:"is_active"`
 }
 
+type resetMemberPasswordRequest struct {
+	Password string `json:"password"`
+}
+
 type memberResponse struct {
 	ID          string    `json:"id"`
 	Email       string    `json:"email"`
@@ -82,6 +86,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/team/members", h.listMembers)
 	mux.HandleFunc("POST /api/v1/team/members", h.createMember)
 	mux.HandleFunc("PATCH /api/v1/team/members/{id}", h.updateMember)
+	mux.HandleFunc("PATCH /api/v1/team/members/{id}/password", h.resetMemberPassword)
 }
 
 func (h *Handler) listMembers(w http.ResponseWriter, r *http.Request) {
@@ -235,6 +240,55 @@ func (h *Handler) updateMember(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, member)
 }
 
+func (h *Handler) resetMemberPassword(w http.ResponseWriter, r *http.Request) {
+	user, ok := h.requireUser(w, r)
+	if !ok {
+		return
+	}
+
+	if user.Role != "admin" {
+		writeError(w, http.StatusForbidden, "forbidden", "admin role is required")
+		return
+	}
+
+	memberID, err := normalizeMemberID(r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	var req resetMemberPasswordRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	password, err := normalizeMemberPassword(req.Password)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	if err := h.resetWorkspaceMemberPassword(ctx, user, memberID, password); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "member_not_found", "team member was not found")
+			return
+		}
+		if errors.Is(err, errInvalidMemberUpdate) {
+			writeError(w, http.StatusBadRequest, "invalid_member_update", "you cannot reset your own password here")
+			return
+		}
+
+		writeError(w, http.StatusInternalServerError, "internal_error", "could not reset team member password")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (h *Handler) createWorkspaceMember(ctx context.Context, workspaceID string, input normalizedCreateMember) (memberResponse, error) {
 	passwordHash, err := bcrypt.GenerateFromPassword([]byte(input.Password), bcrypt.DefaultCost)
 	if err != nil {
@@ -381,6 +435,49 @@ func (h *Handler) updateWorkspaceMember(ctx context.Context, actor auth.CurrentU
 	return member, nil
 }
 
+func (h *Handler) resetWorkspaceMemberPassword(ctx context.Context, actor auth.CurrentUser, memberID string, password string) error {
+	if memberID == actor.ID {
+		return errInvalidMemberUpdate
+	}
+
+	passwordHash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+
+	tx, err := h.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	commandTag, err := tx.Exec(ctx, `
+		UPDATE users u
+		SET password_hash = $3
+		FROM workspace_members wm
+		WHERE wm.user_id = u.id
+			AND wm.workspace_id = $1
+			AND wm.user_id = $2
+	`, actor.WorkspaceID, memberID, string(passwordHash))
+	if err != nil {
+		return err
+	}
+	if commandTag.RowsAffected() == 0 {
+		return pgx.ErrNoRows
+	}
+
+	if _, err := tx.Exec(ctx, `
+		DELETE FROM sessions
+		WHERE user_id = $1
+	`, memberID); err != nil {
+		return err
+	}
+
+	return tx.Commit(ctx)
+}
+
 func (h *Handler) requireUser(w http.ResponseWriter, r *http.Request) (auth.CurrentUser, bool) {
 	user, err := h.auth.CurrentUser(r)
 	if err != nil {
@@ -420,11 +517,8 @@ func normalizeCreateMember(req createMemberRequest) (normalizedCreateMember, err
 	if len([]rune(input.DisplayName)) > 80 {
 		return input, errors.New("display_name must be 80 characters or fewer")
 	}
-	if len(input.Password) < 8 {
-		return input, errors.New("password must be at least 8 characters")
-	}
-	if len(input.Password) > 128 {
-		return input, errors.New("password must be 128 characters or fewer")
+	if _, err := normalizeMemberPassword(input.Password); err != nil {
+		return input, err
 	}
 	if input.Role != "admin" && input.Role != "member" {
 		return input, errors.New("role is invalid")
@@ -463,6 +557,18 @@ func normalizeUpdateMember(memberID string, req updateMemberRequest) (normalized
 	}
 
 	return input, nil
+}
+
+func normalizeMemberPassword(password string) (string, error) {
+	password = strings.TrimSpace(password)
+	if len(password) < 8 {
+		return "", errors.New("password must be at least 8 characters")
+	}
+	if len(password) > 128 {
+		return "", errors.New("password must be 128 characters or fewer")
+	}
+
+	return password, nil
 }
 
 func decodeJSON(w http.ResponseWriter, r *http.Request, dest any) error {

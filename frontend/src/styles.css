@@ -115,6 +115,7 @@ a {
 .project-inline-form textarea:focus,
 .team-member-form input:focus,
 .team-member-form select:focus,
+.member-password-reset input:focus,
 .label-form input:focus,
 .issue-form input:focus,
 .issue-form select:focus,
@@ -616,7 +617,7 @@ h1 {
 
 .member-controls {
   display: grid;
-  grid-template-columns: minmax(110px, 1fr) auto;
+  grid-template-columns: minmax(110px, 1fr) auto auto;
   align-items: end;
   gap: 8px;
 }
@@ -660,6 +661,39 @@ h1 {
   width: 15px;
   height: 15px;
   accent-color: #4e795d;
+}
+
+.member-password-reset {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(180px, 1fr) auto;
+  align-items: end;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid #edf0ed;
+}
+
+.member-password-reset label {
+  display: grid;
+  gap: 8px;
+}
+
+.member-password-reset label span {
+  color: #657268;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.member-password-reset input {
+  width: 100%;
+  min-height: 40px;
+  padding: 10px 12px;
+  border: 1px solid #c8d1cb;
+  border-radius: 8px;
+  color: #17211b;
+  background: #ffffff;
+  outline: none;
 }
 
 .project-row {

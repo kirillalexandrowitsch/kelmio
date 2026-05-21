@@ -1,6 +1,9 @@
 package team
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestNormalizeCreateMember(t *testing.T) {
 	t.Parallel()
@@ -89,6 +92,42 @@ func TestNormalizeCreateMemberValidation(t *testing.T) {
 			t.Parallel()
 
 			if _, err := normalizeCreateMember(tt.req); err == nil {
+				t.Fatal("expected error")
+			}
+		})
+	}
+}
+
+func TestNormalizeMemberPassword(t *testing.T) {
+	t.Parallel()
+
+	got, err := normalizeMemberPassword("  password123  ")
+	if err != nil {
+		t.Fatalf("normalize password: %v", err)
+	}
+
+	if got != "password123" {
+		t.Fatalf("password = %q, want %q", got, "password123")
+	}
+}
+
+func TestNormalizeMemberPasswordValidation(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		password string
+	}{
+		{name: "too short", password: "short"},
+		{name: "too long", password: "x" + strings.Repeat("a", 128)},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			if _, err := normalizeMemberPassword(tt.password); err == nil {
 				t.Fatal("expected error")
 			}
 		})
