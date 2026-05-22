@@ -17,6 +17,7 @@ import {
   archiveIssue,
   archiveProject,
   assignIssue,
+  changePassword,
   createLabel,
   createIssue,
   createIssueComment,
@@ -78,7 +79,7 @@ const issueDueFilterLabels: Record<IssueDueFilter, string> = {
   no_due: "No due date",
 };
 
-type AppSection = "dashboard" | "projects" | "issues" | "team" | "labels";
+type AppSection = "dashboard" | "projects" | "issues" | "team" | "labels" | "account";
 type DueTone = "overdue" | "due-soon" | "scheduled" | "done";
 
 const appSections = [
@@ -87,6 +88,7 @@ const appSections = [
   { id: "issues", title: "Issues" },
   { id: "team", title: "Team" },
   { id: "labels", title: "Labels" },
+  { id: "account", title: "Account" },
 ] satisfies Array<{ id: AppSection; title: string }>;
 
 function issueMatchesFilters(
@@ -333,6 +335,12 @@ export function App() {
   const [isBooting, setIsBooting] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeSection, setActiveSection] = useState<AppSection>("dashboard");
+  const [accountError, setAccountError] = useState("");
+  const [accountSuccess, setAccountSuccess] = useState("");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmNewPassword, setConfirmNewPassword] = useState("");
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectsError, setProjectsError] = useState("");
   const [projectFormError, setProjectFormError] = useState("");
@@ -719,6 +727,12 @@ export function App() {
     await logout();
     setUser(null);
     setActiveSection("dashboard");
+    setAccountError("");
+    setAccountSuccess("");
+    setCurrentPassword("");
+    setNewPassword("");
+    setConfirmNewPassword("");
+    setIsChangingPassword(false);
     setProjects([]);
     setTeamMembers([]);
     setLabels([]);
@@ -772,6 +786,34 @@ export function App() {
     setDeletingCommentIds([]);
     setIssueActivity([]);
     setActivityError("");
+  }
+
+  async function handleChangePassword(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setAccountError("");
+    setAccountSuccess("");
+
+    if (newPassword !== confirmNewPassword) {
+      setAccountError("New password confirmation does not match.");
+      return;
+    }
+
+    setIsChangingPassword(true);
+    try {
+      await changePassword(currentPassword, newPassword);
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmNewPassword("");
+      setAccountSuccess("Password changed. Other sessions were signed out.");
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setAccountError(err.message);
+      } else {
+        setAccountError("Could not change password.");
+      }
+    } finally {
+      setIsChangingPassword(false);
+    }
   }
 
   async function handleCreateProject(event: FormEvent<HTMLFormElement>) {
@@ -1740,6 +1782,87 @@ export function App() {
               Open labels
             </button>
           </article>
+        </section>
+
+        <section
+          className="account-panel"
+          aria-label="Account settings"
+          hidden={activeSection !== "account"}
+        >
+          <header className="section-header">
+            <div>
+              <p className="eyebrow">Account</p>
+              <h2>Profile and password</h2>
+            </div>
+          </header>
+
+          <div className="account-card">
+            <div>
+              <span>Display name</span>
+              <strong>{user.display_name}</strong>
+            </div>
+            <div>
+              <span>Username</span>
+              <strong>@{user.username}</strong>
+            </div>
+            <div>
+              <span>Email</span>
+              <strong>{user.email}</strong>
+            </div>
+            <div>
+              <span>Role</span>
+              <strong>{user.workspace.role}</strong>
+            </div>
+          </div>
+
+          <form className="account-form" onSubmit={handleChangePassword}>
+            <label>
+              <span>Current password</span>
+              <input
+                autoComplete="current-password"
+                onChange={(event) => setCurrentPassword(event.target.value)}
+                type="password"
+                value={currentPassword}
+              />
+            </label>
+            <label>
+              <span>New password</span>
+              <input
+                autoComplete="new-password"
+                minLength={8}
+                onChange={(event) => setNewPassword(event.target.value)}
+                type="password"
+                value={newPassword}
+              />
+            </label>
+            <label>
+              <span>Confirm new password</span>
+              <input
+                autoComplete="new-password"
+                minLength={8}
+                onChange={(event) => setConfirmNewPassword(event.target.value)}
+                type="password"
+                value={confirmNewPassword}
+              />
+            </label>
+
+            {accountError ? <p className="form-error">{accountError}</p> : null}
+            {accountSuccess ? (
+              <p className="form-success">{accountSuccess}</p>
+            ) : null}
+
+            <button
+              disabled={
+                isChangingPassword ||
+                currentPassword.trim() === "" ||
+                newPassword.length < 8 ||
+                confirmNewPassword.length < 8
+              }
+              type="submit"
+            >
+              {isChangingPassword ? "Changing..." : "Change password"}
+            </button>
+          </form>
         </section>
 
         <section

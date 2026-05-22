@@ -109,6 +109,7 @@ a {
 }
 
 .auth-form input:focus,
+.account-form input:focus,
 .project-form input:focus,
 .project-form textarea:focus,
 .project-inline-form input:focus,
@@ -134,6 +135,7 @@ a {
 }
 
 .auth-form button,
+.account-form button,
 .project-form button,
 .team-member-form button,
 .label-form button,
@@ -156,6 +158,16 @@ a {
 }
 
 .auth-form button:hover:not(:disabled) {
+  background: #27362d;
+}
+
+.account-form button {
+  border: 1px solid #18231d;
+  color: #ffffff;
+  background: #18231d;
+}
+
+.account-form button:hover:not(:disabled) {
   background: #27362d;
 }
 
@@ -217,6 +229,17 @@ a {
   border-radius: 8px;
   color: #923c2d;
   background: #fff1ef;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.form-success {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid #b7cfc0;
+  border-radius: 8px;
+  color: #356145;
+  background: #ecf7ef;
   font-size: 13px;
   font-weight: 700;
 }
@@ -472,6 +495,7 @@ h1 {
 
 .projects-panel,
 .project-form,
+.account-panel,
 .issues-panel,
 .issue-form,
 .team-panel,
@@ -495,6 +519,69 @@ h1 {
   align-content: start;
   gap: 14px;
   padding: 18px;
+}
+
+.account-panel {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  padding: 18px;
+}
+
+.account-card {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.account-card div {
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  border: 1px solid #edf0ed;
+  border-radius: 8px;
+  background: #fbfcfb;
+}
+
+.account-card span {
+  color: #657268;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.account-card strong {
+  overflow-wrap: anywhere;
+}
+
+.account-form {
+  display: grid;
+  max-width: 520px;
+  gap: 12px;
+  padding-top: 14px;
+  border-top: 1px solid #edf0ed;
+}
+
+.account-form label {
+  display: grid;
+  gap: 8px;
+}
+
+.account-form label span {
+  color: #4e5c54;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.account-form input {
+  width: 100%;
+  min-height: 40px;
+  padding: 10px 12px;
+  border: 1px solid #c8d1cb;
+  border-radius: 8px;
+  color: #17211b;
+  background: #fbfcfb;
+  outline: none;
 }
 
 .issues-layout {
@@ -1513,7 +1600,7 @@ h1 {
   }
 
   .nav-list {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
   }
 
   .nav-list button {
@@ -1525,6 +1612,7 @@ h1 {
   }
 
   .dashboard-actions,
+  .account-card,
   .projects-layout,
   .issues-layout,
   .team-member-row,

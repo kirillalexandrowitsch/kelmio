@@ -34,6 +34,11 @@ type loginRequest struct {
 	Password string `json:"password"`
 }
 
+type changePasswordRequest struct {
+	CurrentPassword string `json:"current_password"`
+	NewPassword     string `json:"new_password"`
+}
+
 type loginResponse struct {
 	User      userResponse `json:"user"`
 	ExpiresAt time.Time    `json:"expires_at"`
@@ -86,6 +91,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/auth/login", h.login)
 	mux.HandleFunc("POST /api/v1/auth/logout", h.logout)
 	mux.HandleFunc("GET /api/v1/auth/me", h.me)
+	mux.HandleFunc("PATCH /api/v1/auth/password", h.changePassword)
 }
 
 func (h *Handler) CurrentUser(r *http.Request) (CurrentUser, error) {
@@ -198,6 +204,60 @@ func (h *Handler) me(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (h *Handler) changePassword(w http.ResponseWriter, r *http.Request) {
+	cookie, err := r.Cookie(SessionCookieName)
+	if err != nil || cookie.Value == "" {
+		writeError(w, http.StatusUnauthorized, "unauthorized", "session is required")
+		return
+	}
+
+	var req changePasswordRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	currentPassword, newPassword, err := normalizeChangePassword(req)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	tokenHash := hashToken(cookie.Value)
+	user, err := h.userBySession(ctx, tokenHash)
+	if err != nil {
+		if errors.Is(err, errInvalidCredentials) {
+			http.SetCookie(w, expiredSessionCookie())
+			writeError(w, http.StatusUnauthorized, "unauthorized", "session is invalid")
+			return
+		}
+
+		writeError(w, http.StatusInternalServerError, "internal_error", "could not load session")
+		return
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(currentPassword)); err != nil {
+		writeError(w, http.StatusUnauthorized, "invalid_current_password", "current password is invalid")
+		return
+	}
+
+	passwordHash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "internal_error", "could not update password")
+		return
+	}
+
+	if err := h.updateOwnPassword(ctx, user.ID, tokenHash, string(passwordHash)); err != nil {
+		writeError(w, http.StatusInternalServerError, "internal_error", "could not update password")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (h *Handler) userByIdentifier(ctx context.Context, identifier string) (userRecord, error) {
 	var user userRecord
 	if err := h.db.QueryRow(ctx, `
@@ -294,6 +354,34 @@ func (h *Handler) deleteSession(ctx context.Context, tokenHash string) error {
 	return err
 }
 
+func (h *Handler) updateOwnPassword(ctx context.Context, userID string, currentTokenHash string, passwordHash string) error {
+	tx, err := h.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	if _, err := tx.Exec(ctx, `
+		UPDATE users
+		SET password_hash = $2
+		WHERE id = $1
+	`, userID, passwordHash); err != nil {
+		return err
+	}
+
+	if _, err := tx.Exec(ctx, `
+		DELETE FROM sessions
+		WHERE user_id = $1
+			AND token_hash <> $2
+	`, userID, currentTokenHash); err != nil {
+		return err
+	}
+
+	return tx.Commit(ctx)
+}
+
 func (req loginRequest) identifier() string {
 	if strings.TrimSpace(req.Login) != "" {
 		return strings.TrimSpace(req.Login)
@@ -302,6 +390,29 @@ func (req loginRequest) identifier() string {
 		return strings.TrimSpace(req.Email)
 	}
 	return strings.TrimSpace(req.Username)
+}
+
+func normalizeChangePassword(req changePasswordRequest) (string, string, error) {
+	currentPassword := strings.TrimSpace(req.CurrentPassword)
+	newPassword := strings.TrimSpace(req.NewPassword)
+
+	if currentPassword == "" {
+		return "", "", errors.New("current_password is required")
+	}
+	if len(currentPassword) > 128 {
+		return "", "", errors.New("current_password must be 128 characters or fewer")
+	}
+	if len(newPassword) < 8 {
+		return "", "", errors.New("new_password must be at least 8 characters")
+	}
+	if len(newPassword) > 128 {
+		return "", "", errors.New("new_password must be 128 characters or fewer")
+	}
+	if newPassword == currentPassword {
+		return "", "", errors.New("new_password must be different from current_password")
+	}
+
+	return currentPassword, newPassword, nil
 }
 
 func (user userRecord) toResponse() userResponse {

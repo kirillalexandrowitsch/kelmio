@@ -210,6 +210,16 @@ export async function logout() {
   });
 }
 
+export async function changePassword(currentPassword: string, newPassword: string) {
+  await request<void>("/api/v1/auth/password", {
+    method: "PATCH",
+    body: JSON.stringify({
+      current_password: currentPassword,
+      new_password: newPassword,
+    }),
+  });
+}
+
 export async function listProjects() {
   return request<ListProjectsResponse>("/api/v1/projects");
 }
