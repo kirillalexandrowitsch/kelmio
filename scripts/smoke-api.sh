@@ -7,8 +7,12 @@ ADMIN_PASSWORD="${ADMIN_PASSWORD:-admin12345}"
 COOKIE_JAR="$(mktemp "${TMPDIR:-/tmp}/team-task-tracker-smoke.XXXXXX")"
 PROJECT_ID=""
 ISSUE_ID=""
+LABEL_ID=""
 
 cleanup() {
+	if [ -n "$LABEL_ID" ]; then
+		curl -fsS -b "$COOKIE_JAR" -X DELETE "$API_BASE_URL/api/v1/labels/$LABEL_ID" >/dev/null 2>&1 || true
+	fi
 	if [ -n "$ISSUE_ID" ]; then
 		curl -fsS -b "$COOKIE_JAR" -X POST "$API_BASE_URL/api/v1/issues/$ISSUE_ID/archive" >/dev/null 2>&1 || true
 	fi
@@ -54,6 +58,14 @@ api_post() {
 		"$API_BASE_URL$1"
 }
 
+api_put() {
+	curl -fsS -b "$COOKIE_JAR" \
+		-X PUT \
+		-H "Content-Type: application/json" \
+		-d "$2" \
+		"$API_BASE_URL$1"
+}
+
 require_command curl
 require_command node
 
@@ -76,6 +88,10 @@ PROJECT_ID="$(api_post "/api/v1/projects" "{\"key\":\"$PROJECT_KEY\",\"name\":\"
 printf 'Creating issue in project %s\n' "$PROJECT_KEY"
 ISSUE_ID="$(api_post "/api/v1/issues" "{\"project_id\":\"$PROJECT_ID\",\"title\":\"$ISSUE_TITLE\",\"description\":\"Created by API smoke test.\",\"issue_type\":\"task\",\"status\":\"todo\",\"priority\":\"high\"}" | json_value 'data.id')"
 
+printf 'Creating and attaching label\n'
+LABEL_ID="$(api_post "/api/v1/labels" "{\"name\":\"smoke-$RUN_ID\",\"color\":\"#3662a1\"}" | json_value 'data.id')"
+api_put "/api/v1/issues/$ISSUE_ID/labels" "{\"label_ids\":[\"$LABEL_ID\"]}" | json_value "data.labels.some((label) => label.id === \"$LABEL_ID\")" >/dev/null
+
 printf 'Moving issue to in_progress\n'
 api_post "/api/v1/issues/$ISSUE_ID/transition" '{"status":"in_progress"}' | json_value 'data.status === "in_progress"' >/dev/null
 
@@ -84,11 +100,13 @@ COMMENT_ID="$(api_post "/api/v1/issues/$ISSUE_ID/comments" '{"body":"Smoke test 
 
 printf 'Checking issue filters\n'
 api_get "/api/v1/issues?project_id=$PROJECT_ID&status=in_progress&q=Smoke" | json_value "data.issues.some((issue) => issue.id === \"$ISSUE_ID\")" >/dev/null
+api_get "/api/v1/issues?label_id=$LABEL_ID" | json_value "data.issues.some((issue) => issue.id === \"$ISSUE_ID\")" >/dev/null
 
 printf 'Checking comments\n'
 api_get "/api/v1/issues/$ISSUE_ID/comments" | json_value "data.comments.some((comment) => comment.id === \"$COMMENT_ID\")" >/dev/null
 
 printf 'Checking activity log\n'
+api_get "/api/v1/issues/$ISSUE_ID/activity" | json_value 'data.activity.some((entry) => entry.action === "labels_changed")' >/dev/null
 api_get "/api/v1/issues/$ISSUE_ID/activity" | json_value 'data.activity.some((entry) => entry.action === "status_changed")' >/dev/null
 api_get "/api/v1/issues/$ISSUE_ID/activity" | json_value 'data.activity.some((entry) => entry.action === "comment_added")' >/dev/null
 
