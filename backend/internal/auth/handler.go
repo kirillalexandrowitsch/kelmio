@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -582,7 +583,18 @@ func decodeJSON(w http.ResponseWriter, r *http.Request, dest any) error {
 
 	decoder := json.NewDecoder(r.Body)
 	decoder.DisallowUnknownFields()
-	return decoder.Decode(dest)
+	if err := decoder.Decode(dest); err != nil {
+		return err
+	}
+	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
+		if err == nil {
+			return errors.New("request body must contain a single JSON object")
+		}
+
+		return err
+	}
+
+	return nil
 }
 
 func writeJSON(w http.ResponseWriter, status int, payload any) {

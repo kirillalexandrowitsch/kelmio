@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 )
@@ -174,5 +176,21 @@ func TestNewSessionToken(t *testing.T) {
 
 	if len(token) < 32 {
 		t.Fatalf("token is too short: %d", len(token))
+	}
+}
+
+func TestDecodeJSONRejectsTrailingPayload(t *testing.T) {
+	t.Parallel()
+
+	request := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/auth/login",
+		strings.NewReader(`{"login":"admin","password":"admin12345"}{"login":"other"}`),
+	)
+	recorder := httptest.NewRecorder()
+
+	var req loginRequest
+	if err := decodeJSON(recorder, request, &req); err == nil {
+		t.Fatal("expected trailing JSON payload error")
 	}
 }
