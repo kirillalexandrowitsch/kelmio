@@ -2,7 +2,7 @@
 
 Локальный team task tracker для небольших команд.
 
-Текущий этап: базовый scaffold проекта. Бизнес-логика будет добавляться постепенно по плану из [docs/mvp-plan.md](docs/mvp-plan.md).
+Текущий этап: V1 hardening по плану из [docs/mvp-plan.md](docs/mvp-plan.md).
 
 ## Stack
 
@@ -13,7 +13,7 @@
 
 ## Local Development
 
-Пока проект находится на Phase 0, доступны базовые сервисы:
+Локально доступны базовые сервисы:
 
 - frontend: `http://localhost:5173`
 - backend health: `http://localhost:8080/healthz`
@@ -31,6 +31,8 @@ make seed
 make setup-db
 make backend-dev
 make backend-test
+make frontend-build
+make smoke-api
 ```
 
 Backend health:
@@ -39,6 +41,19 @@ Backend health:
 curl http://localhost:8080/healthz
 curl http://localhost:8080/readyz
 ```
+
+API smoke test:
+
+```sh
+# terminal 1
+make dev
+
+# terminal 2, after backend is up
+make setup-db
+make smoke-api
+```
+
+`make smoke-api` проверяет основной сценарий V1: login -> create project -> create issue -> move issue -> add comment -> filters -> activity log. По умолчанию используется `http://localhost:8080`, `admin` и `admin12345`; при необходимости можно переопределить `API_BASE_URL`, `ADMIN_LOGIN` и `ADMIN_PASSWORD`.
 
 Auth API smoke test:
 
@@ -284,4 +299,4 @@ password: admin12345
 
 Шаблон переменных окружения находится в `.env.example`.
 
-Для Docker Compose сейчас используются безопасные development defaults. Позже, когда появятся миграции и подключение backend к базе, env-конфигурация будет расширена.
+Для Docker Compose сейчас используются development defaults, достаточные для localhost-разработки.

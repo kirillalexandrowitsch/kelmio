@@ -1,6 +1,6 @@
 SHELL := /bin/sh
 
-.PHONY: help dev down logs ps db-up migrate-up seed setup-db backend-dev backend-test frontend-install frontend-dev
+.PHONY: help dev down logs ps db-up migrate-up seed setup-db backend-dev backend-test frontend-install frontend-dev frontend-build smoke-api
 
 help:
 	@printf '%s\n' 'Available commands:'
@@ -16,6 +16,8 @@ help:
 	@printf '%s\n' '  make backend-test     Run Go tests'
 	@printf '%s\n' '  make frontend-install Install frontend dependencies'
 	@printf '%s\n' '  make frontend-dev     Run frontend dev server locally'
+	@printf '%s\n' '  make frontend-build   Build frontend'
+	@printf '%s\n' '  make smoke-api        Run API smoke test against localhost backend'
 
 dev:
 	docker compose up --build
@@ -51,3 +53,9 @@ frontend-install:
 
 frontend-dev:
 	cd frontend && npm run dev
+
+frontend-build:
+	cd frontend && npm run build
+
+smoke-api:
+	./scripts/smoke-api.sh
