@@ -1,6 +1,6 @@
 SHELL := /bin/sh
 
-.PHONY: help dev down logs ps db-up migrate-up seed setup-db backend-dev backend-test frontend-install frontend-dev frontend-build smoke-api
+.PHONY: help dev down logs ps db-up migrate-up seed setup-db backend-dev backend-test frontend-install frontend-dev frontend-build smoke-api verify
 
 help:
 	@printf '%s\n' 'Available commands:'
@@ -18,6 +18,7 @@ help:
 	@printf '%s\n' '  make frontend-dev     Run frontend dev server locally'
 	@printf '%s\n' '  make frontend-build   Build frontend'
 	@printf '%s\n' '  make smoke-api        Run API smoke test against localhost backend'
+	@printf '%s\n' '  make verify           Run local non-destructive verification checks'
 
 dev:
 	docker compose up --build
@@ -59,3 +60,9 @@ frontend-build:
 
 smoke-api:
 	./scripts/smoke-api.sh
+
+verify:
+	sh -n scripts/smoke-api.sh
+	cd backend && go test ./...
+	cd frontend && npm run build
+	docker compose config >/dev/null
