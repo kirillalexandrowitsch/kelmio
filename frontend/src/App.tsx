@@ -353,6 +353,7 @@ export function App() {
   const [error, setError] = useState("");
   const [isBooting, setIsBooting] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [activeSection, setActiveSection] = useState<AppSection>("dashboard");
   const [accountError, setAccountError] = useState("");
   const [accountSuccess, setAccountSuccess] = useState("");
@@ -754,7 +755,16 @@ export function App() {
   }
 
   async function handleLogout() {
-    await logout();
+    if (isLoggingOut) {
+      return;
+    }
+
+    setIsLoggingOut(true);
+    try {
+      await logout();
+    } catch {
+      // Logout is best-effort on localhost; clear local state even if the API is down.
+    }
     setUser(null);
     setActiveSection("dashboard");
     setAccountError("");
@@ -818,6 +828,7 @@ export function App() {
     setDeletingCommentIds([]);
     setIssueActivity([]);
     setActivityError("");
+    setIsLoggingOut(false);
   }
 
   async function handleUpdateProfile(event: FormEvent<HTMLFormElement>) {
@@ -1722,8 +1733,13 @@ export function App() {
           </div>
           <div className="topbar-actions">
             <div className="status-pill">{user.workspace.role}</div>
-            <button className="ghost-button" onClick={handleLogout} type="button">
-              Log out
+            <button
+              className="ghost-button"
+              disabled={isLoggingOut}
+              onClick={handleLogout}
+              type="button"
+            >
+              {isLoggingOut ? "Logging out..." : "Log out"}
             </button>
           </div>
         </header>
