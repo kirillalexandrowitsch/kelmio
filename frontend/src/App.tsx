@@ -229,6 +229,20 @@ function memberDisplayName(members: TeamMember[], memberId: string | null) {
   return members.find((member) => member.id === memberId)?.display_name ?? memberId;
 }
 
+function memberOptionLabel(member: TeamMember) {
+  return member.is_active ? member.display_name : `${member.display_name} (inactive)`;
+}
+
+function activeTeamMembers(members: TeamMember[]) {
+  return members.filter((member) => member.is_active);
+}
+
+function assignableTeamMembers(members: TeamMember[], currentAssigneeId: string | null) {
+  return members.filter(
+    (member) => member.is_active || member.id === currentAssigneeId,
+  );
+}
+
 function issueLabelIds(issue: Issue) {
   return issue.labels.map((label) => label.id);
 }
@@ -1285,6 +1299,14 @@ export function App() {
 
   async function handleAssignIssue(issueId: string, assigneeId: string) {
     setSelectedIssueError("");
+    if (assigneeId) {
+      const assignee = teamMembers.find((member) => member.id === assigneeId);
+      if (!assignee?.is_active) {
+        setSelectedIssueError("Choose an active assignee.");
+        return;
+      }
+    }
+
     setAssigningIssueIds((currentIds) =>
       currentIds.includes(issueId) ? currentIds : [...currentIds, issueId],
     );
@@ -1450,6 +1472,14 @@ export function App() {
   async function handleCreateIssue(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setIssueFormError("");
+    if (issueAssigneeId) {
+      const assignee = teamMembers.find((member) => member.id === issueAssigneeId);
+      if (!assignee?.is_active) {
+        setIssueFormError("Choose an active assignee.");
+        return;
+      }
+    }
+
     setIsCreatingIssue(true);
 
     try {
@@ -2458,9 +2488,9 @@ export function App() {
                 value={issueAssigneeId}
               >
                 <option value="">Unassigned</option>
-                {teamMembers.map((member) => (
+                {activeTeamMembers(teamMembers).map((member) => (
                   <option key={member.id} value={member.id}>
-                    {member.display_name}
+                    {memberOptionLabel(member)}
                   </option>
                 ))}
               </select>
@@ -2657,7 +2687,7 @@ export function App() {
                   <option value="unassigned">Unassigned</option>
                   {teamMembers.map((member) => (
                     <option key={member.id} value={member.id}>
-                      {member.display_name}
+                      {memberOptionLabel(member)}
                     </option>
                   ))}
                 </select>
@@ -3202,9 +3232,16 @@ export function App() {
                     value={selectedIssue.assignee_id ?? ""}
                   >
                     <option value="">Unassigned</option>
-                    {teamMembers.map((member) => (
-                      <option key={member.id} value={member.id}>
-                        {member.display_name}
+                    {assignableTeamMembers(
+                      teamMembers,
+                      selectedIssue.assignee_id,
+                    ).map((member) => (
+                      <option
+                        disabled={!member.is_active}
+                        key={member.id}
+                        value={member.id}
+                      >
+                        {memberOptionLabel(member)}
                       </option>
                     ))}
                   </select>

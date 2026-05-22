@@ -234,7 +234,7 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if errors.Is(err, errInvalidAssignee) {
-			writeError(w, http.StatusBadRequest, "invalid_assignee", "assignee is not a workspace member")
+			writeError(w, http.StatusBadRequest, "invalid_assignee", "assignee must be an active workspace member")
 			return
 		}
 		if errors.Is(err, errInvalidLabel) {
@@ -394,7 +394,7 @@ func (h *Handler) assign(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if errors.Is(err, errInvalidAssignee) {
-			writeError(w, http.StatusBadRequest, "invalid_assignee", "assignee is not a workspace member")
+			writeError(w, http.StatusBadRequest, "invalid_assignee", "assignee must be an active workspace member")
 			return
 		}
 
@@ -852,22 +852,8 @@ func (h *Handler) createIssue(ctx context.Context, user auth.CurrentUser, input 
 		return issueResponse{}, err
 	}
 
-	if input.AssigneeID != "" {
-		var exists bool
-		if err := tx.QueryRow(ctx, `
-			SELECT EXISTS (
-				SELECT 1
-				FROM workspace_members
-				WHERE workspace_id = $1
-					AND user_id = $2
-			)
-		`, user.WorkspaceID, input.AssigneeID).Scan(&exists); err != nil {
-			return issueResponse{}, err
-		}
-
-		if !exists {
-			return issueResponse{}, errInvalidAssignee
-		}
+	if err := verifyActiveWorkspaceMember(ctx, tx, user.WorkspaceID, input.AssigneeID); err != nil {
+		return issueResponse{}, err
 	}
 
 	if err := verifyWorkspaceLabels(ctx, tx, user.WorkspaceID, input.LabelIDs); err != nil {
@@ -1198,22 +1184,8 @@ func (h *Handler) assignIssue(ctx context.Context, user auth.CurrentUser, issueI
 		return issueResponse{}, err
 	}
 
-	if assigneeID != "" {
-		var exists bool
-		if err := tx.QueryRow(ctx, `
-			SELECT EXISTS (
-				SELECT 1
-				FROM workspace_members
-				WHERE workspace_id = $1
-					AND user_id = $2
-			)
-		`, user.WorkspaceID, assigneeID).Scan(&exists); err != nil {
-			return issueResponse{}, err
-		}
-
-		if !exists {
-			return issueResponse{}, errInvalidAssignee
-		}
+	if err := verifyActiveWorkspaceMember(ctx, tx, user.WorkspaceID, assigneeID); err != nil {
+		return issueResponse{}, err
 	}
 
 	var nextAssigneeID any
@@ -2038,6 +2010,31 @@ func verifyWorkspaceLabels(ctx context.Context, tx pgx.Tx, workspaceID string, l
 		if !exists {
 			return errInvalidLabel
 		}
+	}
+
+	return nil
+}
+
+func verifyActiveWorkspaceMember(ctx context.Context, tx pgx.Tx, workspaceID string, userID string) error {
+	if userID == "" {
+		return nil
+	}
+
+	var exists bool
+	if err := tx.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1
+			FROM workspace_members wm
+			JOIN users u ON u.id = wm.user_id
+			WHERE wm.workspace_id = $1
+				AND wm.user_id = $2
+				AND u.is_active = true
+		)
+	`, workspaceID, userID).Scan(&exists); err != nil {
+		return err
+	}
+	if !exists {
+		return errInvalidAssignee
 	}
 
 	return nil
