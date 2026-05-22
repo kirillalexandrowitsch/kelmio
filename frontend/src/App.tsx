@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from "react";
 import "./styles.css";
 import {
   ApiError,
+  API_UNAUTHORIZED_EVENT,
   CurrentUser,
   Issue,
   IssueActivity,
@@ -482,6 +483,17 @@ export function App() {
   }, []);
 
   useEffect(() => {
+    function handleUnauthorized() {
+      resetLocalSession("Session expired. Sign in again.");
+    }
+
+    window.addEventListener(API_UNAUTHORIZED_EVENT, handleUnauthorized);
+    return () => {
+      window.removeEventListener(API_UNAUTHORIZED_EVENT, handleUnauthorized);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!user) {
       setAccountDisplayName("");
       return;
@@ -765,7 +777,14 @@ export function App() {
     } catch {
       // Logout is best-effort on localhost; clear local state even if the API is down.
     }
+    resetLocalSession();
+  }
+
+  function resetLocalSession(loginError = "") {
     setUser(null);
+    setError(loginError);
+    setIsSubmitting(false);
+    setIsLoggingOut(false);
     setActiveSection("dashboard");
     setAccountError("");
     setAccountSuccess("");
@@ -828,7 +847,6 @@ export function App() {
     setDeletingCommentIds([]);
     setIssueActivity([]);
     setActivityError("");
-    setIsLoggingOut(false);
   }
 
   async function handleUpdateProfile(event: FormEvent<HTMLFormElement>) {

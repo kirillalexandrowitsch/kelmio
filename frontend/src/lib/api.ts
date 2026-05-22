@@ -1,5 +1,7 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080";
 
+export const API_UNAUTHORIZED_EVENT = "team-task-tracker:unauthorized";
+
 export type CurrentUser = {
   id: string;
   email: string;
@@ -442,6 +444,16 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 
   const payload = await response.json().catch(() => null);
   if (!response.ok) {
+    if (
+      response.status === 401 &&
+      path !== "/api/v1/auth/login" &&
+      path !== "/api/v1/auth/me"
+    ) {
+      const event = document.createEvent("Event");
+      event.initEvent(API_UNAUTHORIZED_EVENT, false, false);
+      window.dispatchEvent(event);
+    }
+
     const message =
       payload?.error?.message ?? `Request failed with status ${response.status}`;
     throw new ApiError(message, response.status);
