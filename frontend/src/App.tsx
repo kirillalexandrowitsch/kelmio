@@ -92,6 +92,10 @@ const appSections = [
   { id: "account", title: "Account" },
 ] satisfies Array<{ id: AppSection; title: string }>;
 
+function apiErrorMessage(error: unknown, fallback: string) {
+  return error instanceof ApiError ? error.message : fallback;
+}
+
 function issueMatchesFilters(
   issue: Issue,
   projectId: string,
@@ -522,9 +526,9 @@ export function App() {
           );
         }
       })
-      .catch(() => {
+      .catch((err) => {
         if (isMounted) {
-          setProjectsError("Could not load projects.");
+          setProjectsError(apiErrorMessage(err, "Could not load projects."));
         }
       })
       .finally(() => {
@@ -555,9 +559,9 @@ export function App() {
           setTeamMembers(response.members);
         }
       })
-      .catch(() => {
+      .catch((err) => {
         if (isMounted) {
-          setTeamMembersError("Could not load team members.");
+          setTeamMembersError(apiErrorMessage(err, "Could not load team members."));
         }
       })
       .finally(() => {
@@ -587,9 +591,9 @@ export function App() {
           setLabels(response.labels);
         }
       })
-      .catch(() => {
+      .catch((err) => {
         if (isMounted) {
-          setLabelsError("Could not load labels.");
+          setLabelsError(apiErrorMessage(err, "Could not load labels."));
         }
       })
       .finally(() => {
@@ -629,9 +633,9 @@ export function App() {
           setIssues(response.issues);
         }
       })
-      .catch(() => {
+      .catch((err) => {
         if (isMounted) {
-          setIssuesError("Could not load issues.");
+          setIssuesError(apiErrorMessage(err, "Could not load issues."));
         }
       })
       .finally(() => {
@@ -681,9 +685,9 @@ export function App() {
           setIssueComments(response.comments);
         }
       })
-      .catch(() => {
+      .catch((err) => {
         if (isMounted) {
-          setCommentsError("Could not load comments.");
+          setCommentsError(apiErrorMessage(err, "Could not load comments."));
         }
       })
       .finally(() => {
@@ -714,9 +718,9 @@ export function App() {
           setIssueActivity(response.activity);
         }
       })
-      .catch(() => {
+      .catch((err) => {
         if (isMounted) {
-          setActivityError("Could not load activity.");
+          setActivityError(apiErrorMessage(err, "Could not load activity."));
         }
       })
       .finally(() => {
@@ -848,11 +852,7 @@ export function App() {
       );
       setAccountSuccess("Profile updated.");
     } catch (err) {
-      if (err instanceof ApiError) {
-        setAccountError(err.message);
-      } else {
-        setAccountError("Could not update profile.");
-      }
+      setAccountError(apiErrorMessage(err, "Could not update profile."));
     } finally {
       setIsUpdatingProfile(false);
     }
@@ -876,11 +876,7 @@ export function App() {
       setConfirmNewPassword("");
       setAccountSuccess("Password changed. Other sessions were signed out.");
     } catch (err) {
-      if (err instanceof ApiError) {
-        setAccountError(err.message);
-      } else {
-        setAccountError("Could not change password.");
-      }
+      setAccountError(apiErrorMessage(err, "Could not change password."));
     } finally {
       setIsChangingPassword(false);
     }
@@ -903,11 +899,7 @@ export function App() {
       setProjectName("");
       setProjectDescription("");
     } catch (err) {
-      if (err instanceof ApiError) {
-        setProjectFormError(err.message);
-      } else {
-        setProjectFormError("Could not create project.");
-      }
+      setProjectFormError(apiErrorMessage(err, "Could not create project."));
     } finally {
       setIsCreatingProject(false);
     }
@@ -948,11 +940,7 @@ export function App() {
       );
       cancelEditingProject();
     } catch (err) {
-      if (err instanceof ApiError) {
-        setProjectsError(err.message);
-      } else {
-        setProjectsError("Could not update project.");
-      }
+      setProjectsError(apiErrorMessage(err, "Could not update project."));
     } finally {
       setUpdatingProjectIds((currentIds) =>
         currentIds.filter((currentProjectId) => currentProjectId !== project.id),
@@ -1000,8 +988,8 @@ export function App() {
         setDeletingCommentIds([]);
         setIsEditingIssueDetails(false);
       }
-    } catch {
-      setProjectsError("Could not archive project.");
+    } catch (err) {
+      setProjectsError(apiErrorMessage(err, "Could not archive project."));
     } finally {
       setArchivingProjectIds((currentIds) =>
         currentIds.filter((currentProjectId) => currentProjectId !== project.id),
@@ -1029,11 +1017,7 @@ export function App() {
       setTeamMemberPassword("");
       setTeamMemberRole("member");
     } catch (err) {
-      if (err instanceof ApiError) {
-        setTeamMemberFormError(err.message);
-      } else {
-        setTeamMemberFormError("Could not create team member.");
-      }
+      setTeamMemberFormError(apiErrorMessage(err, "Could not create team member."));
     } finally {
       setIsCreatingTeamMember(false);
     }
@@ -1056,11 +1040,7 @@ export function App() {
         ),
       );
     } catch (err) {
-      if (err instanceof ApiError) {
-        setTeamMembersError(err.message);
-      } else {
-        setTeamMembersError("Could not update team member.");
-      }
+      setTeamMembersError(apiErrorMessage(err, "Could not update team member."));
     } finally {
       setUpdatingTeamMemberIds((currentIds) =>
         currentIds.filter((currentId) => currentId !== memberId),
@@ -1093,11 +1073,9 @@ export function App() {
       await resetTeamMemberPassword(memberId, teamMemberResetPassword);
       cancelResetTeamMemberPassword();
     } catch (err) {
-      if (err instanceof ApiError) {
-        setTeamMembersError(err.message);
-      } else {
-        setTeamMembersError("Could not reset team member password.");
-      }
+      setTeamMembersError(
+        apiErrorMessage(err, "Could not reset team member password."),
+      );
     } finally {
       setResettingTeamMemberPasswordIds((currentIds) =>
         currentIds.filter((currentId) => currentId !== memberId),
@@ -1123,11 +1101,7 @@ export function App() {
       setLabelName("");
       setLabelColor("#4e795d");
     } catch (err) {
-      if (err instanceof ApiError) {
-        setLabelsError(err.message);
-      } else {
-        setLabelsError("Could not create label.");
-      }
+      setLabelsError(apiErrorMessage(err, "Could not create label."));
     } finally {
       setIsCreatingLabel(false);
     }
@@ -1167,11 +1141,7 @@ export function App() {
           : currentIssue,
       );
     } catch (err) {
-      if (err instanceof ApiError) {
-        setLabelsError(err.message);
-      } else {
-        setLabelsError("Could not delete label.");
-      }
+      setLabelsError(apiErrorMessage(err, "Could not delete label."));
     } finally {
       setDeletingLabelIds((currentIds) =>
         currentIds.filter((currentLabelId) => currentLabelId !== label.id),
@@ -1185,8 +1155,8 @@ export function App() {
     try {
       const response = await listIssueActivity(issueId);
       setIssueActivity(response.activity);
-    } catch {
-      setActivityError("Could not load activity.");
+    } catch (err) {
+      setActivityError(apiErrorMessage(err, "Could not load activity."));
     }
   }
 
@@ -1243,11 +1213,7 @@ export function App() {
       setIsEditingIssueDetails(false);
       await refreshIssueActivity(updatedIssue.id);
     } catch (err) {
-      if (err instanceof ApiError) {
-        setSelectedIssueError(err.message);
-      } else {
-        setSelectedIssueError("Could not update issue.");
-      }
+      setSelectedIssueError(apiErrorMessage(err, "Could not update issue."));
     } finally {
       setIsUpdatingIssue(false);
     }
@@ -1288,8 +1254,8 @@ export function App() {
       if (selectedIssue?.id === updatedIssue.id) {
         await refreshIssueActivity(updatedIssue.id);
       }
-    } catch {
-      setIssuesError("Could not update issue status.");
+    } catch (err) {
+      setIssuesError(apiErrorMessage(err, "Could not update issue status."));
     } finally {
       setTransitioningIssueIds((currentIds) =>
         currentIds.filter((currentIssueId) => currentIssueId !== issueId),
@@ -1340,8 +1306,8 @@ export function App() {
       if (selectedIssue?.id === updatedIssue.id) {
         await refreshIssueActivity(updatedIssue.id);
       }
-    } catch {
-      setSelectedIssueError("Could not update assignee.");
+    } catch (err) {
+      setSelectedIssueError(apiErrorMessage(err, "Could not update assignee."));
     } finally {
       setAssigningIssueIds((currentIds) =>
         currentIds.filter((currentIssueId) => currentIssueId !== issueId),
@@ -1391,8 +1357,8 @@ export function App() {
         currentIssue?.id === updatedIssue.id ? updatedIssue : currentIssue,
       );
       await refreshIssueActivity(updatedIssue.id);
-    } catch {
-      setSelectedIssueError("Could not update labels.");
+    } catch (err) {
+      setSelectedIssueError(apiErrorMessage(err, "Could not update labels."));
     } finally {
       setLabelingIssueIds((currentIds) =>
         currentIds.filter((currentIssueId) => currentIssueId !== issue.id),
@@ -1425,9 +1391,10 @@ export function App() {
         setDeletingCommentIds([]);
         setIsEditingIssueDetails(false);
       }
-    } catch {
-      setIssuesError("Could not archive issue.");
-      setSelectedIssueError("Could not archive issue.");
+    } catch (err) {
+      const message = apiErrorMessage(err, "Could not archive issue.");
+      setIssuesError(message);
+      setSelectedIssueError(message);
     } finally {
       setArchivingIssueIds((currentIds) =>
         currentIds.filter((currentIssueId) => currentIssueId !== issue.id),
@@ -1462,8 +1429,8 @@ export function App() {
     try {
       const issue = await getIssue(issueId);
       setSelectedIssue(issue);
-    } catch {
-      setSelectedIssueError("Could not load issue details.");
+    } catch (err) {
+      setSelectedIssueError(apiErrorMessage(err, "Could not load issue details."));
     } finally {
       setIsLoadingSelectedIssue(false);
     }
@@ -1521,11 +1488,7 @@ export function App() {
       setIssueDueDate("");
       setNewIssueLabelIds([]);
     } catch (err) {
-      if (err instanceof ApiError) {
-        setIssueFormError(err.message);
-      } else {
-        setIssueFormError("Could not create issue.");
-      }
+      setIssueFormError(apiErrorMessage(err, "Could not create issue."));
     } finally {
       setIsCreatingIssue(false);
     }
@@ -1546,11 +1509,7 @@ export function App() {
       setCommentBody("");
       await refreshIssueActivity(selectedIssue.id);
     } catch (err) {
-      if (err instanceof ApiError) {
-        setCommentsError(err.message);
-      } else {
-        setCommentsError("Could not create comment.");
-      }
+      setCommentsError(apiErrorMessage(err, "Could not create comment."));
     } finally {
       setIsCreatingComment(false);
     }
@@ -1596,11 +1555,7 @@ export function App() {
       setEditCommentBody("");
       await refreshIssueActivity(selectedIssue.id);
     } catch (err) {
-      if (err instanceof ApiError) {
-        setCommentsError(err.message);
-      } else {
-        setCommentsError("Could not update comment.");
-      }
+      setCommentsError(apiErrorMessage(err, "Could not update comment."));
     } finally {
       setUpdatingCommentIds((currentIds) =>
         currentIds.filter((currentCommentId) => currentCommentId !== comment.id),
@@ -1632,11 +1587,7 @@ export function App() {
       }
       await refreshIssueActivity(selectedIssue.id);
     } catch (err) {
-      if (err instanceof ApiError) {
-        setCommentsError(err.message);
-      } else {
-        setCommentsError("Could not delete comment.");
-      }
+      setCommentsError(apiErrorMessage(err, "Could not delete comment."));
     } finally {
       setDeletingCommentIds((currentIds) =>
         currentIds.filter((currentCommentId) => currentCommentId !== comment.id),
