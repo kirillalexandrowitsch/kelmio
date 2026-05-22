@@ -293,6 +293,16 @@ workspace: Local Workspace
 email: admin@example.com
 username: admin
 password: admin12345
+
+demo user:
+email: demo.member@example.com
+username: demo_member
+password: demo12345
+
+demo project:
+key: DEMO
+labels: frontend, backend, bug
+issues: DEMO-1, DEMO-2, DEMO-3, DEMO-4
 ```
 
 ## Environment
