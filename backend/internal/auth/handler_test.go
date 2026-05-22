@@ -1,6 +1,9 @@
 package auth
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestLoginRequestIdentifier(t *testing.T) {
 	t.Parallel()
@@ -62,6 +65,42 @@ func TestHashToken(t *testing.T) {
 	}
 	if first == third {
 		t.Fatal("different tokens should produce different hashes")
+	}
+}
+
+func TestNormalizeDisplayName(t *testing.T) {
+	t.Parallel()
+
+	got, err := normalizeDisplayName("  Team Member  ")
+	if err != nil {
+		t.Fatalf("normalize display name: %v", err)
+	}
+
+	if got != "Team Member" {
+		t.Fatalf("displayName = %q, want %q", got, "Team Member")
+	}
+}
+
+func TestNormalizeDisplayNameValidation(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		displayName string
+	}{
+		{name: "missing", displayName: "   "},
+		{name: "too long", displayName: strings.Repeat("a", 81)},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			if _, err := normalizeDisplayName(tt.displayName); err == nil {
+				t.Fatal("expected error")
+			}
+		})
 	}
 }
 

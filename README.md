@@ -51,6 +51,11 @@ curl -i -c /tmp/team-task-tracker.cookies \
 curl -b /tmp/team-task-tracker.cookies \
   http://localhost:8080/api/v1/auth/me
 
+curl -i -X PATCH -b /tmp/team-task-tracker.cookies \
+  -H 'Content-Type: application/json' \
+  -d '{"display_name":"Updated Name"}' \
+  http://localhost:8080/api/v1/auth/profile
+
 # Use a test account cookie here unless you intentionally want to change admin.
 curl -i -X PATCH -b /tmp/team-task-tracker.cookies \
   -H 'Content-Type: application/json' \

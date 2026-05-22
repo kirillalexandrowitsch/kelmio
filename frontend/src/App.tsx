@@ -38,6 +38,7 @@ import {
   resetTeamMemberPassword,
   setIssueLabels,
   transitionIssue,
+  updateProfile,
   updateProject,
   updateIssueComment,
   updateTeamMember,
@@ -337,6 +338,8 @@ export function App() {
   const [activeSection, setActiveSection] = useState<AppSection>("dashboard");
   const [accountError, setAccountError] = useState("");
   const [accountSuccess, setAccountSuccess] = useState("");
+  const [accountDisplayName, setAccountDisplayName] = useState("");
+  const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmNewPassword, setConfirmNewPassword] = useState("");
@@ -458,6 +461,15 @@ export function App() {
       isMounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!user) {
+      setAccountDisplayName("");
+      return;
+    }
+
+    setAccountDisplayName(user.display_name);
+  }, [user]);
 
   useEffect(() => {
     if (!user) {
@@ -729,6 +741,8 @@ export function App() {
     setActiveSection("dashboard");
     setAccountError("");
     setAccountSuccess("");
+    setAccountDisplayName("");
+    setIsUpdatingProfile(false);
     setCurrentPassword("");
     setNewPassword("");
     setConfirmNewPassword("");
@@ -786,6 +800,48 @@ export function App() {
     setDeletingCommentIds([]);
     setIssueActivity([]);
     setActivityError("");
+  }
+
+  async function handleUpdateProfile(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setAccountError("");
+    setAccountSuccess("");
+    setIsUpdatingProfile(true);
+
+    try {
+      const response = await updateProfile(accountDisplayName);
+      setUser(response.user);
+      setTeamMembers((currentMembers) =>
+        currentMembers.map((member) =>
+          member.id === response.user.id
+            ? { ...member, display_name: response.user.display_name }
+            : member,
+        ),
+      );
+      setIssueComments((currentComments) =>
+        currentComments.map((comment) =>
+          comment.author_id === response.user.id
+            ? { ...comment, author_display_name: response.user.display_name }
+            : comment,
+        ),
+      );
+      setIssueActivity((currentActivity) =>
+        currentActivity.map((entry) =>
+          entry.actor_id === response.user.id
+            ? { ...entry, actor_display_name: response.user.display_name }
+            : entry,
+        ),
+      );
+      setAccountSuccess("Profile updated.");
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setAccountError(err.message);
+      } else {
+        setAccountError("Could not update profile.");
+      }
+    } finally {
+      setIsUpdatingProfile(false);
+    }
   }
 
   async function handleChangePassword(event: FormEvent<HTMLFormElement>) {
@@ -1815,7 +1871,46 @@ export function App() {
             </div>
           </div>
 
+          {accountError ? <p className="form-error">{accountError}</p> : null}
+          {accountSuccess ? <p className="form-success">{accountSuccess}</p> : null}
+
+          <form className="account-form" onSubmit={handleUpdateProfile}>
+            <header className="section-header">
+              <div>
+                <p className="eyebrow">Profile</p>
+                <h2>Display name</h2>
+              </div>
+            </header>
+
+            <label>
+              <span>Display name</span>
+              <input
+                maxLength={80}
+                onChange={(event) => setAccountDisplayName(event.target.value)}
+                value={accountDisplayName}
+              />
+            </label>
+
+            <button
+              disabled={
+                isUpdatingProfile ||
+                accountDisplayName.trim() === "" ||
+                accountDisplayName.trim() === user.display_name
+              }
+              type="submit"
+            >
+              {isUpdatingProfile ? "Saving..." : "Save profile"}
+            </button>
+          </form>
+
           <form className="account-form" onSubmit={handleChangePassword}>
+            <header className="section-header">
+              <div>
+                <p className="eyebrow">Security</p>
+                <h2>Change password</h2>
+              </div>
+            </header>
+
             <label>
               <span>Current password</span>
               <input
@@ -1845,11 +1940,6 @@ export function App() {
                 value={confirmNewPassword}
               />
             </label>
-
-            {accountError ? <p className="form-error">{accountError}</p> : null}
-            {accountSuccess ? (
-              <p className="form-success">{accountSuccess}</p>
-            ) : null}
 
             <button
               disabled={

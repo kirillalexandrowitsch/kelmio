@@ -220,6 +220,15 @@ export async function changePassword(currentPassword: string, newPassword: strin
   });
 }
 
+export async function updateProfile(displayName: string) {
+  return request<AuthResponse>("/api/v1/auth/profile", {
+    method: "PATCH",
+    body: JSON.stringify({
+      display_name: displayName,
+    }),
+  });
+}
+
 export async function listProjects() {
   return request<ListProjectsResponse>("/api/v1/projects");
 }

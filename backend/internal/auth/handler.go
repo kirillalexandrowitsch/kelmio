@@ -39,6 +39,10 @@ type changePasswordRequest struct {
 	NewPassword     string `json:"new_password"`
 }
 
+type updateProfileRequest struct {
+	DisplayName string `json:"display_name"`
+}
+
 type loginResponse struct {
 	User      userResponse `json:"user"`
 	ExpiresAt time.Time    `json:"expires_at"`
@@ -91,6 +95,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/auth/login", h.login)
 	mux.HandleFunc("POST /api/v1/auth/logout", h.logout)
 	mux.HandleFunc("GET /api/v1/auth/me", h.me)
+	mux.HandleFunc("PATCH /api/v1/auth/profile", h.updateProfile)
 	mux.HandleFunc("PATCH /api/v1/auth/password", h.changePassword)
 }
 
@@ -196,6 +201,52 @@ func (h *Handler) me(w http.ResponseWriter, r *http.Request) {
 		}
 
 		writeError(w, http.StatusInternalServerError, "internal_error", "could not load session")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, meResponse{
+		User: user.toResponse(),
+	})
+}
+
+func (h *Handler) updateProfile(w http.ResponseWriter, r *http.Request) {
+	cookie, err := r.Cookie(SessionCookieName)
+	if err != nil || cookie.Value == "" {
+		writeError(w, http.StatusUnauthorized, "unauthorized", "session is required")
+		return
+	}
+
+	var req updateProfileRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	displayName, err := normalizeDisplayName(req.DisplayName)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	tokenHash := hashToken(cookie.Value)
+	currentUser, err := h.userBySession(ctx, tokenHash)
+	if err != nil {
+		if errors.Is(err, errInvalidCredentials) {
+			http.SetCookie(w, expiredSessionCookie())
+			writeError(w, http.StatusUnauthorized, "unauthorized", "session is invalid")
+			return
+		}
+
+		writeError(w, http.StatusInternalServerError, "internal_error", "could not load session")
+		return
+	}
+
+	user, err := h.updateOwnProfile(ctx, currentUser.ID, displayName)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "internal_error", "could not update profile")
 		return
 	}
 
@@ -382,6 +433,42 @@ func (h *Handler) updateOwnPassword(ctx context.Context, userID string, currentT
 	return tx.Commit(ctx)
 }
 
+func (h *Handler) updateOwnProfile(ctx context.Context, userID string, displayName string) (userRecord, error) {
+	var user userRecord
+	if err := h.db.QueryRow(ctx, `
+		WITH updated_user AS (
+			UPDATE users
+			SET display_name = $2
+			WHERE id = $1
+			RETURNING id, email, username, password_hash, display_name
+		)
+		SELECT
+			u.id::text,
+			u.email,
+			u.username,
+			u.password_hash,
+			u.display_name,
+			wm.workspace_id::text,
+			wm.role
+		FROM updated_user u
+		JOIN workspace_members wm ON wm.user_id = u.id
+		ORDER BY wm.joined_at ASC
+		LIMIT 1
+	`, userID, displayName).Scan(
+		&user.ID,
+		&user.Email,
+		&user.Username,
+		&user.PasswordHash,
+		&user.DisplayName,
+		&user.WorkspaceID,
+		&user.Role,
+	); err != nil {
+		return userRecord{}, err
+	}
+
+	return user, nil
+}
+
 func (req loginRequest) identifier() string {
 	if strings.TrimSpace(req.Login) != "" {
 		return strings.TrimSpace(req.Login)
@@ -390,6 +477,18 @@ func (req loginRequest) identifier() string {
 		return strings.TrimSpace(req.Email)
 	}
 	return strings.TrimSpace(req.Username)
+}
+
+func normalizeDisplayName(displayName string) (string, error) {
+	displayName = strings.TrimSpace(displayName)
+	if displayName == "" {
+		return "", errors.New("display_name is required")
+	}
+	if len([]rune(displayName)) > 80 {
+		return "", errors.New("display_name must be 80 characters or fewer")
+	}
+
+	return displayName, nil
 }
 
 func normalizeChangePassword(req changePasswordRequest) (string, string, error) {
