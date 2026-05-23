@@ -754,10 +754,22 @@ export function App() {
   async function handleLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
+    const loginIdentifier = loginValue.trim();
+    const loginPassword = password.trim();
+
+    if (loginIdentifier === "") {
+      setError("Username or email is required.");
+      return;
+    }
+    if (loginPassword === "") {
+      setError("Password is required.");
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
-      const response = await login(loginValue, password);
+      const response = await login(loginIdentifier, loginPassword);
       setUser(response.user);
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
@@ -857,10 +869,21 @@ export function App() {
     event.preventDefault();
     setAccountError("");
     setAccountSuccess("");
+    const displayName = accountDisplayName.trim();
+
+    if (displayName === "") {
+      setAccountError("Display name is required.");
+      return;
+    }
+    if (displayName === user?.display_name) {
+      setAccountError("Display name is unchanged.");
+      return;
+    }
+
     setIsUpdatingProfile(true);
 
     try {
-      const response = await updateProfile(accountDisplayName);
+      const response = await updateProfile(displayName);
       setUser(response.user);
       setTeamMembers((currentMembers) =>
         currentMembers.map((member) =>
@@ -895,15 +918,34 @@ export function App() {
     event.preventDefault();
     setAccountError("");
     setAccountSuccess("");
+    const current = currentPassword.trim();
+    const next = newPassword.trim();
+    const confirmation = confirmNewPassword.trim();
 
-    if (newPassword !== confirmNewPassword) {
+    if (current === "") {
+      setAccountError("Current password is required.");
+      return;
+    }
+    if (next.length < 8) {
+      setAccountError("New password must be at least 8 characters.");
+      return;
+    }
+    if (confirmation.length < 8) {
+      setAccountError("Password confirmation must be at least 8 characters.");
+      return;
+    }
+    if (next === current) {
+      setAccountError("New password must be different from current password.");
+      return;
+    }
+    if (next !== confirmation) {
       setAccountError("New password confirmation does not match.");
       return;
     }
 
     setIsChangingPassword(true);
     try {
-      await changePassword(currentPassword, newPassword);
+      await changePassword(current, next);
       setCurrentPassword("");
       setNewPassword("");
       setConfirmNewPassword("");
@@ -1734,6 +1776,18 @@ export function App() {
     : issueSort === "created_desc"
       ? "Showing latest issues across all projects"
       : `Showing issues sorted by ${issueSortLabels[issueSort].toLowerCase()}`;
+  const canSignIn =
+    loginValue.trim() !== "" && password.trim() !== "" && !isSubmitting;
+  const canUpdateProfile =
+    user !== null &&
+    accountDisplayName.trim() !== "" &&
+    accountDisplayName.trim() !== user.display_name &&
+    !isUpdatingProfile;
+  const canChangePassword =
+    currentPassword.trim() !== "" &&
+    newPassword.trim().length >= 8 &&
+    confirmNewPassword.trim().length >= 8 &&
+    !isChangingPassword;
   const canCreateProject =
     projectKey.trim() !== "" && projectName.trim() !== "" && !isCreatingProject;
   const canCreateTeamMember =
@@ -1813,7 +1867,7 @@ export function App() {
 
             {error ? <p className="form-error">{error}</p> : null}
 
-            <button disabled={isSubmitting} type="submit">
+            <button disabled={!canSignIn} type="submit">
               {isSubmitting ? "Signing in..." : "Sign in"}
             </button>
           </form>
@@ -2011,11 +2065,7 @@ export function App() {
             </label>
 
             <button
-              disabled={
-                isUpdatingProfile ||
-                accountDisplayName.trim() === "" ||
-                accountDisplayName.trim() === user.display_name
-              }
+              disabled={!canUpdateProfile}
               type="submit"
             >
               {isUpdatingProfile ? "Saving..." : "Save profile"}
@@ -2061,12 +2111,7 @@ export function App() {
             </label>
 
             <button
-              disabled={
-                isChangingPassword ||
-                currentPassword.trim() === "" ||
-                newPassword.length < 8 ||
-                confirmNewPassword.length < 8
-              }
+              disabled={!canChangePassword}
               type="submit"
             >
               {isChangingPassword ? "Changing..." : "Change password"}
