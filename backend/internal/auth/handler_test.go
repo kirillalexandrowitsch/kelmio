@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestLoginRequestIdentifier(t *testing.T) {
@@ -152,6 +153,20 @@ func TestNormalizeChangePasswordValidation(t *testing.T) {
 				NewPassword:     "same-password",
 			},
 		},
+		{
+			name: "current password too long",
+			req: changePasswordRequest{
+				CurrentPassword: "x" + strings.Repeat("a", 128),
+				NewPassword:     "new-password",
+			},
+		},
+		{
+			name: "new password too long",
+			req: changePasswordRequest{
+				CurrentPassword: "old-password",
+				NewPassword:     "x" + strings.Repeat("a", 128),
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -163,6 +178,60 @@ func TestNormalizeChangePasswordValidation(t *testing.T) {
 				t.Fatal("expected error")
 			}
 		})
+	}
+}
+
+func TestSessionCookie(t *testing.T) {
+	t.Parallel()
+
+	expiresAt := time.Date(2026, time.May, 23, 12, 0, 0, 0, time.UTC)
+	cookie := sessionCookie("session-token", expiresAt, 3600)
+
+	if cookie.Name != SessionCookieName {
+		t.Fatalf("Name = %q, want %q", cookie.Name, SessionCookieName)
+	}
+	if cookie.Value != "session-token" {
+		t.Fatalf("Value = %q, want session-token", cookie.Value)
+	}
+	if cookie.Path != "/" {
+		t.Fatalf("Path = %q, want /", cookie.Path)
+	}
+	if !cookie.Expires.Equal(expiresAt) {
+		t.Fatalf("Expires = %s, want %s", cookie.Expires, expiresAt)
+	}
+	if cookie.MaxAge != 3600 {
+		t.Fatalf("MaxAge = %d, want 3600", cookie.MaxAge)
+	}
+	if !cookie.HttpOnly {
+		t.Fatal("HttpOnly = false, want true")
+	}
+	if cookie.SameSite != http.SameSiteLaxMode {
+		t.Fatalf("SameSite = %v, want %v", cookie.SameSite, http.SameSiteLaxMode)
+	}
+}
+
+func TestExpiredSessionCookie(t *testing.T) {
+	t.Parallel()
+
+	cookie := expiredSessionCookie()
+
+	if cookie.Name != SessionCookieName {
+		t.Fatalf("Name = %q, want %q", cookie.Name, SessionCookieName)
+	}
+	if cookie.Value != "" {
+		t.Fatalf("Value = %q, want empty", cookie.Value)
+	}
+	if cookie.Path != "/" {
+		t.Fatalf("Path = %q, want /", cookie.Path)
+	}
+	if cookie.MaxAge != -1 {
+		t.Fatalf("MaxAge = %d, want -1", cookie.MaxAge)
+	}
+	if !cookie.HttpOnly {
+		t.Fatal("HttpOnly = false, want true")
+	}
+	if cookie.SameSite != http.SameSiteLaxMode {
+		t.Fatalf("SameSite = %v, want %v", cookie.SameSite, http.SameSiteLaxMode)
 	}
 }
 
