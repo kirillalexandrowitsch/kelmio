@@ -521,6 +521,16 @@ h1 {
   padding: 18px;
 }
 
+.permission-note {
+  color: #4e5c54;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.permission-note p {
+  margin: 0;
+}
+
 .account-panel {
   display: grid;
   align-content: start;

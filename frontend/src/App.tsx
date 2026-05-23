@@ -2558,7 +2558,21 @@ export function App() {
                 {isCreatingProject ? "Creating..." : "Create project"}
               </button>
             </form>
-          ) : null}
+          ) : (
+            <aside className="project-form permission-note">
+              <header className="section-header">
+                <div>
+                  <p className="eyebrow">Read-only</p>
+                  <h2>Project management</h2>
+                </div>
+              </header>
+
+              <p>
+                You can view projects and work with issues. Creating, editing, and
+                archiving projects is limited to workspace admins.
+              </p>
+            </aside>
+          )}
         </section>
 
         <section
