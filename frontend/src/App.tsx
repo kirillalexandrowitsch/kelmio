@@ -778,6 +778,8 @@ export function App() {
     try {
       const response = await login(loginIdentifier, loginPassword);
       setUser(response.user);
+      setLoginValue("");
+      setPassword("");
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         setError("Invalid username or password.");
@@ -806,6 +808,8 @@ export function App() {
   function resetLocalSession(loginError = "") {
     setUser(null);
     setError(loginError);
+    setLoginValue("");
+    setPassword("");
     setIsSubmitting(false);
     setIsLoggingOut(false);
     setActiveSection("dashboard");
