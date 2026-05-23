@@ -932,6 +932,11 @@ h1 {
   grid-column: 1 / -1;
 }
 
+.team-readonly-note {
+  padding-top: 14px;
+  border-top: 1px solid #edf0ed;
+}
+
 .label-form {
   display: grid;
   grid-template-columns: minmax(160px, 1fr) 88px auto;

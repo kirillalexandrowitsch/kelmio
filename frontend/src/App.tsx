@@ -2323,7 +2323,15 @@ export function App() {
                 <p className="form-error">{teamMemberFormError}</p>
               ) : null}
             </form>
-          ) : null}
+          ) : (
+            <aside className="team-readonly-note permission-note">
+              <p>
+                You can view workspace members here. Creating users, changing roles,
+                deactivating accounts, and resetting passwords is limited to workspace
+                admins.
+              </p>
+            </aside>
+          )}
         </section>
 
         <section
