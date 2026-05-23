@@ -54,7 +54,7 @@ make setup-db
 make smoke-api
 ```
 
-`make smoke-api` проверяет основной сценарий V1: login -> create project -> create issue -> attach label -> move issue -> add comment -> filters -> activity log. По умолчанию используется `http://localhost:8080`, `admin` и `admin12345`; при необходимости можно переопределить `API_BASE_URL`, `ADMIN_LOGIN` и `ADMIN_PASSWORD`.
+`make smoke-api` проверяет основной сценарий V1: readiness -> auth guard -> login -> team list -> create project -> create issue -> attach label -> move issue -> add/edit/delete comment -> filters -> activity log. По умолчанию используется `http://localhost:8080`, `admin` и `admin12345`; при необходимости можно переопределить `API_BASE_URL`, `ADMIN_LOGIN` и `ADMIN_PASSWORD`.
 
 Перед commit/push удобно запускать:
 
