@@ -11,7 +11,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U team_task_tracker -d team_task_tracker"]
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -24,10 +24,10 @@ services:
     environment:
       APP_ENV: ${APP_ENV:-development}
       BACKEND_PORT: ${BACKEND_PORT:-8080}
-      DATABASE_URL: ${DOCKER_DATABASE_URL:-postgres://team_task_tracker:team_task_tracker@postgres:5432/team_task_tracker?sslmode=disable}
+      DATABASE_URL: postgres://${POSTGRES_USER:-team_task_tracker}:${POSTGRES_PASSWORD:-team_task_tracker}@postgres:5432/${POSTGRES_DB:-team_task_tracker}?sslmode=disable
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
     ports:
-      - "${BACKEND_PORT:-8080}:8080"
+      - "${BACKEND_PORT:-8080}:${BACKEND_PORT:-8080}"
     volumes:
       - ./backend:/app
     depends_on:

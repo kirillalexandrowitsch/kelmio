@@ -349,3 +349,7 @@ issues: DEMO-1, DEMO-2, DEMO-3, DEMO-4
 Для Docker Compose можно не создавать `.env`: development defaults уже заданы в `docker-compose.yml`.
 
 Если нужно поменять порты, credentials или seed-пользователей, создай `.env` из `.env.example` и измени нужные значения локально. Файл `.env` не коммитится.
+
+Для запуска backend вне Docker используется `DATABASE_URL` с host `localhost`. Внутри Docker Compose backend получает database URL автоматически из `POSTGRES_DB`, `POSTGRES_USER` и `POSTGRES_PASSWORD`.
+
+Если меняешь `FRONTEND_PORT`, обнови также `FRONTEND_URL` и `VITE_API_BASE_URL`, чтобы CORS и frontend API calls указывали на актуальные localhost-адреса.
