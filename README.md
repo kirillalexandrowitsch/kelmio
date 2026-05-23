@@ -27,6 +27,25 @@ cp .env.example .env
 
 Docker Compose использует эти переменные автоматически; если `.env` не создан, применяются localhost defaults из `docker-compose.yml`.
 
+Первый запуск с нуля:
+
+```sh
+# terminal 1
+make dev
+
+# terminal 2, after postgres/backend/frontend containers are up
+make setup-db
+make smoke-api
+```
+
+После seed можно войти во frontend:
+
+```text
+url: http://localhost:5173
+username: admin
+password: admin12345
+```
+
 Команды:
 
 ```sh
@@ -327,4 +346,6 @@ issues: DEMO-1, DEMO-2, DEMO-3, DEMO-4
 
 Шаблон переменных окружения находится в `.env.example`.
 
-Для Docker Compose сейчас используются development defaults, достаточные для localhost-разработки.
+Для Docker Compose можно не создавать `.env`: development defaults уже заданы в `docker-compose.yml`.
+
+Если нужно поменять порты, credentials или seed-пользователей, создай `.env` из `.env.example` и измени нужные значения локально. Файл `.env` не коммитится.
