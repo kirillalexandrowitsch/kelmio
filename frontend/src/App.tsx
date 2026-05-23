@@ -45,6 +45,17 @@ import {
   updateTeamMember,
   updateIssue,
 } from "./lib/api";
+import {
+  hasMinTrimmedLength,
+  hasText,
+  isValidEmail,
+  isValidLabelColor,
+  isValidUsername,
+  normalizeEmail,
+  normalizeLabelColor,
+  normalizeText,
+  normalizeUsername,
+} from "./lib/validation";
 
 const columns = [
   { status: "backlog", title: "Backlog" },
@@ -92,10 +103,6 @@ const appSections = [
   { id: "labels", title: "Labels" },
   { id: "account", title: "Account" },
 ] satisfies Array<{ id: AppSection; title: string }>;
-
-const emailPattern = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
-const usernamePattern = /^[a-z0-9][a-z0-9_-]{2,31}$/;
-const labelColorPattern = /^#[0-9a-fA-F]{6}$/;
 
 function apiErrorMessage(error: unknown, fallback: string) {
   return error instanceof ApiError ? error.message : fallback;
@@ -754,14 +761,14 @@ export function App() {
   async function handleLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
-    const loginIdentifier = loginValue.trim();
-    const loginPassword = password.trim();
+    const loginIdentifier = normalizeText(loginValue);
+    const loginPassword = normalizeText(password);
 
-    if (loginIdentifier === "") {
+    if (!hasText(loginIdentifier)) {
       setError("Username or email is required.");
       return;
     }
-    if (loginPassword === "") {
+    if (!hasText(loginPassword)) {
       setError("Password is required.");
       return;
     }
@@ -869,9 +876,9 @@ export function App() {
     event.preventDefault();
     setAccountError("");
     setAccountSuccess("");
-    const displayName = accountDisplayName.trim();
+    const displayName = normalizeText(accountDisplayName);
 
-    if (displayName === "") {
+    if (!hasText(displayName)) {
       setAccountError("Display name is required.");
       return;
     }
@@ -918,19 +925,19 @@ export function App() {
     event.preventDefault();
     setAccountError("");
     setAccountSuccess("");
-    const current = currentPassword.trim();
-    const next = newPassword.trim();
-    const confirmation = confirmNewPassword.trim();
+    const current = normalizeText(currentPassword);
+    const next = normalizeText(newPassword);
+    const confirmation = normalizeText(confirmNewPassword);
 
-    if (current === "") {
+    if (!hasText(current)) {
       setAccountError("Current password is required.");
       return;
     }
-    if (next.length < 8) {
+    if (!hasMinTrimmedLength(next, 8)) {
       setAccountError("New password must be at least 8 characters.");
       return;
     }
-    if (confirmation.length < 8) {
+    if (!hasMinTrimmedLength(confirmation, 8)) {
       setAccountError("Password confirmation must be at least 8 characters.");
       return;
     }
@@ -960,11 +967,11 @@ export function App() {
   async function handleCreateProject(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setProjectFormError("");
-    if (projectKey.trim() === "") {
+    if (!hasText(projectKey)) {
       setProjectFormError("Project key is required.");
       return;
     }
-    if (projectName.trim() === "") {
+    if (!hasText(projectName)) {
       setProjectFormError("Project name is required.");
       return;
     }
@@ -1088,26 +1095,26 @@ export function App() {
   async function handleCreateTeamMember(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setTeamMemberFormError("");
-    const email = teamMemberEmail.trim().toLowerCase();
-    const username = teamMemberUsername.trim().toLowerCase();
-    const displayName = teamMemberDisplayName.trim();
-    const memberPassword = teamMemberPassword.trim();
+    const email = normalizeEmail(teamMemberEmail);
+    const username = normalizeUsername(teamMemberUsername);
+    const displayName = normalizeText(teamMemberDisplayName);
+    const memberPassword = normalizeText(teamMemberPassword);
 
-    if (!emailPattern.test(email)) {
+    if (!isValidEmail(email)) {
       setTeamMemberFormError("Email is invalid.");
       return;
     }
-    if (!usernamePattern.test(username)) {
+    if (!isValidUsername(username)) {
       setTeamMemberFormError(
         "Username must be 3-32 characters and contain lowercase letters, numbers, underscores, or hyphens.",
       );
       return;
     }
-    if (displayName === "") {
+    if (!hasText(displayName)) {
       setTeamMemberFormError("Display name is required.");
       return;
     }
-    if (memberPassword.length < 8) {
+    if (!hasMinTrimmedLength(memberPassword, 8)) {
       setTeamMemberFormError("Password must be at least 8 characters.");
       return;
     }
@@ -1177,8 +1184,8 @@ export function App() {
   ) {
     event.preventDefault();
     setTeamMembersError("");
-    const memberPassword = teamMemberResetPassword.trim();
-    if (memberPassword.length < 8) {
+    const memberPassword = normalizeText(teamMemberResetPassword);
+    if (!hasMinTrimmedLength(memberPassword, 8)) {
       setTeamMembersError("Password must be at least 8 characters.");
       return;
     }
@@ -1204,14 +1211,14 @@ export function App() {
   async function handleCreateLabel(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setLabelsError("");
-    const name = labelName.trim();
-    const color = labelColor.trim().toLowerCase();
+    const name = normalizeText(labelName);
+    const color = normalizeLabelColor(labelColor);
 
-    if (name === "") {
+    if (!hasText(name)) {
       setLabelsError("Label name is required.");
       return;
     }
-    if (!labelColorPattern.test(color)) {
+    if (!isValidLabelColor(color)) {
       setLabelsError("Label color must be a hex color like #4e795d.");
       return;
     }
@@ -1581,7 +1588,7 @@ export function App() {
       setIssueFormError("Choose a project.");
       return;
     }
-    if (issueTitle.trim() === "") {
+    if (!hasText(issueTitle)) {
       setIssueFormError("Issue title is required.");
       return;
     }
@@ -1647,8 +1654,8 @@ export function App() {
     }
 
     setCommentsError("");
-    const body = commentBody.trim();
-    if (body === "") {
+    const body = normalizeText(commentBody);
+    if (!hasText(body)) {
       setCommentsError("Comment body is required.");
       return;
     }
@@ -1688,8 +1695,8 @@ export function App() {
     }
 
     setCommentsError("");
-    const body = editCommentBody.trim();
-    if (body === "") {
+    const body = normalizeText(editCommentBody);
+    if (!hasText(body)) {
       setCommentsError("Comment body is required.");
       return;
     }
@@ -1770,41 +1777,44 @@ export function App() {
     issueFilterAssigneeId !== "" ||
     issueFilterLabelId !== "" ||
     issueFilterDue !== "" ||
-    issueFilterQuery.trim() !== "";
+    hasText(issueFilterQuery);
   const issueListSummary = hasIssueFilters
     ? `${issues.length} issues match current filters`
     : issueSort === "created_desc"
       ? "Showing latest issues across all projects"
       : `Showing issues sorted by ${issueSortLabels[issueSort].toLowerCase()}`;
   const canSignIn =
-    loginValue.trim() !== "" && password.trim() !== "" && !isSubmitting;
+    hasText(loginValue) && hasText(password) && !isSubmitting;
   const canUpdateProfile =
     user !== null &&
-    accountDisplayName.trim() !== "" &&
-    accountDisplayName.trim() !== user.display_name &&
+    hasText(accountDisplayName) &&
+    normalizeText(accountDisplayName) !== user.display_name &&
     !isUpdatingProfile;
   const canChangePassword =
-    currentPassword.trim() !== "" &&
-    newPassword.trim().length >= 8 &&
-    confirmNewPassword.trim().length >= 8 &&
+    hasText(currentPassword) &&
+    hasMinTrimmedLength(newPassword, 8) &&
+    hasMinTrimmedLength(confirmNewPassword, 8) &&
     !isChangingPassword;
   const canCreateProject =
-    projectKey.trim() !== "" && projectName.trim() !== "" && !isCreatingProject;
+    hasText(projectKey) && hasText(projectName) && !isCreatingProject;
   const canCreateTeamMember =
-    emailPattern.test(teamMemberEmail.trim().toLowerCase()) &&
-    usernamePattern.test(teamMemberUsername.trim().toLowerCase()) &&
-    teamMemberDisplayName.trim() !== "" &&
-    teamMemberPassword.trim().length >= 8 &&
+    isValidEmail(teamMemberEmail) &&
+    isValidUsername(teamMemberUsername) &&
+    hasText(teamMemberDisplayName) &&
+    hasMinTrimmedLength(teamMemberPassword, 8) &&
     !isCreatingTeamMember;
-  const canResetTeamMemberPassword = teamMemberResetPassword.trim().length >= 8;
+  const canResetTeamMemberPassword = hasMinTrimmedLength(
+    teamMemberResetPassword,
+    8,
+  );
   const canCreateLabel =
-    labelName.trim() !== "" &&
-    labelColorPattern.test(labelColor.trim().toLowerCase()) &&
+    hasText(labelName) &&
+    isValidLabelColor(labelColor) &&
     !isCreatingLabel;
   const canCreateIssue =
-    selectedProjectId !== "" && issueTitle.trim() !== "" && !isCreatingIssue;
+    selectedProjectId !== "" && hasText(issueTitle) && !isCreatingIssue;
   const canCreateComment =
-    selectedIssue !== null && commentBody.trim() !== "" && !isCreatingComment;
+    selectedIssue !== null && hasText(commentBody) && !isCreatingComment;
   const activeSectionTitle =
     appSections.find((section) => section.id === activeSection)?.title ?? "Dashboard";
   const activeSectionSubtitle =
@@ -2463,9 +2473,7 @@ export function App() {
                           <div className="project-row-actions">
                             <button
                               className="small-button"
-                              disabled={
-                                isUpdatingProject || editProjectName.trim() === ""
-                              }
+                              disabled={isUpdatingProject || !hasText(editProjectName)}
                               type="submit"
                             >
                               {isUpdatingProject ? "Saving" : "Save"}
@@ -3109,7 +3117,7 @@ export function App() {
 
                     <div className="form-actions">
                       <button
-                        disabled={isUpdatingIssue || editIssueTitle.trim() === ""}
+                        disabled={isUpdatingIssue || !hasText(editIssueTitle)}
                         type="submit"
                       >
                         {isUpdatingIssue ? "Saving..." : "Save changes"}
@@ -3259,8 +3267,7 @@ export function App() {
                                 <div className="form-actions">
                                   <button
                                     disabled={
-                                      isUpdatingComment ||
-                                      editCommentBody.trim() === ""
+                                      isUpdatingComment || !hasText(editCommentBody)
                                     }
                                     type="submit"
                                   >

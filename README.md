@@ -40,6 +40,7 @@ make setup-db
 make backend-dev
 make backend-test
 make frontend-build
+make frontend-test
 make smoke-api
 make verify
 ```
@@ -70,7 +71,7 @@ make smoke-api
 make verify
 ```
 
-`make verify` выполняет non-destructive проверки: shell syntax для smoke-скрипта, backend tests, frontend build и проверку Docker Compose config.
+`make verify` выполняет non-destructive проверки: shell syntax для smoke-скрипта, backend tests, frontend tests, frontend build и проверку Docker Compose config.
 
 Auth API smoke test:
 
