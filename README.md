@@ -19,6 +19,14 @@
 - backend health: `http://localhost:8080/healthz`
 - PostgreSQL: `localhost:15432`
 
+Опционально можно создать локальный `.env` из шаблона:
+
+```sh
+cp .env.example .env
+```
+
+Docker Compose использует эти переменные автоматически; если `.env` не создан, применяются localhost defaults из `docker-compose.yml`.
+
 Команды:
 
 ```sh
