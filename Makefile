@@ -1,9 +1,10 @@
 SHELL := /bin/sh
 
-.PHONY: help dev down logs ps db-up migrate-up seed setup-db backend-dev backend-test frontend-install frontend-dev frontend-build frontend-test smoke-api verify
+.PHONY: help doctor dev down logs ps db-up migrate-up seed setup-db backend-dev backend-test frontend-install frontend-dev frontend-build frontend-test smoke-api verify
 
 help:
 	@printf '%s\n' 'Available commands:'
+	@printf '%s\n' '  make doctor           Check local toolchain requirements'
 	@printf '%s\n' '  make dev              Start local Docker stack'
 	@printf '%s\n' '  make down             Stop local Docker stack'
 	@printf '%s\n' '  make logs             Follow Docker logs'
@@ -20,6 +21,9 @@ help:
 	@printf '%s\n' '  make frontend-test    Run frontend tests'
 	@printf '%s\n' '  make smoke-api        Run API smoke test against localhost backend'
 	@printf '%s\n' '  make verify           Run local non-destructive verification checks'
+
+doctor:
+	./scripts/doctor.sh
 
 dev:
 	docker compose up --build
@@ -67,6 +71,8 @@ smoke-api:
 
 verify:
 	sh -n scripts/smoke-api.sh
+	sh -n scripts/doctor.sh
+	./scripts/doctor.sh
 	cd backend && go test ./...
 	cd frontend && npm test
 	cd frontend && npm run build

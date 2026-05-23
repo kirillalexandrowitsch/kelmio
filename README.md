@@ -30,6 +30,8 @@ Docker Compose использует эти переменные автомати
 Первый запуск с нуля:
 
 ```sh
+make doctor
+
 # terminal 1
 make dev
 
@@ -49,6 +51,7 @@ password: admin12345
 Команды:
 
 ```sh
+make doctor
 make dev
 make down
 make logs
@@ -90,7 +93,7 @@ make smoke-api
 make verify
 ```
 
-`make verify` выполняет non-destructive проверки: shell syntax для smoke-скрипта, backend tests, frontend tests, frontend build и проверку Docker Compose config.
+`make verify` выполняет non-destructive проверки: local toolchain doctor, shell syntax для smoke-скрипта, backend tests, frontend tests, frontend build и проверку Docker Compose config.
 
 Auth API smoke test:
 
