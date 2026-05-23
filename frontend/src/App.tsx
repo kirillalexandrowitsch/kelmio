@@ -914,6 +914,15 @@ export function App() {
   async function handleCreateProject(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setProjectFormError("");
+    if (projectKey.trim() === "") {
+      setProjectFormError("Project key is required.");
+      return;
+    }
+    if (projectName.trim() === "") {
+      setProjectFormError("Project name is required.");
+      return;
+    }
+
     setIsCreatingProject(true);
 
     try {
@@ -1480,6 +1489,14 @@ export function App() {
   async function handleCreateIssue(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setIssueFormError("");
+    if (selectedProjectId === "") {
+      setIssueFormError("Choose a project.");
+      return;
+    }
+    if (issueTitle.trim() === "") {
+      setIssueFormError("Issue title is required.");
+      return;
+    }
     if (issueAssigneeId) {
       const assignee = teamMembers.find((member) => member.id === issueAssigneeId);
       if (!assignee?.is_active) {
@@ -1659,6 +1676,10 @@ export function App() {
     : issueSort === "created_desc"
       ? "Showing latest issues across all projects"
       : `Showing issues sorted by ${issueSortLabels[issueSort].toLowerCase()}`;
+  const canCreateProject =
+    projectKey.trim() !== "" && projectName.trim() !== "" && !isCreatingProject;
+  const canCreateIssue =
+    selectedProjectId !== "" && issueTitle.trim() !== "" && !isCreatingIssue;
   const activeSectionTitle =
     appSections.find((section) => section.id === activeSection)?.title ?? "Dashboard";
   const activeSectionSubtitle =
@@ -2423,7 +2444,7 @@ export function App() {
                 <p className="form-error">{projectFormError}</p>
               ) : null}
 
-              <button disabled={isCreatingProject} type="submit">
+              <button disabled={!canCreateProject} type="submit">
                 {isCreatingProject ? "Creating..." : "Create project"}
               </button>
             </form>
@@ -2584,10 +2605,7 @@ export function App() {
 
             {issueFormError ? <p className="form-error">{issueFormError}</p> : null}
 
-            <button
-              disabled={isCreatingIssue || projects.length === 0}
-              type="submit"
-            >
+            <button disabled={!canCreateIssue} type="submit">
               {isCreatingIssue ? "Creating..." : "Create issue"}
             </button>
           </form>
