@@ -91,6 +91,7 @@ func TestValidateProjectDetails(t *testing.T) {
 		wantErr bool
 	}{
 		{name: "valid", project: "Core Platform"},
+		{name: "max length", project: strings.Repeat("a", 120)},
 		{name: "missing name", wantErr: true},
 		{name: "too long", project: "x" + strings.Repeat("a", 120), wantErr: true},
 	}

@@ -1,6 +1,9 @@
 package labels
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestNormalizeCreateLabel(t *testing.T) {
 	t.Parallel()
@@ -34,6 +37,15 @@ func TestNormalizeCreateLabelDefaultColor(t *testing.T) {
 	}
 }
 
+func TestNormalizeLabelName(t *testing.T) {
+	t.Parallel()
+
+	got := normalizeLabelName("  Frontend   Polish  ")
+	if got != "frontend-polish" {
+		t.Fatalf("normalizeLabelName() = %q, want %q", got, "frontend-polish")
+	}
+}
+
 func TestNormalizeCreateLabelValidation(t *testing.T) {
 	t.Parallel()
 
@@ -50,6 +62,12 @@ func TestNormalizeCreateLabelValidation(t *testing.T) {
 			req: createLabelRequest{
 				Name:  "backend",
 				Color: "green",
+			},
+		},
+		{
+			name: "too long",
+			req: createLabelRequest{
+				Name: strings.Repeat("a", 41),
 			},
 		},
 	}
