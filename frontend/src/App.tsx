@@ -978,6 +978,10 @@ export function App() {
   }
 
   async function handleArchiveProject(project: Project) {
+    if (!window.confirm(`Archive project ${project.key}? Its active issues will be hidden.`)) {
+      return;
+    }
+
     setProjectsError("");
     setArchivingProjectIds((currentIds) =>
       currentIds.includes(project.id) ? currentIds : [...currentIds, project.id],
@@ -1137,6 +1141,10 @@ export function App() {
   }
 
   async function handleDeleteLabel(label: Label) {
+    if (!window.confirm(`Delete label "${label.name}"? It will be removed from existing issues.`)) {
+      return;
+    }
+
     setLabelsError("");
     setDeletingLabelIds((currentIds) =>
       currentIds.includes(label.id) ? currentIds : [...currentIds, label.id],
@@ -1396,6 +1404,10 @@ export function App() {
   }
 
   async function handleArchiveIssue(issue: Issue) {
+    if (!window.confirm(`Archive issue ${issue.issue_key}?`)) {
+      return;
+    }
+
     setIssuesError("");
     setSelectedIssueError("");
     setArchivingIssueIds((currentIds) =>
