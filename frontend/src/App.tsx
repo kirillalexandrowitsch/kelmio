@@ -93,6 +93,10 @@ const appSections = [
   { id: "account", title: "Account" },
 ] satisfies Array<{ id: AppSection; title: string }>;
 
+const emailPattern = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+const usernamePattern = /^[a-z0-9][a-z0-9_-]{2,31}$/;
+const labelColorPattern = /^#[0-9a-fA-F]{6}$/;
+
 function apiErrorMessage(error: unknown, fallback: string) {
   return error instanceof ApiError ? error.message : fallback;
 }
@@ -1042,14 +1046,38 @@ export function App() {
   async function handleCreateTeamMember(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setTeamMemberFormError("");
+    const email = teamMemberEmail.trim().toLowerCase();
+    const username = teamMemberUsername.trim().toLowerCase();
+    const displayName = teamMemberDisplayName.trim();
+    const memberPassword = teamMemberPassword.trim();
+
+    if (!emailPattern.test(email)) {
+      setTeamMemberFormError("Email is invalid.");
+      return;
+    }
+    if (!usernamePattern.test(username)) {
+      setTeamMemberFormError(
+        "Username must be 3-32 characters and contain lowercase letters, numbers, underscores, or hyphens.",
+      );
+      return;
+    }
+    if (displayName === "") {
+      setTeamMemberFormError("Display name is required.");
+      return;
+    }
+    if (memberPassword.length < 8) {
+      setTeamMemberFormError("Password must be at least 8 characters.");
+      return;
+    }
+
     setIsCreatingTeamMember(true);
 
     try {
       const member = await createTeamMember({
-        email: teamMemberEmail,
-        username: teamMemberUsername,
-        display_name: teamMemberDisplayName,
-        password: teamMemberPassword,
+        email,
+        username,
+        display_name: displayName,
+        password: memberPassword,
         role: teamMemberRole,
       });
       setTeamMembers((currentMembers) => [...currentMembers, member]);
@@ -1107,12 +1135,18 @@ export function App() {
   ) {
     event.preventDefault();
     setTeamMembersError("");
+    const memberPassword = teamMemberResetPassword.trim();
+    if (memberPassword.length < 8) {
+      setTeamMembersError("Password must be at least 8 characters.");
+      return;
+    }
+
     setResettingTeamMemberPasswordIds((currentIds) =>
       currentIds.includes(memberId) ? currentIds : [...currentIds, memberId],
     );
 
     try {
-      await resetTeamMemberPassword(memberId, teamMemberResetPassword);
+      await resetTeamMemberPassword(memberId, memberPassword);
       cancelResetTeamMemberPassword();
     } catch (err) {
       setTeamMembersError(
@@ -1128,12 +1162,24 @@ export function App() {
   async function handleCreateLabel(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setLabelsError("");
+    const name = labelName.trim();
+    const color = labelColor.trim().toLowerCase();
+
+    if (name === "") {
+      setLabelsError("Label name is required.");
+      return;
+    }
+    if (!labelColorPattern.test(color)) {
+      setLabelsError("Label color must be a hex color like #4e795d.");
+      return;
+    }
+
     setIsCreatingLabel(true);
 
     try {
       const label = await createLabel({
-        name: labelName,
-        color: labelColor,
+        name,
+        color,
       });
       setLabels((currentLabels) =>
         [...currentLabels, label].sort((left, right) =>
@@ -1559,10 +1605,16 @@ export function App() {
     }
 
     setCommentsError("");
+    const body = commentBody.trim();
+    if (body === "") {
+      setCommentsError("Comment body is required.");
+      return;
+    }
+
     setIsCreatingComment(true);
 
     try {
-      const comment = await createIssueComment(selectedIssue.id, commentBody);
+      const comment = await createIssueComment(selectedIssue.id, body);
       setIssueComments((currentComments) => [...currentComments, comment]);
       setCommentBody("");
       await refreshIssueActivity(selectedIssue.id);
@@ -1594,6 +1646,12 @@ export function App() {
     }
 
     setCommentsError("");
+    const body = editCommentBody.trim();
+    if (body === "") {
+      setCommentsError("Comment body is required.");
+      return;
+    }
+
     setUpdatingCommentIds((currentIds) =>
       currentIds.includes(comment.id) ? currentIds : [...currentIds, comment.id],
     );
@@ -1602,7 +1660,7 @@ export function App() {
       const updatedComment = await updateIssueComment(
         selectedIssue.id,
         comment.id,
-        editCommentBody,
+        body,
       );
       setIssueComments((currentComments) =>
         currentComments.map((currentComment) =>
@@ -1678,8 +1736,21 @@ export function App() {
       : `Showing issues sorted by ${issueSortLabels[issueSort].toLowerCase()}`;
   const canCreateProject =
     projectKey.trim() !== "" && projectName.trim() !== "" && !isCreatingProject;
+  const canCreateTeamMember =
+    emailPattern.test(teamMemberEmail.trim().toLowerCase()) &&
+    usernamePattern.test(teamMemberUsername.trim().toLowerCase()) &&
+    teamMemberDisplayName.trim() !== "" &&
+    teamMemberPassword.trim().length >= 8 &&
+    !isCreatingTeamMember;
+  const canResetTeamMemberPassword = teamMemberResetPassword.trim().length >= 8;
+  const canCreateLabel =
+    labelName.trim() !== "" &&
+    labelColorPattern.test(labelColor.trim().toLowerCase()) &&
+    !isCreatingLabel;
   const canCreateIssue =
     selectedProjectId !== "" && issueTitle.trim() !== "" && !isCreatingIssue;
+  const canCreateComment =
+    selectedIssue !== null && commentBody.trim() !== "" && !isCreatingComment;
   const activeSectionTitle =
     appSections.find((section) => section.id === activeSection)?.title ?? "Dashboard";
   const activeSectionSubtitle =
@@ -2110,7 +2181,7 @@ export function App() {
                             className="small-button"
                             disabled={
                               isSubmittingPasswordReset ||
-                              teamMemberResetPassword.length < 8
+                              !canResetTeamMemberPassword
                             }
                             type="submit"
                           >
@@ -2197,13 +2268,7 @@ export function App() {
               </label>
 
               <button
-                disabled={
-                  isCreatingTeamMember ||
-                  teamMemberEmail.trim() === "" ||
-                  teamMemberUsername.trim() === "" ||
-                  teamMemberDisplayName.trim() === "" ||
-                  teamMemberPassword.length < 8
-                }
+                disabled={!canCreateTeamMember}
                 type="submit"
               >
                 {isCreatingTeamMember ? "Creating..." : "Create member"}
@@ -2283,7 +2348,7 @@ export function App() {
                 value={labelColor}
               />
             </label>
-            <button disabled={isCreatingLabel || labelName.trim() === ""} type="submit">
+            <button disabled={!canCreateLabel} type="submit">
               {isCreatingLabel ? "Creating..." : "Create label"}
             </button>
           </form>
@@ -3167,7 +3232,7 @@ export function App() {
                       />
                     </label>
                     <button
-                      disabled={isCreatingComment || commentBody.trim() === ""}
+                      disabled={!canCreateComment}
                       type="submit"
                     >
                       {isCreatingComment ? "Posting..." : "Post comment"}
