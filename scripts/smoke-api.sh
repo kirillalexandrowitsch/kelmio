@@ -80,6 +80,12 @@ api_patch_status_with_jar() {
 		"$API_BASE_URL$2"
 }
 
+api_delete_status_with_jar() {
+	curl -sS -o /dev/null -w '%{http_code}' -b "$1" \
+		-X DELETE \
+		"$API_BASE_URL$2"
+}
+
 api_patch() {
 	curl -fsS -b "$COOKIE_JAR" \
 		-X PATCH \
@@ -177,6 +183,15 @@ api_post "/api/v1/issues/$ISSUE_ID/transition" '{"status":"in_progress"}' | json
 printf 'Adding issue comment\n'
 COMMENT_ID="$(api_post "/api/v1/issues/$ISSUE_ID/comments" '{"body":"Smoke test comment."}' | json_value 'data.id')"
 api_patch "/api/v1/issues/$ISSUE_ID/comments/$COMMENT_ID" '{"body":"Smoke test comment updated."}' | json_value 'data.body === "Smoke test comment updated."' >/dev/null
+printf 'Checking member comment access guards\n'
+if [ "$(api_patch_status_with_jar "$MEMBER_COOKIE_JAR" "/api/v1/issues/$ISSUE_ID/comments/$COMMENT_ID" '{"body":"Blocked member edit."}')" != "403" ]; then
+	printf 'Expected member comment update to return 403\n' >&2
+	exit 1
+fi
+if [ "$(api_delete_status_with_jar "$MEMBER_COOKIE_JAR" "/api/v1/issues/$ISSUE_ID/comments/$COMMENT_ID")" != "403" ]; then
+	printf 'Expected member comment delete to return 403\n' >&2
+	exit 1
+fi
 DELETE_COMMENT_ID="$(api_post "/api/v1/issues/$ISSUE_ID/comments" '{"body":"Smoke test delete comment."}' | json_value 'data.id')"
 api_delete "/api/v1/issues/$ISSUE_ID/comments/$DELETE_COMMENT_ID" >/dev/null
 
