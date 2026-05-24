@@ -4,7 +4,10 @@ set -eu
 API_BASE_URL="${API_BASE_URL:-http://localhost:8080}"
 ADMIN_LOGIN="${ADMIN_LOGIN:-admin}"
 ADMIN_PASSWORD="${ADMIN_PASSWORD:-admin12345}"
+MEMBER_LOGIN="${MEMBER_LOGIN:-demo_member}"
+MEMBER_PASSWORD="${MEMBER_PASSWORD:-demo12345}"
 COOKIE_JAR="$(mktemp "${TMPDIR:-/tmp}/team-task-tracker-smoke.XXXXXX")"
+MEMBER_COOKIE_JAR="$(mktemp "${TMPDIR:-/tmp}/team-task-tracker-smoke-member.XXXXXX")"
 PROJECT_ID=""
 ISSUE_ID=""
 LABEL_ID=""
@@ -19,7 +22,7 @@ cleanup() {
 	if [ -n "$PROJECT_ID" ]; then
 		curl -fsS -b "$COOKIE_JAR" -X POST "$API_BASE_URL/api/v1/projects/$PROJECT_ID/archive" >/dev/null 2>&1 || true
 	fi
-	rm -f "$COOKIE_JAR"
+	rm -f "$COOKIE_JAR" "$MEMBER_COOKIE_JAR"
 }
 trap cleanup EXIT
 
@@ -60,6 +63,21 @@ api_post() {
 		-H "Content-Type: application/json" \
 		-d "$2" \
 		"$API_BASE_URL$1"
+}
+
+api_post_status_with_jar() {
+	curl -sS -o /dev/null -w '%{http_code}' -b "$1" -c "$1" \
+		-H "Content-Type: application/json" \
+		-d "$3" \
+		"$API_BASE_URL$2"
+}
+
+api_patch_status_with_jar() {
+	curl -sS -o /dev/null -w '%{http_code}' -b "$1" \
+		-X PATCH \
+		-H "Content-Type: application/json" \
+		-d "$3" \
+		"$API_BASE_URL$2"
 }
 
 api_patch() {
@@ -104,6 +122,29 @@ ADMIN_USER_ID="$(api_get "/api/v1/auth/me" | json_value 'data.user.id')"
 
 printf 'Checking team members\n'
 api_get "/api/v1/team/members" | json_value "data.members.some((member) => member.id === \"$ADMIN_USER_ID\" && member.role === \"admin\")" >/dev/null
+
+printf 'Checking member access guards\n'
+MEMBER_LOGIN_BODY="$(printf '{"login":"%s","password":"%s"}' "$MEMBER_LOGIN" "$MEMBER_PASSWORD")"
+if [ "$(api_post_status_with_jar "$MEMBER_COOKIE_JAR" "/api/v1/auth/login" "$MEMBER_LOGIN_BODY")" != "200" ]; then
+	printf 'Expected member login to succeed for %s\n' "$MEMBER_LOGIN" >&2
+	exit 1
+fi
+if [ "$(api_post_status_with_jar "$MEMBER_COOKIE_JAR" "/api/v1/projects" '{"key":"MEMBERTRY","name":"Member Project"}')" != "403" ]; then
+	printf 'Expected member project creation to return 403\n' >&2
+	exit 1
+fi
+if [ "$(api_post_status_with_jar "$MEMBER_COOKIE_JAR" "/api/v1/team/members" '{"email":"blocked@example.com","username":"blocked_member","display_name":"Blocked Member","password":"blocked12345","role":"member"}')" != "403" ]; then
+	printf 'Expected member team creation to return 403\n' >&2
+	exit 1
+fi
+if [ "$(api_patch_status_with_jar "$MEMBER_COOKIE_JAR" "/api/v1/team/members/$ADMIN_USER_ID" '{"role":"member","is_active":true}')" != "403" ]; then
+	printf 'Expected member team update to return 403\n' >&2
+	exit 1
+fi
+if [ "$(api_patch_status_with_jar "$MEMBER_COOKIE_JAR" "/api/v1/team/members/$ADMIN_USER_ID/password" '{"password":"blocked12345"}')" != "403" ]; then
+	printf 'Expected member password reset to return 403\n' >&2
+	exit 1
+fi
 
 RUN_ID="$(date +%M%S)$$"
 PROJECT_KEY="$(printf 'S%s' "$RUN_ID" | cut -c1-10)"
