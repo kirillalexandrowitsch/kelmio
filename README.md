@@ -2,7 +2,7 @@
 
 Локальный team task tracker для небольших команд.
 
-Текущий этап: V1 hardening по плану из [docs/mvp-plan.md](docs/mvp-plan.md).
+Текущий статус: localhost V1 завершена по плану из [docs/mvp-plan.md](docs/mvp-plan.md).
 
 ## Stack
 
