@@ -56,6 +56,7 @@ make dev
 make down
 make logs
 make db-up
+make wait-db
 make migrate-up
 make seed
 make setup-db

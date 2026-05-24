@@ -1,6 +1,6 @@
 SHELL := /bin/sh
 
-.PHONY: help doctor dev down logs ps db-up migrate-up seed setup-db backend-dev backend-test frontend-install frontend-dev frontend-build frontend-test smoke-api verify
+.PHONY: help doctor dev down logs ps db-up wait-db migrate-up seed setup-db backend-dev backend-test frontend-install frontend-dev frontend-build frontend-test smoke-api verify
 
 help:
 	@printf '%s\n' 'Available commands:'
@@ -10,6 +10,7 @@ help:
 	@printf '%s\n' '  make logs             Follow Docker logs'
 	@printf '%s\n' '  make ps               Show Docker services'
 	@printf '%s\n' '  make db-up            Start PostgreSQL only'
+	@printf '%s\n' '  make wait-db          Wait until PostgreSQL is ready'
 	@printf '%s\n' '  make migrate-up       Apply database migrations'
 	@printf '%s\n' '  make seed             Create local admin seed data'
 	@printf '%s\n' '  make setup-db         Start DB, migrate, and seed'
@@ -40,13 +41,16 @@ ps:
 db-up:
 	docker compose up -d postgres
 
+wait-db:
+	docker compose exec -T postgres sh -c 'until pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"; do sleep 1; done'
+
 migrate-up:
 	cd backend && go run ./cmd/migrate
 
 seed:
 	cd backend && go run ./cmd/seed
 
-setup-db: db-up migrate-up seed
+setup-db: db-up wait-db migrate-up seed
 
 backend-dev:
 	cd backend && go run ./cmd/api
