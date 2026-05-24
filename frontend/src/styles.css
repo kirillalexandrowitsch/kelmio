@@ -658,13 +658,12 @@ h1 {
 
 .team-list {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 8px;
 }
 
 .team-member-row {
   display: grid;
-  grid-template-columns: 42px minmax(0, 1fr) auto minmax(220px, auto);
+  grid-template-columns: 42px minmax(220px, 1fr) auto minmax(280px, auto);
   align-items: center;
   gap: 12px;
   padding: 12px;
@@ -812,16 +811,21 @@ h1 {
 }
 
 .project-key {
-  display: grid;
+  display: block;
   width: 62px;
   height: 32px;
-  place-items: center;
+  padding: 8px 7px;
   border: 1px solid #b8c5bd;
   border-radius: 8px;
   color: #18231d;
   background: #eef2ea;
   font-size: 12px;
   font-weight: 900;
+  line-height: 1.15;
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .project-row h3,
@@ -1535,12 +1539,22 @@ h1 {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
 }
 
 .label-checkbox input {
+  flex: 0 0 auto;
   width: 16px;
   height: 16px;
   accent-color: #4e795d;
+}
+
+.label-checkbox .label-chip {
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .metadata-grid {
