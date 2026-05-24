@@ -154,6 +154,16 @@ ISSUE_TITLE="Smoke issue $RUN_ID"
 printf 'Creating project %s\n' "$PROJECT_KEY"
 PROJECT_ID="$(api_post "/api/v1/projects" "{\"key\":\"$PROJECT_KEY\",\"name\":\"$PROJECT_NAME\",\"description\":\"Created by API smoke test.\"}" | json_value 'data.id')"
 
+printf 'Checking member project access guards\n'
+if [ "$(api_patch_status_with_jar "$MEMBER_COOKIE_JAR" "/api/v1/projects/$PROJECT_ID" '{"name":"Member Update","description":"Blocked by smoke test."}')" != "403" ]; then
+	printf 'Expected member project update to return 403\n' >&2
+	exit 1
+fi
+if [ "$(api_post_status_with_jar "$MEMBER_COOKIE_JAR" "/api/v1/projects/$PROJECT_ID/archive" '{}')" != "403" ]; then
+	printf 'Expected member project archive to return 403\n' >&2
+	exit 1
+fi
+
 printf 'Creating issue in project %s\n' "$PROJECT_KEY"
 ISSUE_ID="$(api_post "/api/v1/issues" "{\"project_id\":\"$PROJECT_ID\",\"title\":\"$ISSUE_TITLE\",\"description\":\"Created by API smoke test.\",\"issue_type\":\"task\",\"status\":\"todo\",\"priority\":\"high\"}" | json_value 'data.id')"
 
