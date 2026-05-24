@@ -57,6 +57,7 @@ import {
   normalizeUsername,
 } from "./lib/validation";
 import {
+  DASHBOARD_ACTION_COPY,
   PROJECT_PERMISSION_NOTE,
   TEAM_PERMISSION_NOTE,
 } from "./lib/permissions";
@@ -1974,7 +1975,7 @@ export function App() {
             <div>
               <p className="eyebrow">Planning</p>
               <h2>Projects</h2>
-              <p>Create or review project spaces before adding team work.</p>
+              <p>{DASHBOARD_ACTION_COPY.projects[user.workspace.role]}</p>
             </div>
             <button
               className="small-button"
@@ -2004,7 +2005,7 @@ export function App() {
             <div>
               <p className="eyebrow">People</p>
               <h2>Team</h2>
-              <p>Review workspace members and manage roles when you are an admin.</p>
+              <p>{DASHBOARD_ACTION_COPY.team[user.workspace.role]}</p>
             </div>
             <button
               className="small-button"
