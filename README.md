@@ -62,6 +62,8 @@ make seed
 make setup-db
 make backend-dev
 make backend-test
+make frontend-install
+make frontend-dev
 make frontend-build
 make frontend-test
 make smoke-api
