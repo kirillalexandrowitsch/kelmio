@@ -1533,12 +1533,15 @@ h1 {
 .label-checkbox-list {
   display: grid;
   gap: 8px;
+  justify-items: start;
 }
 
-.label-checkbox {
-  display: flex;
+.issue-label-picker .label-checkbox {
+  display: grid;
+  grid-template-columns: 16px minmax(0, max-content);
   align-items: center;
   gap: 8px;
+  max-width: 100%;
   min-width: 0;
 }
 
