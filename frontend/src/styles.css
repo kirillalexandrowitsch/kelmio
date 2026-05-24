@@ -933,6 +933,8 @@ h1 {
 }
 
 .team-readonly-note {
+  display: grid;
+  gap: 10px;
   padding-top: 14px;
   border-top: 1px solid #edf0ed;
 }

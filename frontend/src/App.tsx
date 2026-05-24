@@ -56,6 +56,10 @@ import {
   normalizeText,
   normalizeUsername,
 } from "./lib/validation";
+import {
+  PROJECT_PERMISSION_NOTE,
+  TEAM_PERMISSION_NOTE,
+} from "./lib/permissions";
 
 const columns = [
   { status: "backlog", title: "Backlog" },
@@ -2339,10 +2343,15 @@ export function App() {
             </form>
           ) : (
             <aside className="team-readonly-note permission-note">
+              <header className="section-header">
+                <div>
+                  <p className="eyebrow">{TEAM_PERMISSION_NOTE.eyebrow}</p>
+                  <h2>{TEAM_PERMISSION_NOTE.title}</h2>
+                </div>
+              </header>
+
               <p>
-                You can view workspace members here. Creating users, changing roles,
-                deactivating accounts, and resetting passwords is limited to workspace
-                admins.
+                {TEAM_PERMISSION_NOTE.body}
               </p>
             </aside>
           )}
@@ -2582,15 +2591,12 @@ export function App() {
             <aside className="project-form permission-note">
               <header className="section-header">
                 <div>
-                  <p className="eyebrow">Read-only</p>
-                  <h2>Project management</h2>
+                  <p className="eyebrow">{PROJECT_PERMISSION_NOTE.eyebrow}</p>
+                  <h2>{PROJECT_PERMISSION_NOTE.title}</h2>
                 </div>
               </header>
 
-              <p>
-                You can view projects and work with issues. Creating, editing, and
-                archiving projects is limited to workspace admins.
-              </p>
+              <p>{PROJECT_PERMISSION_NOTE.body}</p>
             </aside>
           )}
         </section>
