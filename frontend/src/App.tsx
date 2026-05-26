@@ -89,6 +89,8 @@ import {
 } from "./lib/routing";
 import { FormError } from "./components/form-feedback";
 import { AppSidebar, WorkspaceTopbar } from "./components/app-shell";
+import { AccountSection } from "./features/account/account-section";
+import { BootingScreen, SignInScreen } from "./features/auth/auth-screens";
 import { DashboardSection } from "./features/dashboard/dashboard-section";
 
 function apiErrorMessage(error: unknown, fallback: string) {
@@ -1690,64 +1692,21 @@ export function App() {
       : activeSectionTitle;
 
   if (isBooting) {
-    return (
-      <main className="auth-shell">
-        <section className="auth-panel auth-panel-compact">
-          <span className="brand-mark">TT</span>
-          <p className="eyebrow">Checking session</p>
-        </section>
-      </main>
-    );
+    return <BootingScreen />;
   }
 
   if (!user) {
     return (
-      <main className="auth-shell">
-        <section className="auth-panel">
-          <div className="brand auth-brand">
-            <span className="brand-mark">TT</span>
-            <div>
-              <strong>Team Task Tracker</strong>
-              <span>Local workspace</span>
-            </div>
-          </div>
-
-          <div>
-            <p className="eyebrow">Sign in</p>
-            <h1>Welcome back</h1>
-          </div>
-
-          <form className="auth-form" onSubmit={handleLogin}>
-            <label>
-              <span>Username or email</span>
-              <input
-                autoComplete="username"
-                autoFocus
-                name="login"
-                onChange={(event) => setLoginValue(event.target.value)}
-                value={loginValue}
-              />
-            </label>
-
-            <label>
-              <span>Password</span>
-              <input
-                autoComplete="current-password"
-                name="password"
-                onChange={(event) => setPassword(event.target.value)}
-                type="password"
-                value={password}
-              />
-            </label>
-
-            <FormError message={error} />
-
-            <button disabled={!canSignIn} type="submit">
-              {isSubmitting ? "Signing in..." : "Sign in"}
-            </button>
-          </form>
-        </section>
-      </main>
+      <SignInScreen
+        canSignIn={canSignIn}
+        error={error}
+        isSubmitting={isSubmitting}
+        loginValue={loginValue}
+        onLoginChange={setLoginValue}
+        onPasswordChange={setPassword}
+        onSubmit={handleLogin}
+        password={password}
+      />
     );
   }
 
@@ -1775,111 +1734,26 @@ export function App() {
           teamMembersCount={teamMembers.length}
         />
 
-        <section
-          className="account-panel"
-          aria-label="Account settings"
-          hidden={activeSection !== "account"}
-        >
-          <header className="section-header">
-            <div>
-              <p className="eyebrow">Account</p>
-              <h2>Profile and password</h2>
-            </div>
-          </header>
-
-          <div className="account-card">
-            <div>
-              <span>Display name</span>
-              <strong>{user.display_name}</strong>
-            </div>
-            <div>
-              <span>Username</span>
-              <strong>@{user.username}</strong>
-            </div>
-            <div>
-              <span>Email</span>
-              <strong>{user.email}</strong>
-            </div>
-            <div>
-              <span>Role</span>
-              <strong>{user.workspace.role}</strong>
-            </div>
-          </div>
-
-          <FormError message={accountError} />
-          {accountSuccess ? <p className="form-success">{accountSuccess}</p> : null}
-
-          <form className="account-form" onSubmit={handleUpdateProfile}>
-            <header className="section-header">
-              <div>
-                <p className="eyebrow">Profile</p>
-                <h2>Display name</h2>
-              </div>
-            </header>
-
-            <label>
-              <span>Display name</span>
-              <input
-                maxLength={80}
-                onChange={(event) => setAccountDisplayName(event.target.value)}
-                value={accountDisplayName}
-              />
-            </label>
-
-            <button
-              disabled={!canUpdateProfile}
-              type="submit"
-            >
-              {isUpdatingProfile ? "Saving..." : "Save profile"}
-            </button>
-          </form>
-
-          <form className="account-form" onSubmit={handleChangePassword}>
-            <header className="section-header">
-              <div>
-                <p className="eyebrow">Security</p>
-                <h2>Change password</h2>
-              </div>
-            </header>
-
-            <label>
-              <span>Current password</span>
-              <input
-                autoComplete="current-password"
-                onChange={(event) => setCurrentPassword(event.target.value)}
-                type="password"
-                value={currentPassword}
-              />
-            </label>
-            <label>
-              <span>New password</span>
-              <input
-                autoComplete="new-password"
-                minLength={8}
-                onChange={(event) => setNewPassword(event.target.value)}
-                type="password"
-                value={newPassword}
-              />
-            </label>
-            <label>
-              <span>Confirm new password</span>
-              <input
-                autoComplete="new-password"
-                minLength={8}
-                onChange={(event) => setConfirmNewPassword(event.target.value)}
-                type="password"
-                value={confirmNewPassword}
-              />
-            </label>
-
-            <button
-              disabled={!canChangePassword}
-              type="submit"
-            >
-              {isChangingPassword ? "Changing..." : "Change password"}
-            </button>
-          </form>
-        </section>
+        <AccountSection
+          accountDisplayName={accountDisplayName}
+          accountError={accountError}
+          accountSuccess={accountSuccess}
+          canChangePassword={canChangePassword}
+          canUpdateProfile={canUpdateProfile}
+          confirmNewPassword={confirmNewPassword}
+          currentPassword={currentPassword}
+          isActive={activeSection === "account"}
+          isChangingPassword={isChangingPassword}
+          isUpdatingProfile={isUpdatingProfile}
+          newPassword={newPassword}
+          onChangePassword={handleChangePassword}
+          onConfirmNewPasswordChange={setConfirmNewPassword}
+          onCurrentPasswordChange={setCurrentPassword}
+          onDisplayNameChange={setAccountDisplayName}
+          onNewPasswordChange={setNewPassword}
+          onUpdateProfile={handleUpdateProfile}
+          user={user}
+        />
 
         <section
           className="team-panel"
