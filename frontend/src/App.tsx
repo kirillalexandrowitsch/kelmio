@@ -58,7 +58,6 @@ import {
   normalizeUsername,
 } from "./lib/validation";
 import {
-  DASHBOARD_ACTION_COPY,
   PROJECT_PERMISSION_NOTE,
   TEAM_PERMISSION_NOTE,
 } from "./lib/permissions";
@@ -89,6 +88,8 @@ import {
   type AppSection,
 } from "./lib/routing";
 import { FormError } from "./components/form-feedback";
+import { AppSidebar, WorkspaceTopbar } from "./components/app-shell";
+import { DashboardSection } from "./features/dashboard/dashboard-section";
 
 function apiErrorMessage(error: unknown, fallback: string) {
   return error instanceof ApiError ? error.message : fallback;
@@ -1752,155 +1753,27 @@ export function App() {
 
   return (
     <main className="app-shell">
-      <aside className="sidebar">
-        <div className="brand">
-          <span className="brand-mark">TT</span>
-          <div>
-            <strong>Team Task Tracker</strong>
-            <span>Local workspace</span>
-          </div>
-        </div>
-
-        <nav className="nav-list" aria-label="Main navigation">
-          {appSections.map((section) => (
-            <button
-              aria-current={activeSection === section.id ? "page" : undefined}
-              key={section.id}
-              onClick={() => navigateToSection(section.id)}
-              type="button"
-            >
-              {section.title}
-            </button>
-          ))}
-        </nav>
-      </aside>
+      <AppSidebar activeSection={activeSection} onNavigate={navigateToSection} />
 
       <section className="workspace">
-        <header className="topbar">
-          <div>
-            <p className="eyebrow">{activeSectionSubtitle}</p>
-            <h1>{activeSectionHeading}</h1>
-          </div>
-          <div className="topbar-actions">
-            <div className="status-pill">{user.workspace.role}</div>
-            <button
-              className="ghost-button"
-              disabled={isLoggingOut}
-              onClick={handleLogout}
-              type="button"
-            >
-              {isLoggingOut ? "Logging out..." : "Log out"}
-            </button>
-          </div>
-        </header>
+        <WorkspaceTopbar
+          heading={activeSectionHeading}
+          isLoggingOut={isLoggingOut}
+          onLogout={handleLogout}
+          role={user.workspace.role}
+          subtitle={activeSectionSubtitle}
+        />
 
-        <section
-          className="summary-grid"
-          aria-label="Project summary"
-          hidden={activeSection !== "dashboard"}
-        >
-          <article>
-            <span>Projects</span>
-            <strong>{projects.length}</strong>
-          </article>
-          <article>
-            <span>Open issues</span>
-            <strong>{openIssuesCount}</strong>
-          </article>
-          <article className={overdueIssuesCount > 0 ? "summary-alert" : undefined}>
-            <span>Overdue</span>
-            <strong>{overdueIssuesCount}</strong>
-          </article>
-          <article className={dueSoonIssuesCount > 0 ? "summary-warning" : undefined}>
-            <span>Due soon</span>
-            <strong>{dueSoonIssuesCount}</strong>
-          </article>
-          <article>
-            <span>Team members</span>
-            <strong>{teamMembers.length}</strong>
-          </article>
-        </section>
-
-        <section
-          className="dashboard-actions"
-          aria-label="Dashboard quick actions"
-          hidden={activeSection !== "dashboard"}
-        >
-          <article className="dashboard-action-card">
-            <div>
-              <p className="eyebrow">Planning</p>
-              <h2>Projects</h2>
-              <p>{DASHBOARD_ACTION_COPY.projects[user.workspace.role]}</p>
-            </div>
-            <button
-              className="small-button"
-              onClick={() => navigateToSection("projects")}
-              type="button"
-            >
-              Open projects
-            </button>
-          </article>
-
-          <article className="dashboard-action-card">
-            <div>
-              <p className="eyebrow">Execution</p>
-              <h2>Issues</h2>
-              <p>Create tasks, inspect details, update status, comments, and labels.</p>
-            </div>
-            <button
-              className="small-button"
-              onClick={() => navigateToSection("issues")}
-              type="button"
-            >
-              Open issues
-            </button>
-          </article>
-
-          <article className="dashboard-action-card">
-            <div>
-              <p className="eyebrow">Flow</p>
-              <h2>Board</h2>
-              <p>Move work between statuses with a kanban view backed by the same issue data.</p>
-            </div>
-            <button
-              className="small-button"
-              onClick={() => navigateToSection("board")}
-              type="button"
-            >
-              Open board
-            </button>
-          </article>
-
-          <article className="dashboard-action-card">
-            <div>
-              <p className="eyebrow">People</p>
-              <h2>Team</h2>
-              <p>{DASHBOARD_ACTION_COPY.team[user.workspace.role]}</p>
-            </div>
-            <button
-              className="small-button"
-              onClick={() => navigateToSection("team")}
-              type="button"
-            >
-              Open team
-            </button>
-          </article>
-
-          <article className="dashboard-action-card">
-            <div>
-              <p className="eyebrow">Taxonomy</p>
-              <h2>Labels</h2>
-              <p>Keep issue categories clean so filtering and board scans stay useful.</p>
-            </div>
-            <button
-              className="small-button"
-              onClick={() => navigateToSection("labels")}
-              type="button"
-            >
-              Open labels
-            </button>
-          </article>
-        </section>
+        <DashboardSection
+          dueSoonIssuesCount={dueSoonIssuesCount}
+          isActive={activeSection === "dashboard"}
+          onNavigate={navigateToSection}
+          openIssuesCount={openIssuesCount}
+          overdueIssuesCount={overdueIssuesCount}
+          projectsCount={projects.length}
+          role={user.workspace.role}
+          teamMembersCount={teamMembers.length}
+        />
 
         <section
           className="account-panel"
