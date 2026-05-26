@@ -92,6 +92,7 @@ import { AppSidebar, WorkspaceTopbar } from "./components/app-shell";
 import { AccountSection } from "./features/account/account-section";
 import { BootingScreen, SignInScreen } from "./features/auth/auth-screens";
 import { DashboardSection } from "./features/dashboard/dashboard-section";
+import { LabelsSection } from "./features/labels/labels-section";
 
 function apiErrorMessage(error: unknown, fallback: string) {
   return error instanceof ApiError ? error.message : fallback;
@@ -1973,78 +1974,23 @@ export function App() {
           )}
         </section>
 
-        <section
-          className="labels-panel"
-          aria-label="Labels"
-          hidden={activeSection !== "labels"}
-        >
-          <header className="section-header">
-            <div>
-              <p className="eyebrow">Labels</p>
-              <h2>Workspace labels</h2>
-            </div>
-            {isLoadingLabels ? <span className="muted">Loading</span> : null}
-          </header>
-
-          <FormError message={labelsError} />
-
-          {labels.length > 0 ? (
-            <div className="label-list">
-              {labels.map((label) => {
-                const isDeletingLabel = deletingLabelIds.includes(label.id);
-
-                return (
-                  <div className="label-management-row" key={label.id}>
-                    <span
-                      className="label-chip"
-                      style={{
-                        backgroundColor: `${label.color}1a`,
-                        borderColor: label.color,
-                      }}
-                    >
-                      {label.name}
-                    </span>
-                    <button
-                      className="small-button danger-button"
-                      disabled={isDeletingLabel}
-                      onClick={() => {
-                        void handleDeleteLabel(label);
-                      }}
-                      type="button"
-                    >
-                      {isDeletingLabel ? "Deleting..." : "Delete"}
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="labels-empty">No labels yet</div>
-          )}
-
-          <form className="label-form" onSubmit={handleCreateLabel}>
-            <label>
-              <span>Name</span>
-              <input
-                maxLength={40}
-                onChange={(event) => setLabelName(event.target.value)}
-                placeholder="frontend"
-                value={labelName}
-              />
-            </label>
-            <label>
-              <span>Color</span>
-              <input
-                onChange={(event) => setLabelColor(event.target.value)}
-                type="color"
-                value={labelColor}
-              />
-            </label>
-            <button disabled={!canCreateLabel} type="submit">
-              {isCreatingLabel ? "Creating..." : "Create label"}
-            </button>
-          </form>
-        </section>
+        <LabelsSection
+          canCreateLabel={canCreateLabel}
+          deletingLabelIds={deletingLabelIds}
+          isActive={activeSection === "labels"}
+          isCreatingLabel={isCreatingLabel}
+          isLoadingLabels={isLoadingLabels}
+          labelColor={labelColor}
+          labelName={labelName}
+          labels={labels}
+          labelsError={labelsError}
+          onColorChange={setLabelColor}
+          onCreateLabel={handleCreateLabel}
+          onDeleteLabel={(label) => {
+            void handleDeleteLabel(label);
+          }}
+          onNameChange={setLabelName}
+        />
 
         <section
           className="projects-layout"
