@@ -316,9 +316,12 @@ curl -i -b /tmp/team-task-tracker.cookies \
   -d '{"status":"in_progress"}' \
   "http://localhost:8080/api/v1/issues/$ISSUE_ID/transition"
 
+ASSIGNEE_ID="$(curl -s -b /tmp/team-task-tracker.cookies http://localhost:8080/api/v1/users \
+  | node -e 'let data=""; process.stdin.on("data", c => data += c); process.stdin.on("end", () => console.log(JSON.parse(data).members.find((member) => member.username === "demo_member").id));')"
+
 curl -i -b /tmp/team-task-tracker.cookies \
   -H 'Content-Type: application/json' \
-  -d '{"assignee_id":"f2d59348-61a3-491a-9eb1-5aec91fbdf1e"}' \
+  -d "{\"assignee_id\":\"$ASSIGNEE_ID\"}" \
   "http://localhost:8080/api/v1/issues/$ISSUE_ID/assign"
 
 curl -i -X PATCH -b /tmp/team-task-tracker.cookies \

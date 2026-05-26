@@ -59,7 +59,11 @@ test("V1 browser smoke: create and move issue with a comment", async ({ page }) 
     await page.getByLabel("Add comment").fill(commentBody);
     await page.getByRole("button", { name: "Post comment" }).click();
 
-    await expect(page.getByText(commentBody)).toBeVisible();
+    await expect(
+      page.getByRole("region", { name: "Issue comments" }).getByText(commentBody, {
+        exact: true,
+      }),
+    ).toBeVisible();
     await expect(page.getByText("Added comment")).toBeVisible();
   } finally {
     if (projectId) {
