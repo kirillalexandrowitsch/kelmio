@@ -97,15 +97,29 @@
 
 Технологии вроде Redis, WebSocket, message queues, OpenTelemetry, background workers и object storage откладываются до момента, когда появится реальная потребность.
 
+### Примечание по реализации V1
+
+Список выше фиксирует разрешенные технологии, а не обязательные зависимости.
+Финальная localhost V1 использует более легкий набор там, где это снижает сложность без потери сценариев MVP:
+
+- backend routing сделан на стандартном `net/http`, потому что текущий REST API небольшой и не требует `chi`;
+- SQL написан напрямую поверх `pgx`, без `sqlc`, чтобы не добавлять генерацию кода до появления более широкой SQL-поверхности;
+- миграции используют собственный легкий runner с `-- +goose Up/Down` markers, без отдельной зависимости от `goose` binary;
+- frontend state и forms реализованы на React state + TypeScript validation helpers, без `TanStack Query`, `React Hook Form`, `Zod` и `Zustand`, потому что V1 пока помещается в простой локальный UI контур;
+- стили написаны в обычном CSS с design tokens, без Tailwind build layer;
+- browser e2e smoke покрыт Playwright.
+
+Это осознанное упрощение V1. При расширении продукта эти инструменты можно добавить точечно, когда они начнут уменьшать сложность, а не увеличивать ее.
+
 ## Backend
 
 - язык: Go;
 - формат: modular monolith;
 - API: REST JSON;
-- router: `chi`;
+- router: стандартный `net/http` для V1, `chi` остается разрешенным при росте API;
 - database driver: `pgx`;
-- migrations: `goose`;
-- SQL generation: `sqlc`;
+- migrations: легкий внутренний runner с goose-compatible markers;
+- SQL generation: handwritten SQL поверх `pgx` для V1, `sqlc` остается разрешенным при росте количества запросов;
 - auth: server-side sessions в PostgreSQL с HttpOnly cookie;
 - logging: structured logs;
 - config: `.env` + typed config loader.
@@ -121,11 +135,11 @@
 
 - React + TypeScript;
 - bundler/dev server: Vite;
-- routing: React Router;
-- server state: TanStack Query;
-- forms: React Hook Form + Zod;
-- UI state: Zustand только там, где реально нужен локальный shared state;
-- styling: Tailwind CSS с собственными design tokens и аккуратной admin-oriented UI системой.
+- routing: локальное section state для V1, React Router остается разрешенным, когда понадобится URL-level навигация;
+- server state: explicit fetch helpers и React state для V1, TanStack Query остается разрешенным при росте сложности caching/invalidation;
+- forms: controlled React forms с TypeScript validation helpers для V1;
+- UI state: локальный React state, Zustand только если позже понадобится shared local state;
+- styling: обычный CSS с project design tokens и admin-oriented UI system.
 
 ## Database
 

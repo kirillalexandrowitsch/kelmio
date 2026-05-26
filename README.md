@@ -6,10 +6,13 @@
 
 ## Stack
 
-- Backend: Go
-- Frontend: React + TypeScript
+- Backend: Go, `net/http`, `pgx`
+- Frontend: React + TypeScript, Vite, обычный CSS
 - Database: PostgreSQL
 - Local infrastructure: Docker Compose
+- Tests: Go tests, backend PostgreSQL integration test, API smoke script, Playwright browser e2e smoke
+
+V1 намеренно держит зависимости небольшими. [docs/mvp-plan.md](docs/mvp-plan.md) перечисляет несколько технологий, которые разрешены для будущего роста, но localhost V1 использует более легкие встроенные решения там, где они закрывают те же MVP-сценарии с меньшей сложностью.
 
 ## Local Development
 
