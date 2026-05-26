@@ -128,6 +128,7 @@ ADMIN_USER_ID="$(api_get "/api/v1/auth/me" | json_value 'data.user.id')"
 
 printf 'Checking team members\n'
 api_get "/api/v1/team/members" | json_value "data.members.some((member) => member.id === \"$ADMIN_USER_ID\" && member.role === \"admin\")" >/dev/null
+api_get "/api/v1/users" | json_value "data.users.some((user) => user.id === \"$ADMIN_USER_ID\" && user.role === \"admin\")" >/dev/null
 
 printf 'Checking member access guards\n'
 MEMBER_LOGIN_BODY="$(printf '{"login":"%s","password":"%s"}' "$MEMBER_LOGIN" "$MEMBER_PASSWORD")"
@@ -141,6 +142,10 @@ if [ "$(api_post_status_with_jar "$MEMBER_COOKIE_JAR" "/api/v1/projects" '{"key"
 fi
 if [ "$(api_post_status_with_jar "$MEMBER_COOKIE_JAR" "/api/v1/team/members" '{"email":"blocked@example.com","username":"blocked_member","display_name":"Blocked Member","password":"blocked12345","role":"member"}')" != "403" ]; then
 	printf 'Expected member team creation to return 403\n' >&2
+	exit 1
+fi
+if [ "$(api_post_status_with_jar "$MEMBER_COOKIE_JAR" "/api/v1/users" '{"email":"blocked-user@example.com","username":"blocked_user","display_name":"Blocked User","password":"blocked12345","role":"member"}')" != "403" ]; then
+	printf 'Expected member user creation to return 403\n' >&2
 	exit 1
 fi
 if [ "$(api_patch_status_with_jar "$MEMBER_COOKIE_JAR" "/api/v1/team/members/$ADMIN_USER_ID" '{"role":"member","is_active":true}')" != "403" ]; then
@@ -183,18 +188,18 @@ api_post "/api/v1/issues/$ISSUE_ID/transition" '{"status":"in_progress"}' | json
 
 printf 'Adding issue comment\n'
 COMMENT_ID="$(api_post "/api/v1/issues/$ISSUE_ID/comments" '{"body":"Smoke test comment."}' | json_value 'data.id')"
-api_patch "/api/v1/issues/$ISSUE_ID/comments/$COMMENT_ID" '{"body":"Smoke test comment updated."}' | json_value 'data.body === "Smoke test comment updated."' >/dev/null
+api_patch "/api/v1/comments/$COMMENT_ID" '{"body":"Smoke test comment updated."}' | json_value 'data.body === "Smoke test comment updated."' >/dev/null
 printf 'Checking member comment access guards\n'
-if [ "$(api_patch_status_with_jar "$MEMBER_COOKIE_JAR" "/api/v1/issues/$ISSUE_ID/comments/$COMMENT_ID" '{"body":"Blocked member edit."}')" != "403" ]; then
+if [ "$(api_patch_status_with_jar "$MEMBER_COOKIE_JAR" "/api/v1/comments/$COMMENT_ID" '{"body":"Blocked member edit."}')" != "403" ]; then
 	printf 'Expected member comment update to return 403\n' >&2
 	exit 1
 fi
-if [ "$(api_delete_status_with_jar "$MEMBER_COOKIE_JAR" "/api/v1/issues/$ISSUE_ID/comments/$COMMENT_ID")" != "403" ]; then
+if [ "$(api_delete_status_with_jar "$MEMBER_COOKIE_JAR" "/api/v1/comments/$COMMENT_ID")" != "403" ]; then
 	printf 'Expected member comment delete to return 403\n' >&2
 	exit 1
 fi
 DELETE_COMMENT_ID="$(api_post "/api/v1/issues/$ISSUE_ID/comments" '{"body":"Smoke test delete comment."}' | json_value 'data.id')"
-api_delete "/api/v1/issues/$ISSUE_ID/comments/$DELETE_COMMENT_ID" >/dev/null
+api_delete "/api/v1/comments/$DELETE_COMMENT_ID" >/dev/null
 
 printf 'Checking issue filters\n'
 api_get "/api/v1/issues?project_id=$PROJECT_ID&status=in_progress&q=Smoke" | json_value "data.issues.some((issue) => issue.id === \"$ISSUE_ID\")" >/dev/null

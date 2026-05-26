@@ -186,6 +186,8 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/issues/{id}/comments", h.createComment)
 	mux.HandleFunc("PATCH /api/v1/issues/{id}/comments/{commentID}", h.updateComment)
 	mux.HandleFunc("DELETE /api/v1/issues/{id}/comments/{commentID}", h.deleteComment)
+	mux.HandleFunc("PATCH /api/v1/comments/{id}", h.updateCommentByID)
+	mux.HandleFunc("DELETE /api/v1/comments/{id}", h.deleteCommentByID)
 	mux.HandleFunc("GET /api/v1/issues/{id}/activity", h.listActivity)
 }
 
@@ -615,6 +617,105 @@ func (h *Handler) deleteComment(w http.ResponseWriter, r *http.Request) {
 
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
+
+	if err := h.deleteIssueComment(ctx, user, issueID, commentID); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "comment_not_found", "comment was not found")
+			return
+		}
+		if errors.Is(err, errCommentForbidden) {
+			writeError(w, http.StatusForbidden, "forbidden", "only the comment author or an admin can delete this comment")
+			return
+		}
+
+		writeError(w, http.StatusInternalServerError, "internal_error", "could not delete comment")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) updateCommentByID(w http.ResponseWriter, r *http.Request) {
+	user, ok := h.requireUser(w, r)
+	if !ok {
+		return
+	}
+
+	commentID, err := normalizeCommentID(r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	var req updateCommentRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	body, err := normalizeCommentBody(req.Body)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	issueID, err := h.issueIDForComment(ctx, user.WorkspaceID, commentID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "comment_not_found", "comment was not found")
+			return
+		}
+
+		writeError(w, http.StatusInternalServerError, "internal_error", "could not load comment")
+		return
+	}
+
+	comment, err := h.updateIssueComment(ctx, user, issueID, commentID, body)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "comment_not_found", "comment was not found")
+			return
+		}
+		if errors.Is(err, errCommentForbidden) {
+			writeError(w, http.StatusForbidden, "forbidden", "only the comment author or an admin can edit this comment")
+			return
+		}
+
+		writeError(w, http.StatusInternalServerError, "internal_error", "could not update comment")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, comment)
+}
+
+func (h *Handler) deleteCommentByID(w http.ResponseWriter, r *http.Request) {
+	user, ok := h.requireUser(w, r)
+	if !ok {
+		return
+	}
+
+	commentID, err := normalizeCommentID(r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	issueID, err := h.issueIDForComment(ctx, user.WorkspaceID, commentID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "comment_not_found", "comment was not found")
+			return
+		}
+
+		writeError(w, http.StatusInternalServerError, "internal_error", "could not load comment")
+		return
+	}
 
 	if err := h.deleteIssueComment(ctx, user, issueID, commentID); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -1510,6 +1611,25 @@ func (h *Handler) createIssueComment(ctx context.Context, user auth.CurrentUser,
 	}
 
 	return comment, nil
+}
+
+func (h *Handler) issueIDForComment(ctx context.Context, workspaceID string, commentID string) (string, error) {
+	var issueID string
+	err := h.db.QueryRow(ctx, `
+		SELECT c.issue_id::text
+		FROM comments c
+		JOIN issues i ON i.id = c.issue_id
+		JOIN projects p ON p.id = i.project_id
+		WHERE c.id = $1
+			AND p.workspace_id = $2
+			AND p.archived_at IS NULL
+			AND i.archived_at IS NULL
+	`, commentID, workspaceID).Scan(&issueID)
+	if err != nil {
+		return "", err
+	}
+
+	return issueID, nil
 }
 
 func (h *Handler) updateIssueComment(ctx context.Context, user auth.CurrentUser, issueID string, commentID string, body string) (issueCommentResponse, error) {

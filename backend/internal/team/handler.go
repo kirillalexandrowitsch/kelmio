@@ -61,6 +61,10 @@ type listMembersResponse struct {
 	Members []memberResponse `json:"members"`
 }
 
+type listUsersResponse struct {
+	Users []memberResponse `json:"users"`
+}
+
 type normalizedCreateMember struct {
 	Email       string
 	Username    string
@@ -88,6 +92,9 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/team/members", h.createMember)
 	mux.HandleFunc("PATCH /api/v1/team/members/{id}", h.updateMember)
 	mux.HandleFunc("PATCH /api/v1/team/members/{id}/password", h.resetMemberPassword)
+	mux.HandleFunc("GET /api/v1/users", h.listUsers)
+	mux.HandleFunc("POST /api/v1/users", h.createMember)
+	mux.HandleFunc("PATCH /api/v1/users/{id}", h.updateMember)
 }
 
 func (h *Handler) listMembers(w http.ResponseWriter, r *http.Request) {
@@ -99,6 +106,34 @@ func (h *Handler) listMembers(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
+	members, err := h.listWorkspaceMembers(ctx, user.WorkspaceID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "internal_error", "could not list team members")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, listMembersResponse{Members: members})
+}
+
+func (h *Handler) listUsers(w http.ResponseWriter, r *http.Request) {
+	user, ok := h.requireUser(w, r)
+	if !ok {
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	users, err := h.listWorkspaceMembers(ctx, user.WorkspaceID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "internal_error", "could not list users")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, listUsersResponse{Users: users})
+}
+
+func (h *Handler) listWorkspaceMembers(ctx context.Context, workspaceID string) ([]memberResponse, error) {
 	rows, err := h.db.Query(ctx, `
 		SELECT
 			u.id::text,
@@ -112,10 +147,9 @@ func (h *Handler) listMembers(w http.ResponseWriter, r *http.Request) {
 		JOIN users u ON u.id = wm.user_id
 		WHERE wm.workspace_id = $1
 		ORDER BY wm.joined_at ASC
-	`, user.WorkspaceID)
+	`, workspaceID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "internal_error", "could not list team members")
-		return
+		return nil, err
 	}
 	defer rows.Close()
 
@@ -131,19 +165,17 @@ func (h *Handler) listMembers(w http.ResponseWriter, r *http.Request) {
 			&member.IsActive,
 			&member.JoinedAt,
 		); err != nil {
-			writeError(w, http.StatusInternalServerError, "internal_error", "could not read team member")
-			return
+			return nil, err
 		}
 
 		members = append(members, member)
 	}
 
 	if err := rows.Err(); err != nil {
-		writeError(w, http.StatusInternalServerError, "internal_error", "could not list team members")
-		return
+		return nil, err
 	}
 
-	writeJSON(w, http.StatusOK, listMembersResponse{Members: members})
+	return members, nil
 }
 
 func (h *Handler) createMember(w http.ResponseWriter, r *http.Request) {
