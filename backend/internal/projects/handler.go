@@ -60,6 +60,7 @@ func NewHandler(db *pgxpool.Pool, authHandler *auth.Handler) *Handler {
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/projects", h.list)
 	mux.HandleFunc("POST /api/v1/projects", h.create)
+	mux.HandleFunc("GET /api/v1/projects/{id}", h.get)
 	mux.HandleFunc("PATCH /api/v1/projects/{id}", h.update)
 	mux.HandleFunc("POST /api/v1/projects/{id}/archive", h.archive)
 }
@@ -184,6 +185,35 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, project)
 }
 
+func (h *Handler) get(w http.ResponseWriter, r *http.Request) {
+	user, ok := h.requireUser(w, r)
+	if !ok {
+		return
+	}
+
+	projectID, err := normalizeProjectID(r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	project, err := h.getProject(ctx, user.WorkspaceID, projectID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "project_not_found", "project was not found")
+			return
+		}
+
+		writeError(w, http.StatusInternalServerError, "internal_error", "could not load project")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, project)
+}
+
 func (h *Handler) update(w http.ResponseWriter, r *http.Request) {
 	user, ok := h.requireUser(w, r)
 	if !ok {
@@ -262,6 +292,37 @@ func (h *Handler) archive(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) getProject(ctx context.Context, workspaceID string, projectID string) (projectResponse, error) {
+	var project projectResponse
+	err := h.db.QueryRow(ctx, `
+		SELECT
+			id::text,
+			key,
+			name,
+			description,
+			created_by::text,
+			created_at,
+			archived_at
+		FROM projects
+		WHERE id = $1
+			AND workspace_id = $2
+			AND archived_at IS NULL
+	`, projectID, workspaceID).Scan(
+		&project.ID,
+		&project.Key,
+		&project.Name,
+		&project.Description,
+		&project.CreatedBy,
+		&project.CreatedAt,
+		&project.ArchivedAt,
+	)
+	if err != nil {
+		return projectResponse{}, err
+	}
+
+	return project, nil
 }
 
 func (h *Handler) archiveProject(ctx context.Context, workspaceID string, projectID string) error {

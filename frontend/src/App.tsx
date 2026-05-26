@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from "react";
+import { DragEvent, FormEvent, useEffect, useState } from "react";
 import "./styles.css";
 import {
   ApiError,
@@ -28,6 +28,7 @@ import {
   deleteIssueComment,
   getIssue,
   getCurrentUser,
+  getProject,
   listIssueActivity,
   listIssueComments,
   listIssues,
@@ -61,6 +62,7 @@ import {
   PROJECT_PERMISSION_NOTE,
   TEAM_PERMISSION_NOTE,
 } from "./lib/permissions";
+import { FormError } from "./components/form-feedback";
 
 const columns = [
   { status: "backlog", title: "Backlog" },
@@ -97,13 +99,21 @@ const issueDueFilterLabels: Record<IssueDueFilter, string> = {
   no_due: "No due date",
 };
 
-type AppSection = "dashboard" | "projects" | "issues" | "team" | "labels" | "account";
+type AppSection =
+  | "dashboard"
+  | "projects"
+  | "issues"
+  | "board"
+  | "team"
+  | "labels"
+  | "account";
 type DueTone = "overdue" | "due-soon" | "scheduled" | "done";
 
 const appSections = [
   { id: "dashboard", title: "Dashboard" },
   { id: "projects", title: "Projects" },
   { id: "issues", title: "Issues" },
+  { id: "board", title: "Board" },
   { id: "team", title: "Team" },
   { id: "labels", title: "Labels" },
   { id: "account", title: "Account" },
@@ -390,6 +400,10 @@ export function App() {
   const [editProjectName, setEditProjectName] = useState("");
   const [editProjectDescription, setEditProjectDescription] = useState("");
   const [updatingProjectIds, setUpdatingProjectIds] = useState<string[]>([]);
+  const [selectedProjectDetail, setSelectedProjectDetail] =
+    useState<Project | null>(null);
+  const [projectDetailError, setProjectDetailError] = useState("");
+  const [isLoadingProjectDetail, setIsLoadingProjectDetail] = useState(false);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [teamMembersError, setTeamMembersError] = useState("");
   const [teamMemberFormError, setTeamMemberFormError] = useState("");
@@ -521,6 +535,7 @@ export function App() {
   useEffect(() => {
     if (!user) {
       setProjects([]);
+      setSelectedProjectDetail(null);
       return;
     }
 
@@ -532,12 +547,23 @@ export function App() {
     setEditProjectDescription("");
     setUpdatingProjectIds([]);
     setArchivingProjectIds([]);
+    setProjectDetailError("");
     setIsLoadingProjects(true);
 
     listProjects()
       .then((response) => {
         if (isMounted) {
           setProjects(response.projects);
+          setSelectedProjectDetail((currentProject) => {
+            if (!response.projects.length) {
+              return null;
+            }
+
+            const matchingProject = response.projects.find(
+              (project) => project.id === currentProject?.id,
+            );
+            return matchingProject ?? response.projects[0];
+          });
           setSelectedProjectId((currentProjectId) => {
             if (
               currentProjectId &&
@@ -836,6 +862,9 @@ export function App() {
     setEditProjectName("");
     setEditProjectDescription("");
     setUpdatingProjectIds([]);
+    setSelectedProjectDetail(null);
+    setProjectDetailError("");
+    setIsLoadingProjectDetail(false);
     setTeamMembersError("");
     setTeamMemberFormError("");
     setTeamMemberEmail("");
@@ -995,6 +1024,7 @@ export function App() {
       });
       setProjects((currentProjects) => [project, ...currentProjects]);
       setSelectedProjectId(project.id);
+      setSelectedProjectDetail(project);
       setProjectKey("");
       setProjectName("");
       setProjectDescription("");
@@ -1018,6 +1048,30 @@ export function App() {
     setEditProjectDescription("");
   }
 
+  async function handleSelectProjectDetail(projectId: string) {
+    const projectPreview = projects.find((project) => project.id === projectId);
+    if (projectPreview) {
+      setSelectedProjectDetail(projectPreview);
+    }
+
+    setProjectDetailError("");
+    setIsLoadingProjectDetail(true);
+
+    try {
+      const project = await getProject(projectId);
+      setSelectedProjectDetail(project);
+      setProjects((currentProjects) =>
+        currentProjects.map((currentProject) =>
+          currentProject.id === project.id ? project : currentProject,
+        ),
+      );
+    } catch (err) {
+      setProjectDetailError(apiErrorMessage(err, "Could not load project details."));
+    } finally {
+      setIsLoadingProjectDetail(false);
+    }
+  }
+
   async function handleUpdateProject(
     event: FormEvent<HTMLFormElement>,
     project: Project,
@@ -1037,6 +1091,9 @@ export function App() {
         currentProjects.map((currentProject) =>
           currentProject.id === updatedProject.id ? updatedProject : currentProject,
         ),
+      );
+      setSelectedProjectDetail((currentProject) =>
+        currentProject?.id === updatedProject.id ? updatedProject : currentProject,
       );
       cancelEditingProject();
     } catch (err) {
@@ -1069,6 +1126,9 @@ export function App() {
       );
       setSelectedProjectId((currentProjectId) =>
         currentProjectId === project.id ? nextProjects[0]?.id ?? "" : currentProjectId,
+      );
+      setSelectedProjectDetail((currentProject) =>
+        currentProject?.id === project.id ? nextProjects[0] ?? null : currentProject,
       );
       setIssueFilterProjectId((currentProjectId) =>
         currentProjectId === project.id ? "" : currentProjectId,
@@ -1769,8 +1829,42 @@ export function App() {
     }
   }
 
+  function handleIssueDragStart(
+    event: DragEvent<HTMLElement>,
+    issueId: string,
+  ) {
+    event.dataTransfer.setData("text/plain", issueId);
+    event.dataTransfer.effectAllowed = "move";
+  }
+
+  function handleIssueDragOver(event: DragEvent<HTMLElement>) {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+  }
+
+  function handleIssueDrop(
+    event: DragEvent<HTMLElement>,
+    nextStatus: IssueStatus,
+  ) {
+    event.preventDefault();
+
+    const issueId = event.dataTransfer.getData("text/plain");
+    const issue = issues.find((currentIssue) => currentIssue.id === issueId);
+    if (!issue || issue.status === nextStatus) {
+      return;
+    }
+
+    void handleTransitionIssue(issue.id, nextStatus);
+  }
+
   const today = startOfToday();
   const openIssues = issues.filter((issue) => issue.status !== "done");
+  const selectedProjectIssues = selectedProjectDetail
+    ? issues.filter((issue) => issue.project_id === selectedProjectDetail.id)
+    : [];
+  const selectedProjectOpenIssues = selectedProjectIssues.filter(
+    (issue) => issue.status !== "done",
+  );
   const selectedIssueDueInfo = selectedIssue ? issueDueInfo(selectedIssue, today) : null;
   const overdueIssuesCount = openIssues.filter(
     (issue) => issueDueInfo(issue, today)?.tone === "overdue",
@@ -1790,7 +1884,7 @@ export function App() {
   const issueListSummary = hasIssueFilters
     ? `${issues.length} issues match current filters`
     : issueSort === "created_desc"
-      ? "Showing latest issues across all projects"
+      ? "Showing all issues across all projects"
       : `Showing issues sorted by ${issueSortLabels[issueSort].toLowerCase()}`;
   const canSignIn =
     hasText(loginValue) && hasText(password) && !isSubmitting;
@@ -1884,7 +1978,7 @@ export function App() {
               />
             </label>
 
-            {error ? <p className="form-error">{error}</p> : null}
+            <FormError message={error} />
 
             <button disabled={!canSignIn} type="submit">
               {isSubmitting ? "Signing in..." : "Sign in"}
@@ -2003,6 +2097,21 @@ export function App() {
 
           <article className="dashboard-action-card">
             <div>
+              <p className="eyebrow">Flow</p>
+              <h2>Board</h2>
+              <p>Move work between statuses with a kanban view backed by the same issue data.</p>
+            </div>
+            <button
+              className="small-button"
+              onClick={() => setActiveSection("board")}
+              type="button"
+            >
+              Open board
+            </button>
+          </article>
+
+          <article className="dashboard-action-card">
+            <div>
               <p className="eyebrow">People</p>
               <h2>Team</h2>
               <p>{DASHBOARD_ACTION_COPY.team[user.workspace.role]}</p>
@@ -2063,7 +2172,7 @@ export function App() {
             </div>
           </div>
 
-          {accountError ? <p className="form-error">{accountError}</p> : null}
+          <FormError message={accountError} />
           {accountSuccess ? <p className="form-success">{accountSuccess}</p> : null}
 
           <form className="account-form" onSubmit={handleUpdateProfile}>
@@ -2151,7 +2260,7 @@ export function App() {
             {isLoadingTeamMembers ? <span className="muted">Loading</span> : null}
           </header>
 
-          {teamMembersError ? <p className="form-error">{teamMembersError}</p> : null}
+          <FormError message={teamMembersError} />
 
           {teamMembers.length > 0 ? (
             <div className="team-list">
@@ -2338,9 +2447,7 @@ export function App() {
                 {isCreatingTeamMember ? "Creating..." : "Create member"}
               </button>
 
-              {teamMemberFormError ? (
-                <p className="form-error">{teamMemberFormError}</p>
-              ) : null}
+              <FormError message={teamMemberFormError} />
             </form>
           ) : (
             <aside className="team-readonly-note permission-note">
@@ -2371,7 +2478,7 @@ export function App() {
             {isLoadingLabels ? <span className="muted">Loading</span> : null}
           </header>
 
-          {labelsError ? <p className="form-error">{labelsError}</p> : null}
+          <FormError message={labelsError} />
 
           {labels.length > 0 ? (
             <div className="label-list">
@@ -2445,7 +2552,7 @@ export function App() {
               {isLoadingProjects ? <span className="muted">Loading</span> : null}
             </header>
 
-            {projectsError ? <p className="form-error">{projectsError}</p> : null}
+            <FormError message={projectsError} />
 
             {projects.length > 0 ? (
               <div className="project-list">
@@ -2508,26 +2615,40 @@ export function App() {
                           <p>{project.description || "No description"}</p>
                         </div>
                       )}
-                      {user.workspace.role === "admin" && !isEditingProject ? (
+                      {!isEditingProject ? (
                         <div className="project-row-actions">
                           <button
                             className="small-button"
-                            disabled={isArchivingProject}
-                            onClick={() => startEditingProject(project)}
-                            type="button"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            className="small-button danger-button"
-                            disabled={isArchivingProject}
+                            disabled={isLoadingProjectDetail}
                             onClick={() => {
-                              void handleArchiveProject(project);
+                              void handleSelectProjectDetail(project.id);
                             }}
                             type="button"
                           >
-                            {isArchivingProject ? "Archiving" : "Archive"}
+                            Details
                           </button>
+                          {user.workspace.role === "admin" ? (
+                            <>
+                              <button
+                                className="small-button"
+                                disabled={isArchivingProject}
+                                onClick={() => startEditingProject(project)}
+                                type="button"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                className="small-button danger-button"
+                                disabled={isArchivingProject}
+                                onClick={() => {
+                                  void handleArchiveProject(project);
+                                }}
+                                type="button"
+                              >
+                                {isArchivingProject ? "Archiving" : "Archive"}
+                              </button>
+                            </>
+                          ) : null}
                         </div>
                       ) : null}
                     </article>
@@ -2539,67 +2660,146 @@ export function App() {
             )}
           </div>
 
-          {user.workspace.role === "admin" ? (
-            <form className="project-form" onSubmit={handleCreateProject}>
+          <div className="project-sidebar">
+            {user.workspace.role === "admin" ? (
+              <form className="project-form" onSubmit={handleCreateProject}>
+                <header className="section-header">
+                  <div>
+                    <p className="eyebrow">Admin</p>
+                    <h2>Create project</h2>
+                  </div>
+                </header>
+
+                <label>
+                  <span>Key</span>
+                  <input
+                    maxLength={10}
+                    onChange={(event) =>
+                      setProjectKey(event.target.value.toUpperCase())
+                    }
+                    placeholder="CORE"
+                    value={projectKey}
+                  />
+                </label>
+
+                <label>
+                  <span>Name</span>
+                  <input
+                    maxLength={120}
+                    onChange={(event) => setProjectName(event.target.value)}
+                    placeholder="Core Platform"
+                    value={projectName}
+                  />
+                </label>
+
+                <label>
+                  <span>Description</span>
+                  <textarea
+                    onChange={(event) => setProjectDescription(event.target.value)}
+                    placeholder="Main product workspace"
+                    rows={4}
+                    value={projectDescription}
+                  />
+                </label>
+
+                <FormError message={projectFormError} />
+
+                <button disabled={!canCreateProject} type="submit">
+                  {isCreatingProject ? "Creating..." : "Create project"}
+                </button>
+              </form>
+            ) : (
+              <aside className="project-form permission-note">
+                <header className="section-header">
+                  <div>
+                    <p className="eyebrow">{PROJECT_PERMISSION_NOTE.eyebrow}</p>
+                    <h2>{PROJECT_PERMISSION_NOTE.title}</h2>
+                  </div>
+                </header>
+
+                <p>{PROJECT_PERMISSION_NOTE.body}</p>
+              </aside>
+            )}
+
+            <aside className="project-detail-panel" aria-label="Project details">
               <header className="section-header">
                 <div>
-                  <p className="eyebrow">Admin</p>
-                  <h2>Create project</h2>
+                  <p className="eyebrow">Project detail</p>
+                  <h2>
+                    {selectedProjectDetail
+                      ? `${selectedProjectDetail.key} · ${selectedProjectDetail.name}`
+                      : "Select project"}
+                  </h2>
                 </div>
+                {isLoadingProjectDetail ? <span className="muted">Loading</span> : null}
               </header>
 
-              <label>
-                <span>Key</span>
-                <input
-                  maxLength={10}
-                  onChange={(event) =>
-                    setProjectKey(event.target.value.toUpperCase())
-                  }
-                  placeholder="CORE"
-                  value={projectKey}
-                />
-              </label>
+              <FormError message={projectDetailError} />
 
-              <label>
-                <span>Name</span>
-                <input
-                  maxLength={120}
-                  onChange={(event) => setProjectName(event.target.value)}
-                  placeholder="Core Platform"
-                  value={projectName}
-                />
-              </label>
+              {selectedProjectDetail ? (
+                <>
+                  <p className="project-detail-description">
+                    {selectedProjectDetail.description || "No description"}
+                  </p>
 
-              <label>
-                <span>Description</span>
-                <textarea
-                  onChange={(event) => setProjectDescription(event.target.value)}
-                  placeholder="Main product workspace"
-                  rows={4}
-                  value={projectDescription}
-                />
-              </label>
+                  <div className="project-detail-stats">
+                    <article>
+                      <span>Visible issues</span>
+                      <strong>{selectedProjectIssues.length}</strong>
+                    </article>
+                    <article>
+                      <span>Open</span>
+                      <strong>{selectedProjectOpenIssues.length}</strong>
+                    </article>
+                  </div>
 
-              {projectFormError ? (
-                <p className="form-error">{projectFormError}</p>
-              ) : null}
+                  <div className="project-detail-actions">
+                    <button
+                      className="small-button"
+                      onClick={() => {
+                        setIssueFilterProjectId(selectedProjectDetail.id);
+                        setActiveSection("issues");
+                      }}
+                      type="button"
+                    >
+                      View project issues
+                    </button>
+                    <button
+                      className="small-button"
+                      onClick={() => {
+                        setIssueFilterProjectId(selectedProjectDetail.id);
+                        setActiveSection("board");
+                      }}
+                      type="button"
+                    >
+                      Open project board
+                    </button>
+                  </div>
 
-              <button disabled={!canCreateProject} type="submit">
-                {isCreatingProject ? "Creating..." : "Create project"}
-              </button>
-            </form>
-          ) : (
-            <aside className="project-form permission-note">
-              <header className="section-header">
-                <div>
-                  <p className="eyebrow">{PROJECT_PERMISSION_NOTE.eyebrow}</p>
-                  <h2>{PROJECT_PERMISSION_NOTE.title}</h2>
-                </div>
-              </header>
-
-              <p>{PROJECT_PERMISSION_NOTE.body}</p>
+                  {selectedProjectIssues.length > 0 ? (
+                    <div className="project-detail-issues">
+                      {selectedProjectIssues.slice(0, 4).map((issue) => (
+                        <button
+                          key={issue.id}
+                          onClick={() => {
+                            void handleSelectIssue(issue.id);
+                          }}
+                          type="button"
+                        >
+                          <span>{issue.issue_key}</span>
+                          <strong>{issue.title}</strong>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="comments-empty">No visible issues for this project</div>
+                  )}
+                </>
+              ) : (
+                <div className="comments-empty">No project selected</div>
+              )}
             </aside>
-          )}
+          </div>
         </section>
 
         <section
@@ -2754,7 +2954,7 @@ export function App() {
               </label>
             </div>
 
-            {issueFormError ? <p className="form-error">{issueFormError}</p> : null}
+            <FormError message={issueFormError} />
 
             <button disabled={!canCreateIssue} type="submit">
               {isCreatingIssue ? "Creating..." : "Create issue"}
@@ -2911,11 +3111,11 @@ export function App() {
 
             <p className="filter-summary">{issueListSummary}</p>
 
-            {issuesError ? <p className="form-error">{issuesError}</p> : null}
+            <FormError message={issuesError} />
 
             {issues.length > 0 ? (
               <div className="issue-list">
-                {issues.slice(0, 6).map((issue) => {
+                {issues.map((issue) => {
                   const dueInfo = issueDueInfo(issue, today);
 
                   return (
@@ -3046,7 +3246,7 @@ export function App() {
           </header>
 
           {selectedIssueError ? (
-            <p className="form-error">{selectedIssueError}</p>
+            <FormError message={selectedIssueError} />
           ) : null}
 
           {isLoadingSelectedIssue ? (
@@ -3198,7 +3398,7 @@ export function App() {
                   </header>
 
                   {commentsError ? (
-                    <p className="form-error">{commentsError}</p>
+                    <FormError message={commentsError} />
                   ) : null}
 
                   {issueComments.length > 0 ? (
@@ -3337,7 +3537,7 @@ export function App() {
                   </header>
 
                   {activityError ? (
-                    <p className="form-error">{activityError}</p>
+                    <FormError message={activityError} />
                   ) : null}
 
                   {issueActivity.length > 0 ? (
@@ -3488,11 +3688,16 @@ export function App() {
 
         <section
           className="board"
-          aria-label="Task board preview"
-          hidden={activeSection !== "dashboard"}
+          aria-label="Kanban board"
+          hidden={activeSection !== "board"}
         >
           {columns.map((column) => (
-            <article className="board-column" key={column.title}>
+            <article
+              className="board-column"
+              key={column.title}
+              onDragOver={handleIssueDragOver}
+              onDrop={(event) => handleIssueDrop(event, column.status)}
+            >
               <header>
                 <h2>{column.title}</h2>
                 <span>
@@ -3505,8 +3710,15 @@ export function App() {
                   .map((issue) => {
                     const dueInfo = issueDueInfo(issue, today);
 
-                    return (
-                      <article className="issue-card" key={issue.id}>
+	                    return (
+	                      <article
+	                        className="issue-card"
+	                        draggable
+	                        key={issue.id}
+	                        onDragStart={(event) =>
+	                          handleIssueDragStart(event, issue.id)
+	                        }
+	                      >
                         <div className="issue-card-meta">
                           <span>{issue.issue_key}</span>
                           <span>{priorityLabels[issue.priority]}</span>

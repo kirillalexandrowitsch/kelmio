@@ -159,6 +159,7 @@ ISSUE_TITLE="Smoke issue $RUN_ID"
 
 printf 'Creating project %s\n' "$PROJECT_KEY"
 PROJECT_ID="$(api_post "/api/v1/projects" "{\"key\":\"$PROJECT_KEY\",\"name\":\"$PROJECT_NAME\",\"description\":\"Created by API smoke test.\"}" | json_value 'data.id')"
+api_get "/api/v1/projects/$PROJECT_ID" | json_value "data.id === \"$PROJECT_ID\" && data.key === \"$PROJECT_KEY\"" >/dev/null
 
 printf 'Checking member project access guards\n'
 if [ "$(api_patch_status_with_jar "$MEMBER_COOKIE_JAR" "/api/v1/projects/$PROJECT_ID" '{"name":"Member Update","description":"Blocked by smoke test."}')" != "403" ]; then

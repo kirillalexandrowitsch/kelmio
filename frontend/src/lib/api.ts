@@ -235,6 +235,10 @@ export async function listProjects() {
   return request<ListProjectsResponse>("/api/v1/projects");
 }
 
+export async function getProject(projectId: string) {
+  return request<Project>(`/api/v1/projects/${encodeURIComponent(projectId)}`);
+}
+
 export async function createProject(input: CreateProjectInput) {
   return request<Project>("/api/v1/projects", {
     method: "POST",

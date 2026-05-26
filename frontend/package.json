@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
-    "test": "node --test --experimental-strip-types src/lib/validation.test.ts src/lib/permissions.test.ts",
+    "test": "node --test --experimental-strip-types src/lib/validation.test.ts src/lib/permissions.test.ts src/components/form-feedback.test.ts",
     "preview": "vite preview"
   },
   "dependencies": {

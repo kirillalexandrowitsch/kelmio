@@ -450,7 +450,7 @@ h1 {
 
 .dashboard-actions {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -495,6 +495,7 @@ h1 {
 
 .projects-panel,
 .project-form,
+.project-detail-panel,
 .account-panel,
 .issues-panel,
 .issue-form,
@@ -519,6 +520,90 @@ h1 {
   align-content: start;
   gap: 14px;
   padding: 18px;
+}
+
+.project-sidebar {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+}
+
+.project-detail-panel {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  padding: 18px;
+}
+
+.project-detail-description {
+  margin: 0;
+  color: #4e5c54;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.project-detail-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.project-detail-stats article {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid #edf0ed;
+  border-radius: 8px;
+  background: #fbfcfb;
+}
+
+.project-detail-stats span {
+  color: #657268;
+  font-size: 12px;
+}
+
+.project-detail-stats strong {
+  font-size: 22px;
+}
+
+.project-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.project-detail-issues {
+  display: grid;
+  gap: 8px;
+}
+
+.project-detail-issues button {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #edf0ed;
+  border-radius: 8px;
+  color: #17211b;
+  background: #fbfcfb;
+  text-align: left;
+}
+
+.project-detail-issues button:hover {
+  border-color: #b8c5bd;
+  background: #f6f8f6;
+}
+
+.project-detail-issues span {
+  color: #657268;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.project-detail-issues strong {
+  font-size: 13px;
 }
 
 .permission-note {
@@ -1159,6 +1244,14 @@ h1 {
   border: 1px solid #edf0ed;
   border-radius: 8px;
   background: #fbfcfb;
+}
+
+.issue-card[draggable="true"] {
+  cursor: grab;
+}
+
+.issue-card[draggable="true"]:active {
+  cursor: grabbing;
 }
 
 .issue-card h3,
