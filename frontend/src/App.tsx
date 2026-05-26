@@ -62,6 +62,12 @@ import {
   PROJECT_PERMISSION_NOTE,
   TEAM_PERMISSION_NOTE,
 } from "./lib/permissions";
+import {
+  appSectionPath,
+  appSections,
+  currentAppSectionFromLocation,
+  type AppSection,
+} from "./lib/routing";
 import { FormError } from "./components/form-feedback";
 
 const columns = [
@@ -99,25 +105,7 @@ const issueDueFilterLabels: Record<IssueDueFilter, string> = {
   no_due: "No due date",
 };
 
-type AppSection =
-  | "dashboard"
-  | "projects"
-  | "issues"
-  | "board"
-  | "team"
-  | "labels"
-  | "account";
 type DueTone = "overdue" | "due-soon" | "scheduled" | "done";
-
-const appSections = [
-  { id: "dashboard", title: "Dashboard" },
-  { id: "projects", title: "Projects" },
-  { id: "issues", title: "Issues" },
-  { id: "board", title: "Board" },
-  { id: "team", title: "Team" },
-  { id: "labels", title: "Labels" },
-  { id: "account", title: "Account" },
-] satisfies Array<{ id: AppSection; title: string }>;
 
 function apiErrorMessage(error: unknown, fallback: string) {
   return error instanceof ApiError ? error.message : fallback;
@@ -381,7 +369,9 @@ export function App() {
   const [isBooting, setIsBooting] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [activeSection, setActiveSection] = useState<AppSection>("dashboard");
+  const [activeSection, setActiveSection] = useState<AppSection>(
+    currentAppSectionFromLocation,
+  );
   const [accountError, setAccountError] = useState("");
   const [accountSuccess, setAccountSuccess] = useState("");
   const [accountDisplayName, setAccountDisplayName] = useState("");
@@ -483,6 +473,33 @@ export function App() {
   const [isLoadingActivity, setIsLoadingActivity] = useState(false);
   const selectedIssueId = selectedIssue?.id ?? "";
 
+  function navigateToSection(
+    section: AppSection,
+    mode: "push" | "replace" = "push",
+  ) {
+    setActiveSection(section);
+
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const nextPath = appSectionPath(section);
+    if (
+      window.location.pathname === nextPath &&
+      window.location.search === "" &&
+      window.location.hash === ""
+    ) {
+      return;
+    }
+
+    if (mode === "replace") {
+      window.history.replaceState({ section }, "", nextPath);
+      return;
+    }
+
+    window.history.pushState({ section }, "", nextPath);
+  }
+
   useEffect(() => {
     let isMounted = true;
 
@@ -509,6 +526,17 @@ export function App() {
 
     return () => {
       isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    function handleRouteChange() {
+      setActiveSection(currentAppSectionFromLocation());
+    }
+
+    window.addEventListener("popstate", handleRouteChange);
+    return () => {
+      window.removeEventListener("popstate", handleRouteChange);
     };
   }, []);
 
@@ -843,7 +871,7 @@ export function App() {
     setPassword("");
     setIsSubmitting(false);
     setIsLoggingOut(false);
-    setActiveSection("dashboard");
+    navigateToSection("dashboard", "replace");
     setAccountError("");
     setAccountSuccess("");
     setAccountDisplayName("");
@@ -1625,7 +1653,7 @@ export function App() {
   }
 
   async function handleSelectIssue(issueId: string) {
-    setActiveSection("issues");
+    navigateToSection("issues");
 
     const issuePreview = issues.find((issue) => issue.id === issueId);
     if (issuePreview) {
@@ -2005,7 +2033,7 @@ export function App() {
             <button
               aria-current={activeSection === section.id ? "page" : undefined}
               key={section.id}
-              onClick={() => setActiveSection(section.id)}
+              onClick={() => navigateToSection(section.id)}
               type="button"
             >
               {section.title}
@@ -2073,7 +2101,7 @@ export function App() {
             </div>
             <button
               className="small-button"
-              onClick={() => setActiveSection("projects")}
+              onClick={() => navigateToSection("projects")}
               type="button"
             >
               Open projects
@@ -2088,7 +2116,7 @@ export function App() {
             </div>
             <button
               className="small-button"
-              onClick={() => setActiveSection("issues")}
+              onClick={() => navigateToSection("issues")}
               type="button"
             >
               Open issues
@@ -2103,7 +2131,7 @@ export function App() {
             </div>
             <button
               className="small-button"
-              onClick={() => setActiveSection("board")}
+              onClick={() => navigateToSection("board")}
               type="button"
             >
               Open board
@@ -2118,7 +2146,7 @@ export function App() {
             </div>
             <button
               className="small-button"
-              onClick={() => setActiveSection("team")}
+              onClick={() => navigateToSection("team")}
               type="button"
             >
               Open team
@@ -2133,7 +2161,7 @@ export function App() {
             </div>
             <button
               className="small-button"
-              onClick={() => setActiveSection("labels")}
+              onClick={() => navigateToSection("labels")}
               type="button"
             >
               Open labels
@@ -2758,7 +2786,7 @@ export function App() {
                       className="small-button"
                       onClick={() => {
                         setIssueFilterProjectId(selectedProjectDetail.id);
-                        setActiveSection("issues");
+                        navigateToSection("issues");
                       }}
                       type="button"
                     >
@@ -2768,7 +2796,7 @@ export function App() {
                       className="small-button"
                       onClick={() => {
                         setIssueFilterProjectId(selectedProjectDetail.id);
-                        setActiveSection("board");
+                        navigateToSection("board");
                       }}
                       type="button"
                     >
