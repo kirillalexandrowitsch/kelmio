@@ -57,10 +57,7 @@ import {
   normalizeText,
   normalizeUsername,
 } from "./lib/validation";
-import {
-  PROJECT_PERMISSION_NOTE,
-  TEAM_PERMISSION_NOTE,
-} from "./lib/permissions";
+import { PROJECT_PERMISSION_NOTE } from "./lib/permissions";
 import {
   columns,
   issueDueFilterLabels,
@@ -76,7 +73,6 @@ import {
   activeTeamMembers,
   assignableTeamMembers,
   memberDisplayName,
-  memberInitials,
   memberOptionLabel,
 } from "./lib/team-view";
 import { activityDescription, activityTitle } from "./lib/activity-view";
@@ -93,6 +89,7 @@ import { AccountSection } from "./features/account/account-section";
 import { BootingScreen, SignInScreen } from "./features/auth/auth-screens";
 import { DashboardSection } from "./features/dashboard/dashboard-section";
 import { LabelsSection } from "./features/labels/labels-section";
+import { TeamSection } from "./features/team/team-section";
 
 function apiErrorMessage(error: unknown, fallback: string) {
   return error instanceof ApiError ? error.message : fallback;
@@ -1756,223 +1753,41 @@ export function App() {
           user={user}
         />
 
-        <section
-          className="team-panel"
-          aria-label="Team members"
-          hidden={activeSection !== "team"}
-        >
-          <header className="section-header">
-            <div>
-              <p className="eyebrow">Team</p>
-              <h2>Workspace members</h2>
-            </div>
-            {isLoadingTeamMembers ? <span className="muted">Loading</span> : null}
-          </header>
-
-          <FormError message={teamMembersError} />
-
-          {teamMembers.length > 0 ? (
-            <div className="team-list">
-              {teamMembers.map((member) => {
-                const isSelf = member.id === user.id;
-                const isUpdatingMember = updatingTeamMemberIds.includes(member.id);
-                const isResettingPassword = passwordResetMemberId === member.id;
-                const isSubmittingPasswordReset =
-                  resettingTeamMemberPasswordIds.includes(member.id);
-
-                return (
-                  <article className="team-member-row" key={member.id}>
-                    <span className="member-avatar">
-                      {memberInitials(member.display_name)}
-                    </span>
-                    <div>
-                      <h3>{member.display_name}</h3>
-                      <p>
-                        @{member.username} · {member.email}
-                      </p>
-                    </div>
-                    <span className="member-role">{member.role}</span>
-                    {user.workspace.role === "admin" ? (
-                      <div className="member-controls">
-                        <label>
-                          <span>Role</span>
-                          <select
-                            disabled={isSelf || isUpdatingMember}
-                            onChange={(event) => {
-                              void handleUpdateTeamMember(member.id, {
-                                role: event.target.value as TeamMember["role"],
-                              });
-                            }}
-                            value={member.role}
-                          >
-                            <option value="member">Member</option>
-                            <option value="admin">Admin</option>
-                          </select>
-                        </label>
-                        <label className="member-active-toggle">
-                          <input
-                            checked={member.is_active}
-                            disabled={isSelf || isUpdatingMember}
-                            onChange={(event) => {
-                              void handleUpdateTeamMember(member.id, {
-                                is_active: event.target.checked,
-                              });
-                            }}
-                            type="checkbox"
-                          />
-                          <span>{member.is_active ? "Active" : "Inactive"}</span>
-                        </label>
-                        <button
-                          className="small-button"
-                          disabled={isSelf || isUpdatingMember || isSubmittingPasswordReset}
-                          onClick={() => {
-                            if (isResettingPassword) {
-                              cancelResetTeamMemberPassword();
-                            } else {
-                              startResetTeamMemberPassword(member.id);
-                            }
-                          }}
-                          type="button"
-                        >
-                          {isResettingPassword ? "Cancel reset" : "Reset password"}
-                        </button>
-                      </div>
-                    ) : null}
-                    {user.workspace.role === "admin" && isResettingPassword ? (
-                      <form
-                        className="member-password-reset"
-                        onSubmit={(event) => {
-                          void handleResetTeamMemberPassword(event, member.id);
-                        }}
-                      >
-                        <label>
-                          <span>New password for @{member.username}</span>
-                          <input
-                            autoComplete="new-password"
-                            minLength={8}
-                            onChange={(event) =>
-                              setTeamMemberResetPassword(event.target.value)
-                            }
-                            placeholder="At least 8 characters"
-                            type="password"
-                            value={teamMemberResetPassword}
-                          />
-                        </label>
-                        <div className="form-actions">
-                          <button
-                            className="small-button"
-                            disabled={
-                              isSubmittingPasswordReset ||
-                              !canResetTeamMemberPassword
-                            }
-                            type="submit"
-                          >
-                            {isSubmittingPasswordReset ? "Saving..." : "Save password"}
-                          </button>
-                          <button
-                            className="ghost-button"
-                            disabled={isSubmittingPasswordReset}
-                            onClick={cancelResetTeamMemberPassword}
-                            type="button"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      </form>
-                    ) : null}
-                  </article>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="project-empty">No team members yet</div>
-          )}
-
-          {user.workspace.role === "admin" ? (
-            <form className="team-member-form" onSubmit={handleCreateTeamMember}>
-              <label>
-                <span>Email</span>
-                <input
-                  autoComplete="off"
-                  onChange={(event) => setTeamMemberEmail(event.target.value)}
-                  placeholder="member@example.com"
-                  type="email"
-                  value={teamMemberEmail}
-                />
-              </label>
-
-              <label>
-                <span>Username</span>
-                <input
-                  autoComplete="off"
-                  maxLength={32}
-                  onChange={(event) =>
-                    setTeamMemberUsername(event.target.value.toLowerCase())
-                  }
-                  placeholder="member_name"
-                  value={teamMemberUsername}
-                />
-              </label>
-
-              <label>
-                <span>Display name</span>
-                <input
-                  maxLength={80}
-                  onChange={(event) => setTeamMemberDisplayName(event.target.value)}
-                  placeholder="Member Name"
-                  value={teamMemberDisplayName}
-                />
-              </label>
-
-              <label>
-                <span>Role</span>
-                <select
-                  onChange={(event) =>
-                    setTeamMemberRole(event.target.value as TeamMember["role"])
-                  }
-                  value={teamMemberRole}
-                >
-                  <option value="member">Member</option>
-                  <option value="admin">Admin</option>
-                </select>
-              </label>
-
-              <label>
-                <span>Password</span>
-                <input
-                  autoComplete="new-password"
-                  minLength={8}
-                  onChange={(event) => setTeamMemberPassword(event.target.value)}
-                  placeholder="At least 8 characters"
-                  type="password"
-                  value={teamMemberPassword}
-                />
-              </label>
-
-              <button
-                disabled={!canCreateTeamMember}
-                type="submit"
-              >
-                {isCreatingTeamMember ? "Creating..." : "Create member"}
-              </button>
-
-              <FormError message={teamMemberFormError} />
-            </form>
-          ) : (
-            <aside className="team-readonly-note permission-note">
-              <header className="section-header">
-                <div>
-                  <p className="eyebrow">{TEAM_PERMISSION_NOTE.eyebrow}</p>
-                  <h2>{TEAM_PERMISSION_NOTE.title}</h2>
-                </div>
-              </header>
-
-              <p>
-                {TEAM_PERMISSION_NOTE.body}
-              </p>
-            </aside>
-          )}
-        </section>
+        <TeamSection
+          canCreateTeamMember={canCreateTeamMember}
+          canResetTeamMemberPassword={canResetTeamMemberPassword}
+          currentUser={user}
+          isActive={activeSection === "team"}
+          isCreatingTeamMember={isCreatingTeamMember}
+          isLoadingTeamMembers={isLoadingTeamMembers}
+          onCancelResetPassword={cancelResetTeamMemberPassword}
+          onCreateTeamMember={handleCreateTeamMember}
+          onDisplayNameChange={setTeamMemberDisplayName}
+          onEmailChange={setTeamMemberEmail}
+          onPasswordChange={setTeamMemberPassword}
+          onResetPassword={(event, memberId) => {
+            void handleResetTeamMemberPassword(event, memberId);
+          }}
+          onResetPasswordChange={setTeamMemberResetPassword}
+          onRoleChange={setTeamMemberRole}
+          onStartResetPassword={startResetTeamMemberPassword}
+          onUpdateTeamMember={(memberId, input) => {
+            void handleUpdateTeamMember(memberId, input);
+          }}
+          onUsernameChange={setTeamMemberUsername}
+          passwordResetMemberId={passwordResetMemberId}
+          resettingTeamMemberPasswordIds={resettingTeamMemberPasswordIds}
+          teamMemberDisplayName={teamMemberDisplayName}
+          teamMemberEmail={teamMemberEmail}
+          teamMemberFormError={teamMemberFormError}
+          teamMemberPassword={teamMemberPassword}
+          teamMemberResetPassword={teamMemberResetPassword}
+          teamMemberRole={teamMemberRole}
+          teamMemberUsername={teamMemberUsername}
+          teamMembers={teamMembers}
+          teamMembersError={teamMembersError}
+          updatingTeamMemberIds={updatingTeamMemberIds}
+        />
 
         <LabelsSection
           canCreateLabel={canCreateLabel}
