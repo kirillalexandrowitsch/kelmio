@@ -62,6 +62,7 @@ make seed
 make setup-db
 make backend-dev
 make backend-test
+make backend-integration-test
 make frontend-install
 make frontend-dev
 make frontend-build
@@ -97,6 +98,18 @@ make verify
 ```
 
 `make verify` выполняет non-destructive проверки: local toolchain doctor, shell syntax для smoke-скрипта, backend tests, frontend tests, frontend build и проверку Docker Compose config.
+
+Backend integration test:
+
+```sh
+# terminal 1
+make dev
+
+# terminal 2
+make backend-integration-test
+```
+
+`make backend-integration-test` проверяет миграции и базовые PostgreSQL операции в изолированной временной schema, затем удаляет ее. Рабочие localhost-данные не очищаются.
 
 Auth API smoke test:
 

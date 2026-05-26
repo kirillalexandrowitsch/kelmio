@@ -1,6 +1,6 @@
 SHELL := /bin/sh
 
-.PHONY: help doctor dev down logs ps db-up wait-db migrate-up seed setup-db backend-dev backend-test frontend-install frontend-dev frontend-build frontend-test smoke-api verify
+.PHONY: help doctor dev down logs ps db-up wait-db migrate-up seed setup-db backend-dev backend-test backend-integration-test frontend-install frontend-dev frontend-build frontend-test smoke-api verify
 
 help:
 	@printf '%s\n' 'Available commands:'
@@ -16,6 +16,7 @@ help:
 	@printf '%s\n' '  make setup-db         Start DB, migrate, and seed'
 	@printf '%s\n' '  make backend-dev      Run backend locally'
 	@printf '%s\n' '  make backend-test     Run Go tests'
+	@printf '%s\n' '  make backend-integration-test Run Go integration tests against local PostgreSQL'
 	@printf '%s\n' '  make frontend-install Install frontend dependencies'
 	@printf '%s\n' '  make frontend-dev     Run frontend dev server locally'
 	@printf '%s\n' '  make frontend-build   Build frontend'
@@ -57,6 +58,9 @@ backend-dev:
 
 backend-test:
 	cd backend && go test ./...
+
+backend-integration-test: wait-db
+	cd backend && go test -tags=integration ./internal/database
 
 frontend-install:
 	cd frontend && npm install
