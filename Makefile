@@ -1,6 +1,6 @@
 SHELL := /bin/sh
 
-.PHONY: help doctor dev down logs ps db-up wait-db migrate-up seed setup-db backend-dev backend-test backend-integration-test frontend-install frontend-dev frontend-build frontend-test smoke-api verify
+.PHONY: help doctor dev down logs ps db-up wait-db migrate-up seed setup-db backend-dev backend-test backend-integration-test frontend-install frontend-dev frontend-build frontend-test frontend-e2e-install frontend-e2e smoke-api verify
 
 help:
 	@printf '%s\n' 'Available commands:'
@@ -21,6 +21,8 @@ help:
 	@printf '%s\n' '  make frontend-dev     Run frontend dev server locally'
 	@printf '%s\n' '  make frontend-build   Build frontend'
 	@printf '%s\n' '  make frontend-test    Run frontend tests'
+	@printf '%s\n' '  make frontend-e2e-install Install Playwright browser dependencies'
+	@printf '%s\n' '  make frontend-e2e     Run browser e2e smoke against localhost frontend'
 	@printf '%s\n' '  make smoke-api        Run API smoke test against localhost backend'
 	@printf '%s\n' '  make verify           Run local non-destructive verification checks'
 
@@ -73,6 +75,12 @@ frontend-build:
 
 frontend-test:
 	cd frontend && npm test
+
+frontend-e2e-install:
+	cd frontend && npx playwright install chromium
+
+frontend-e2e:
+	cd frontend && npm run e2e
 
 smoke-api:
 	./scripts/smoke-api.sh

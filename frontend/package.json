@@ -8,6 +8,7 @@
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
     "test": "node --test --experimental-strip-types src/lib/validation.test.ts src/lib/permissions.test.ts src/components/form-feedback.test.ts",
+    "e2e": "playwright test",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -15,9 +16,10 @@
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
-    "@vitejs/plugin-react": "^5.0.0",
+    "@playwright/test": "^1.60.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^5.0.0",
     "typescript": "^5.8.0",
     "vite": "^7.0.0"
   }

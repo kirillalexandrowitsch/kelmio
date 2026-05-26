@@ -67,6 +67,8 @@ make frontend-install
 make frontend-dev
 make frontend-build
 make frontend-test
+make frontend-e2e-install
+make frontend-e2e
 make smoke-api
 make verify
 ```
@@ -110,6 +112,22 @@ make backend-integration-test
 ```
 
 `make backend-integration-test` проверяет миграции и базовые PostgreSQL операции в изолированной временной schema, затем удаляет ее. Рабочие localhost-данные не очищаются.
+
+Browser e2e smoke test:
+
+```sh
+# one-time browser install
+make frontend-e2e-install
+
+# terminal 1
+make dev
+
+# terminal 2, after setup-db has seeded admin/demo data
+make setup-db
+make frontend-e2e
+```
+
+`make frontend-e2e` запускает Playwright-сценарий V1 в браузере: login -> create project -> create issue -> move issue -> add comment. По умолчанию используется `http://localhost:5173`, `admin` / `admin12345`; при необходимости можно переопределить `E2E_BASE_URL`, `E2E_ADMIN_LOGIN` и `E2E_ADMIN_PASSWORD`.
 
 Auth API smoke test:
 
