@@ -67,11 +67,6 @@ import {
   startOfToday,
 } from "./lib/issue-model";
 import {
-  assignableTeamMembers,
-  memberOptionLabel,
-} from "./lib/team-view";
-import { formatDateTime } from "./lib/formatting";
-import {
   appSectionPath,
   appSections,
   currentAppSectionFromLocation,
@@ -86,6 +81,7 @@ import { DashboardSection } from "./features/dashboard/dashboard-section";
 import { IssueActivitySection } from "./features/issues/issue-activity-section";
 import { IssueCommentsSection } from "./features/issues/issue-comments-section";
 import { IssueCreateForm } from "./features/issues/issue-create-form";
+import { IssueDetailSidebar } from "./features/issues/issue-detail-sidebar";
 import { IssueListPanel } from "./features/issues/issue-list-panel";
 import { LabelsSection } from "./features/labels/labels-section";
 import { ProjectsSection } from "./features/projects/projects-section";
@@ -1627,7 +1623,6 @@ export function App() {
   const selectedProjectOpenIssues = selectedProjectIssues.filter(
     (issue) => issue.status !== "done",
   );
-  const selectedIssueDueInfo = selectedIssue ? issueDueInfo(selectedIssue, today) : null;
   const overdueIssuesCount = openIssues.filter(
     (issue) => issueDueInfo(issue, today)?.tone === "overdue",
   ).length;
@@ -2156,118 +2151,24 @@ export function App() {
                 />
               </div>
 
-              <aside className="issue-detail-sidebar">
-                <label className="issue-detail-status">
-                  <span>Status</span>
-                  <select
-                    disabled={transitioningIssueIds.includes(selectedIssue.id)}
-                    onChange={(event) => {
-                      void handleTransitionIssue(
-                        selectedIssue.id,
-                        event.target.value as IssueStatus,
-                      );
-                    }}
-                    value={selectedIssue.status}
-                  >
-                    {columns.map((column) => (
-                      <option key={column.status} value={column.status}>
-                        {column.title}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="issue-detail-status">
-                  <span>Assignee</span>
-                  <select
-                    disabled={assigningIssueIds.includes(selectedIssue.id)}
-                    onChange={(event) => {
-                      void handleAssignIssue(selectedIssue.id, event.target.value);
-                    }}
-                    value={selectedIssue.assignee_id ?? ""}
-                  >
-                    <option value="">Unassigned</option>
-                    {assignableTeamMembers(
-                      teamMembers,
-                      selectedIssue.assignee_id,
-                    ).map((member) => (
-                      <option
-                        disabled={!member.is_active}
-                        key={member.id}
-                        value={member.id}
-                      >
-                        {memberOptionLabel(member)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <div className="issue-label-picker">
-                  <span>Labels</span>
-                  {labels.length > 0 ? (
-                    <div className="label-checkbox-list">
-                      {labels.map((label) => (
-                        <label className="label-checkbox" key={label.id}>
-                          <input
-                            checked={selectedIssue.labels.some(
-                              (issueLabel) => issueLabel.id === label.id,
-                            )}
-                            disabled={labelingIssueIds.includes(selectedIssue.id)}
-                            onChange={(event) => {
-                              void handleSetIssueLabel(
-                                selectedIssue,
-                                label.id,
-                                event.target.checked,
-                              );
-                            }}
-                            type="checkbox"
-                          />
-                          <span
-                            className="label-chip label-chip-small"
-                            style={{
-                              backgroundColor: `${label.color}1a`,
-                              borderColor: label.color,
-                            }}
-                          >
-                            {label.name}
-                          </span>
-                        </label>
-                      ))}
-                    </div>
-                  ) : (
-                    <strong>No labels created</strong>
-                  )}
-                </div>
-
-                <div className="metadata-grid">
-                  <div>
-                    <span>Project</span>
-                    <strong>{selectedIssue.project_key}</strong>
-                  </div>
-                  <div>
-                    <span>Due date</span>
-                    {selectedIssueDueInfo ? (
-                      <strong>
-                        <span
-                          className={`due-badge due-badge-${selectedIssueDueInfo.tone}`}
-                        >
-                          {selectedIssueDueInfo.label}
-                        </span>
-                      </strong>
-                    ) : (
-                      <strong>No due date</strong>
-                    )}
-                  </div>
-                  <div>
-                    <span>Created</span>
-                    <strong>{formatDateTime(selectedIssue.created_at)}</strong>
-                  </div>
-                  <div>
-                    <span>Updated</span>
-                    <strong>{formatDateTime(selectedIssue.updated_at)}</strong>
-                  </div>
-                </div>
-              </aside>
+              <IssueDetailSidebar
+                assigningIssueIds={assigningIssueIds}
+                issue={selectedIssue}
+                labelingIssueIds={labelingIssueIds}
+                labels={labels}
+                onAssignIssue={(issueId, assigneeId) => {
+                  void handleAssignIssue(issueId, assigneeId);
+                }}
+                onSetIssueLabel={(issue, labelId, shouldAttach) => {
+                  void handleSetIssueLabel(issue, labelId, shouldAttach);
+                }}
+                onTransitionIssue={(issueId, status) => {
+                  void handleTransitionIssue(issueId, status);
+                }}
+                teamMembers={teamMembers}
+                today={today}
+                transitioningIssueIds={transitioningIssueIds}
+              />
             </div>
           ) : (
             <div className="issue-detail-empty">
