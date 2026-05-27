@@ -57,7 +57,6 @@ import {
   normalizeText,
   normalizeUsername,
 } from "./lib/validation";
-import { PROJECT_PERMISSION_NOTE } from "./lib/permissions";
 import {
   columns,
   issueDueFilterLabels,
@@ -89,6 +88,7 @@ import { AccountSection } from "./features/account/account-section";
 import { BootingScreen, SignInScreen } from "./features/auth/auth-screens";
 import { DashboardSection } from "./features/dashboard/dashboard-section";
 import { LabelsSection } from "./features/labels/labels-section";
+import { ProjectsSection } from "./features/projects/projects-section";
 import { TeamSection } from "./features/team/team-section";
 
 function apiErrorMessage(error: unknown, fallback: string) {
@@ -1807,269 +1807,57 @@ export function App() {
           onNameChange={setLabelName}
         />
 
-        <section
-          className="projects-layout"
-          aria-label="Projects"
-          hidden={activeSection !== "projects"}
-        >
-          <div className="projects-panel">
-            <header className="section-header">
-              <div>
-                <p className="eyebrow">Projects</p>
-                <h2>Workspace projects</h2>
-              </div>
-              {isLoadingProjects ? <span className="muted">Loading</span> : null}
-            </header>
-
-            <FormError message={projectsError} />
-
-            {projects.length > 0 ? (
-              <div className="project-list">
-                {projects.map((project) => {
-                  const isEditingProject = editingProjectId === project.id;
-                  const isUpdatingProject = updatingProjectIds.includes(project.id);
-                  const isArchivingProject = archivingProjectIds.includes(project.id);
-
-                  return (
-                    <article className="project-row" key={project.id}>
-                      <span className="project-key">{project.key}</span>
-                      {isEditingProject ? (
-                        <form
-                          className="project-inline-form"
-                          onSubmit={(event) => {
-                            void handleUpdateProject(event, project);
-                          }}
-                        >
-                          <label>
-                            <span>Name</span>
-                            <input
-                              maxLength={120}
-                              onChange={(event) =>
-                                setEditProjectName(event.target.value)
-                              }
-                              value={editProjectName}
-                            />
-                          </label>
-                          <label>
-                            <span>Description</span>
-                            <textarea
-                              onChange={(event) =>
-                                setEditProjectDescription(event.target.value)
-                              }
-                              rows={2}
-                              value={editProjectDescription}
-                            />
-                          </label>
-                          <div className="project-row-actions">
-                            <button
-                              className="small-button"
-                              disabled={isUpdatingProject || !hasText(editProjectName)}
-                              type="submit"
-                            >
-                              {isUpdatingProject ? "Saving" : "Save"}
-                            </button>
-                            <button
-                              className="ghost-button"
-                              disabled={isUpdatingProject}
-                              onClick={cancelEditingProject}
-                              type="button"
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        </form>
-                      ) : (
-                        <div>
-                          <h3>{project.name}</h3>
-                          <p>{project.description || "No description"}</p>
-                        </div>
-                      )}
-                      {!isEditingProject ? (
-                        <div className="project-row-actions">
-                          <button
-                            className="small-button"
-                            disabled={isLoadingProjectDetail}
-                            onClick={() => {
-                              void handleSelectProjectDetail(project.id);
-                            }}
-                            type="button"
-                          >
-                            Details
-                          </button>
-                          {user.workspace.role === "admin" ? (
-                            <>
-                              <button
-                                className="small-button"
-                                disabled={isArchivingProject}
-                                onClick={() => startEditingProject(project)}
-                                type="button"
-                              >
-                                Edit
-                              </button>
-                              <button
-                                className="small-button danger-button"
-                                disabled={isArchivingProject}
-                                onClick={() => {
-                                  void handleArchiveProject(project);
-                                }}
-                                type="button"
-                              >
-                                {isArchivingProject ? "Archiving" : "Archive"}
-                              </button>
-                            </>
-                          ) : null}
-                        </div>
-                      ) : null}
-                    </article>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="project-empty">No projects yet</div>
-            )}
-          </div>
-
-          <div className="project-sidebar">
-            {user.workspace.role === "admin" ? (
-              <form className="project-form" onSubmit={handleCreateProject}>
-                <header className="section-header">
-                  <div>
-                    <p className="eyebrow">Admin</p>
-                    <h2>Create project</h2>
-                  </div>
-                </header>
-
-                <label>
-                  <span>Key</span>
-                  <input
-                    maxLength={10}
-                    onChange={(event) =>
-                      setProjectKey(event.target.value.toUpperCase())
-                    }
-                    placeholder="CORE"
-                    value={projectKey}
-                  />
-                </label>
-
-                <label>
-                  <span>Name</span>
-                  <input
-                    maxLength={120}
-                    onChange={(event) => setProjectName(event.target.value)}
-                    placeholder="Core Platform"
-                    value={projectName}
-                  />
-                </label>
-
-                <label>
-                  <span>Description</span>
-                  <textarea
-                    onChange={(event) => setProjectDescription(event.target.value)}
-                    placeholder="Main product workspace"
-                    rows={4}
-                    value={projectDescription}
-                  />
-                </label>
-
-                <FormError message={projectFormError} />
-
-                <button disabled={!canCreateProject} type="submit">
-                  {isCreatingProject ? "Creating..." : "Create project"}
-                </button>
-              </form>
-            ) : (
-              <aside className="project-form permission-note">
-                <header className="section-header">
-                  <div>
-                    <p className="eyebrow">{PROJECT_PERMISSION_NOTE.eyebrow}</p>
-                    <h2>{PROJECT_PERMISSION_NOTE.title}</h2>
-                  </div>
-                </header>
-
-                <p>{PROJECT_PERMISSION_NOTE.body}</p>
-              </aside>
-            )}
-
-            <aside className="project-detail-panel" aria-label="Project details">
-              <header className="section-header">
-                <div>
-                  <p className="eyebrow">Project detail</p>
-                  <h2>
-                    {selectedProjectDetail
-                      ? `${selectedProjectDetail.key} · ${selectedProjectDetail.name}`
-                      : "Select project"}
-                  </h2>
-                </div>
-                {isLoadingProjectDetail ? <span className="muted">Loading</span> : null}
-              </header>
-
-              <FormError message={projectDetailError} />
-
-              {selectedProjectDetail ? (
-                <>
-                  <p className="project-detail-description">
-                    {selectedProjectDetail.description || "No description"}
-                  </p>
-
-                  <div className="project-detail-stats">
-                    <article>
-                      <span>Visible issues</span>
-                      <strong>{selectedProjectIssues.length}</strong>
-                    </article>
-                    <article>
-                      <span>Open</span>
-                      <strong>{selectedProjectOpenIssues.length}</strong>
-                    </article>
-                  </div>
-
-                  <div className="project-detail-actions">
-                    <button
-                      className="small-button"
-                      onClick={() => {
-                        setIssueFilterProjectId(selectedProjectDetail.id);
-                        navigateToSection("issues");
-                      }}
-                      type="button"
-                    >
-                      View project issues
-                    </button>
-                    <button
-                      className="small-button"
-                      onClick={() => {
-                        setIssueFilterProjectId(selectedProjectDetail.id);
-                        navigateToSection("board");
-                      }}
-                      type="button"
-                    >
-                      Open project board
-                    </button>
-                  </div>
-
-                  {selectedProjectIssues.length > 0 ? (
-                    <div className="project-detail-issues">
-                      {selectedProjectIssues.slice(0, 4).map((issue) => (
-                        <button
-                          key={issue.id}
-                          onClick={() => {
-                            void handleSelectIssue(issue.id);
-                          }}
-                          type="button"
-                        >
-                          <span>{issue.issue_key}</span>
-                          <strong>{issue.title}</strong>
-                        </button>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="comments-empty">No visible issues for this project</div>
-                  )}
-                </>
-              ) : (
-                <div className="comments-empty">No project selected</div>
-              )}
-            </aside>
-          </div>
-        </section>
+        <ProjectsSection
+          archivingProjectIds={archivingProjectIds}
+          canCreateProject={canCreateProject}
+          editProjectDescription={editProjectDescription}
+          editProjectName={editProjectName}
+          editingProjectId={editingProjectId}
+          isActive={activeSection === "projects"}
+          isCreatingProject={isCreatingProject}
+          isLoadingProjectDetail={isLoadingProjectDetail}
+          isLoadingProjects={isLoadingProjects}
+          onArchiveProject={(project) => {
+            void handleArchiveProject(project);
+          }}
+          onCancelEditingProject={cancelEditingProject}
+          onCreateProject={handleCreateProject}
+          onEditProjectDescriptionChange={setEditProjectDescription}
+          onEditProjectNameChange={setEditProjectName}
+          onOpenProjectBoard={(projectId) => {
+            setIssueFilterProjectId(projectId);
+            navigateToSection("board");
+          }}
+          onProjectDescriptionChange={setProjectDescription}
+          onProjectKeyChange={setProjectKey}
+          onProjectNameChange={setProjectName}
+          onSelectIssue={(issueId) => {
+            void handleSelectIssue(issueId);
+          }}
+          onSelectProjectDetail={(projectId) => {
+            void handleSelectProjectDetail(projectId);
+          }}
+          onStartEditingProject={startEditingProject}
+          onUpdateProject={(event, project) => {
+            void handleUpdateProject(event, project);
+          }}
+          onViewProjectIssues={(projectId) => {
+            setIssueFilterProjectId(projectId);
+            navigateToSection("issues");
+          }}
+          projectDescription={projectDescription}
+          projectDetailError={projectDetailError}
+          projectFormError={projectFormError}
+          projectKey={projectKey}
+          projectName={projectName}
+          projects={projects}
+          projectsError={projectsError}
+          role={user.workspace.role}
+          selectedProjectDetail={selectedProjectDetail}
+          selectedProjectIssues={selectedProjectIssues}
+          selectedProjectOpenIssues={selectedProjectOpenIssues}
+          updatingProjectIds={updatingProjectIds}
+        />
 
         <section
           className="issues-layout"
