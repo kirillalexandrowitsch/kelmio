@@ -69,7 +69,6 @@ import {
   startOfToday,
 } from "./lib/issue-model";
 import {
-  activeTeamMembers,
   assignableTeamMembers,
   memberDisplayName,
   memberOptionLabel,
@@ -88,6 +87,7 @@ import { AccountSection } from "./features/account/account-section";
 import { BootingScreen, SignInScreen } from "./features/auth/auth-screens";
 import { BoardSection } from "./features/board/board-section";
 import { DashboardSection } from "./features/dashboard/dashboard-section";
+import { IssueCreateForm } from "./features/issues/issue-create-form";
 import { LabelsSection } from "./features/labels/labels-section";
 import { ProjectsSection } from "./features/projects/projects-section";
 import { TeamSection } from "./features/team/team-section";
@@ -1865,159 +1865,33 @@ export function App() {
           aria-label="Issues"
           hidden={activeSection !== "issues"}
         >
-          <form className="issue-form" onSubmit={handleCreateIssue}>
-            <header className="section-header">
-              <div>
-                <p className="eyebrow">Issues</p>
-                <h2>Create issue</h2>
-              </div>
-            </header>
-
-            <label>
-              <span>Project</span>
-              <select
-                onChange={(event) => setSelectedProjectId(event.target.value)}
-                value={selectedProjectId}
-              >
-                <option value="">Select project</option>
-                {projects.map((project) => (
-                  <option key={project.id} value={project.id}>
-                    {project.key} · {project.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label>
-              <span>Title</span>
-              <input
-                maxLength={180}
-                onChange={(event) => setIssueTitle(event.target.value)}
-                placeholder="Create project board"
-                value={issueTitle}
-              />
-            </label>
-
-            <label>
-              <span>Description</span>
-              <textarea
-                onChange={(event) => setIssueDescription(event.target.value)}
-                placeholder="Short context for the team"
-                rows={3}
-                value={issueDescription}
-              />
-            </label>
-
-            <label>
-              <span>Assignee</span>
-              <select
-                onChange={(event) => setIssueAssigneeId(event.target.value)}
-                value={issueAssigneeId}
-              >
-                <option value="">Unassigned</option>
-                {activeTeamMembers(teamMembers).map((member) => (
-                  <option key={member.id} value={member.id}>
-                    {memberOptionLabel(member)}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <div className="issue-label-picker">
-              <span>Labels</span>
-              {labels.length > 0 ? (
-                <div className="label-checkbox-list">
-                  {labels.map((label) => (
-                    <label className="label-checkbox" key={label.id}>
-                      <input
-                        checked={newIssueLabelIds.includes(label.id)}
-                        onChange={(event) =>
-                          handleCreateIssueLabel(label.id, event.target.checked)
-                        }
-                        type="checkbox"
-                      />
-                      <span
-                        className="label-chip label-chip-small"
-                        style={{
-                          backgroundColor: `${label.color}1a`,
-                          borderColor: label.color,
-                        }}
-                      >
-                        {label.name}
-                      </span>
-                    </label>
-                  ))}
-                </div>
-              ) : (
-                <strong>No labels created</strong>
-              )}
-            </div>
-
-            <div className="field-grid">
-              <label>
-                <span>Type</span>
-                <select
-                  onChange={(event) => setIssueType(event.target.value as IssueType)}
-                  value={issueType}
-                >
-                  {Object.entries(issueTypeLabels).map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label>
-                <span>Priority</span>
-                <select
-                  onChange={(event) =>
-                    setIssuePriority(event.target.value as IssuePriority)
-                  }
-                  value={issuePriority}
-                >
-                  {Object.entries(priorityLabels).map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-
-            <div className="field-grid">
-              <label>
-                <span>Status</span>
-                <select
-                  onChange={(event) =>
-                    setIssueStatus(event.target.value as IssueStatus)
-                  }
-                  value={issueStatus}
-                >
-                  {columns.map((column) => (
-                    <option key={column.status} value={column.status}>
-                      {column.title}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label>
-                <span>Due date</span>
-                <input
-                  onChange={(event) => setIssueDueDate(event.target.value)}
-                  type="date"
-                  value={issueDueDate}
-                />
-              </label>
-            </div>
-
-            <FormError message={issueFormError} />
-
-            <button disabled={!canCreateIssue} type="submit">
-              {isCreatingIssue ? "Creating..." : "Create issue"}
-            </button>
-          </form>
+          <IssueCreateForm
+            assigneeId={issueAssigneeId}
+            canCreateIssue={canCreateIssue}
+            description={issueDescription}
+            dueDate={issueDueDate}
+            formError={issueFormError}
+            isCreatingIssue={isCreatingIssue}
+            labels={labels}
+            labelIds={newIssueLabelIds}
+            onAssigneeChange={setIssueAssigneeId}
+            onCreateIssue={handleCreateIssue}
+            onDescriptionChange={setIssueDescription}
+            onDueDateChange={setIssueDueDate}
+            onLabelChange={handleCreateIssueLabel}
+            onPriorityChange={setIssuePriority}
+            onProjectChange={setSelectedProjectId}
+            onStatusChange={setIssueStatus}
+            onTitleChange={setIssueTitle}
+            onTypeChange={setIssueType}
+            priority={issuePriority}
+            projectId={selectedProjectId}
+            projects={projects}
+            status={issueStatus}
+            teamMembers={teamMembers}
+            title={issueTitle}
+            type={issueType}
+          />
 
           <div className="issues-panel">
             <header className="section-header">
