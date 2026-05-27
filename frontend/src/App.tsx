@@ -58,12 +58,9 @@ import {
   normalizeUsername,
 } from "./lib/validation";
 import {
-  columns,
   issueDueInfo,
   issueLabelIds,
   issueMatchesFilters,
-  issueTypeLabels,
-  priorityLabels,
   startOfToday,
 } from "./lib/issue-model";
 import {
@@ -81,6 +78,7 @@ import { DashboardSection } from "./features/dashboard/dashboard-section";
 import { IssueActivitySection } from "./features/issues/issue-activity-section";
 import { IssueCommentsSection } from "./features/issues/issue-comments-section";
 import { IssueCreateForm } from "./features/issues/issue-create-form";
+import { IssueDetailMainContent } from "./features/issues/issue-detail-main-content";
 import { IssueDetailSidebar } from "./features/issues/issue-detail-sidebar";
 import { IssueListPanel } from "./features/issues/issue-list-panel";
 import { LabelsSection } from "./features/labels/labels-section";
@@ -1988,135 +1986,23 @@ export function App() {
           {selectedIssue ? (
             <div className="issue-detail-body">
               <div className="issue-detail-main">
-                {isEditingIssueDetails ? (
-                  <form
-                    className="issue-edit-form"
-                    onSubmit={handleUpdateSelectedIssue}
-                  >
-                    <label>
-                      <span>Title</span>
-                      <input
-                        maxLength={180}
-                        onChange={(event) => setEditIssueTitle(event.target.value)}
-                        value={editIssueTitle}
-                      />
-                    </label>
-
-                    <label>
-                      <span>Description</span>
-                      <textarea
-                        onChange={(event) =>
-                          setEditIssueDescription(event.target.value)
-                        }
-                        rows={4}
-                        value={editIssueDescription}
-                      />
-                    </label>
-
-                    <div className="field-grid">
-                      <label>
-                        <span>Type</span>
-                        <select
-                          onChange={(event) =>
-                            setEditIssueType(event.target.value as IssueType)
-                          }
-                          value={editIssueType}
-                        >
-                          {Object.entries(issueTypeLabels).map(([value, label]) => (
-                            <option key={value} value={value}>
-                              {label}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-
-                      <label>
-                        <span>Priority</span>
-                        <select
-                          onChange={(event) =>
-                            setEditIssuePriority(
-                              event.target.value as IssuePriority,
-                            )
-                          }
-                          value={editIssuePriority}
-                        >
-                          {Object.entries(priorityLabels).map(([value, label]) => (
-                            <option key={value} value={value}>
-                              {label}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    </div>
-
-                    <label>
-                      <span>Due date</span>
-                      <input
-                        onChange={(event) => setEditIssueDueDate(event.target.value)}
-                        type="date"
-                        value={editIssueDueDate}
-                      />
-                    </label>
-
-                    <div className="form-actions">
-                      <button
-                        disabled={isUpdatingIssue || !hasText(editIssueTitle)}
-                        type="submit"
-                      >
-                        {isUpdatingIssue ? "Saving..." : "Save changes"}
-                      </button>
-                      <button
-                        className="ghost-button"
-                        disabled={isUpdatingIssue}
-                        onClick={() => setIsEditingIssueDetails(false)}
-                        type="button"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </form>
-                ) : (
-                  <>
-                    <div className="issue-detail-headline">
-                      <span className="issue-key">{selectedIssue.issue_key}</span>
-                      <span className="detail-chip">
-                        {issueTypeLabels[selectedIssue.issue_type]}
-                      </span>
-                      <span className="detail-chip">
-                        {priorityLabels[selectedIssue.priority]}
-                      </span>
-                    </div>
-
-                    <div>
-                      <p className="eyebrow">Description</p>
-                      <p className="issue-detail-description">
-                        {selectedIssue.description || "No description yet."}
-                      </p>
-                    </div>
-
-                    <div>
-                      <p className="eyebrow">Labels</p>
-                      {selectedIssue.labels.length > 0 ? (
-                        <div className="issue-label-row">
-                          {selectedIssue.labels.map((label) => (
-                            <span
-                              className="label-chip"
-                              key={label.id}
-                              style={{
-                                backgroundColor: `${label.color}1a`,
-                                borderColor: label.color,
-                              }}
-                            >
-                              {label.name}
-                            </span>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="issue-detail-description">No labels yet.</p>
-                      )}
-                    </div>
-                  </>
-                )}
+                <IssueDetailMainContent
+                  editDescription={editIssueDescription}
+                  editDueDate={editIssueDueDate}
+                  editPriority={editIssuePriority}
+                  editTitle={editIssueTitle}
+                  editType={editIssueType}
+                  isEditing={isEditingIssueDetails}
+                  isUpdating={isUpdatingIssue}
+                  issue={selectedIssue}
+                  onCancelEdit={() => setIsEditingIssueDetails(false)}
+                  onDescriptionChange={setEditIssueDescription}
+                  onDueDateChange={setEditIssueDueDate}
+                  onPriorityChange={setEditIssuePriority}
+                  onSubmit={handleUpdateSelectedIssue}
+                  onTitleChange={setEditIssueTitle}
+                  onTypeChange={setEditIssueType}
+                />
 
                 <IssueCommentsSection
                   canCreateComment={canCreateComment}
