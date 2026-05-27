@@ -59,18 +59,15 @@ import {
 } from "./lib/validation";
 import {
   columns,
-  issueDueFilterLabels,
   issueDueInfo,
   issueLabelIds,
   issueMatchesFilters,
-  issueSortLabels,
   issueTypeLabels,
   priorityLabels,
   startOfToday,
 } from "./lib/issue-model";
 import {
   assignableTeamMembers,
-  memberDisplayName,
   memberOptionLabel,
 } from "./lib/team-view";
 import { activityDescription, activityTitle } from "./lib/activity-view";
@@ -88,6 +85,7 @@ import { BootingScreen, SignInScreen } from "./features/auth/auth-screens";
 import { BoardSection } from "./features/board/board-section";
 import { DashboardSection } from "./features/dashboard/dashboard-section";
 import { IssueCreateForm } from "./features/issues/issue-create-form";
+import { IssueListPanel } from "./features/issues/issue-list-panel";
 import { LabelsSection } from "./features/labels/labels-section";
 import { ProjectsSection } from "./features/projects/projects-section";
 import { TeamSection } from "./features/team/team-section";
@@ -1636,19 +1634,6 @@ export function App() {
     (issue) => issueDueInfo(issue, today)?.tone === "due-soon",
   ).length;
   const openIssuesCount = openIssues.length;
-  const hasIssueFilters =
-    issueFilterProjectId !== "" ||
-    issueFilterStatus !== "" ||
-    issueFilterPriority !== "" ||
-    issueFilterAssigneeId !== "" ||
-    issueFilterLabelId !== "" ||
-    issueFilterDue !== "" ||
-    hasText(issueFilterQuery);
-  const issueListSummary = hasIssueFilters
-    ? `${issues.length} issues match current filters`
-    : issueSort === "created_desc"
-      ? "Showing all issues across all projects"
-      : `Showing issues sorted by ${issueSortLabels[issueSort].toLowerCase()}`;
   const canSignIn =
     hasText(loginValue) && hasText(password) && !isSubmitting;
   const canUpdateProfile =
@@ -1893,228 +1878,47 @@ export function App() {
             type={issueType}
           />
 
-          <div className="issues-panel">
-            <header className="section-header">
-              <div>
-                <p className="eyebrow">Open work</p>
-                <h2>Recent issues</h2>
-              </div>
-              {isLoadingIssues ? <span className="muted">Loading</span> : null}
-            </header>
-
-            <section className="issue-filters" aria-label="Issue filters">
-              <label>
-                <span>Search</span>
-                <input
-                  onChange={(event) => setIssueFilterQuery(event.target.value)}
-                  placeholder="Key, title, description"
-                  value={issueFilterQuery}
-                />
-              </label>
-
-              <label>
-                <span>Sort</span>
-                <select
-                  onChange={(event) => setIssueSort(event.target.value as IssueSort)}
-                  value={issueSort}
-                >
-                  {Object.entries(issueSortLabels).map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label>
-                <span>Project</span>
-                <select
-                  onChange={(event) => setIssueFilterProjectId(event.target.value)}
-                  value={issueFilterProjectId}
-                >
-                  <option value="">All projects</option>
-                  {projects.map((project) => (
-                    <option key={project.id} value={project.id}>
-                      {project.key}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label>
-                <span>Status</span>
-                <select
-                  onChange={(event) =>
-                    setIssueFilterStatus(event.target.value as IssueStatus | "")
-                  }
-                  value={issueFilterStatus}
-                >
-                  <option value="">All statuses</option>
-                  {columns.map((column) => (
-                    <option key={column.status} value={column.status}>
-                      {column.title}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label>
-                <span>Priority</span>
-                <select
-                  onChange={(event) =>
-                    setIssueFilterPriority(event.target.value as IssuePriority | "")
-                  }
-                  value={issueFilterPriority}
-                >
-                  <option value="">All priorities</option>
-                  {Object.entries(priorityLabels).map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label>
-                <span>Assignee</span>
-                <select
-                  onChange={(event) => setIssueFilterAssigneeId(event.target.value)}
-                  value={issueFilterAssigneeId}
-                >
-                  <option value="">All assignees</option>
-                  <option value="unassigned">Unassigned</option>
-                  {teamMembers.map((member) => (
-                    <option key={member.id} value={member.id}>
-                      {memberOptionLabel(member)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label>
-                <span>Label</span>
-                <select
-                  onChange={(event) => setIssueFilterLabelId(event.target.value)}
-                  value={issueFilterLabelId}
-                >
-                  <option value="">All labels</option>
-                  {labels.map((label) => (
-                    <option key={label.id} value={label.id}>
-                      {label.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label>
-                <span>Due</span>
-                <select
-                  onChange={(event) =>
-                    setIssueFilterDue(event.target.value as IssueDueFilter | "")
-                  }
-                  value={issueFilterDue}
-                >
-                  <option value="">Any due date</option>
-                  {Object.entries(issueDueFilterLabels).map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <button
-                className="small-button"
-                disabled={!hasIssueFilters}
-                onClick={() => {
-                  setIssueFilterQuery("");
-                  setIssueFilterProjectId("");
-                  setIssueFilterStatus("");
-                  setIssueFilterPriority("");
-                  setIssueFilterAssigneeId("");
-                  setIssueFilterLabelId("");
-                  setIssueFilterDue("");
-                }}
-                type="button"
-              >
-                Clear
-              </button>
-            </section>
-
-            <p className="filter-summary">{issueListSummary}</p>
-
-            <FormError message={issuesError} />
-
-            {issues.length > 0 ? (
-              <div className="issue-list">
-                {issues.map((issue) => {
-                  const dueInfo = issueDueInfo(issue, today);
-
-                  return (
-                    <article className="issue-row" key={issue.id}>
-                      <span className="issue-key">{issue.issue_key}</span>
-                      <div>
-                        <h3>{issue.title}</h3>
-                        <p>
-                          {issueTypeLabels[issue.issue_type]} ·{" "}
-                          {priorityLabels[issue.priority]} ·{" "}
-                          {columns.find((column) => column.status === issue.status)
-                            ?.title ?? issue.status}{" "}
-                          · {memberDisplayName(teamMembers, issue.assignee_id)}
-                        </p>
-                        {dueInfo ? (
-                          <span className={`due-badge due-badge-${dueInfo.tone}`}>
-                            {dueInfo.label}
-                          </span>
-                        ) : null}
-                        {issue.labels.length > 0 ? (
-                          <div className="issue-label-row">
-                            {issue.labels.map((label) => (
-                              <span
-                                className="label-chip label-chip-small"
-                                key={label.id}
-                                style={{
-                                  backgroundColor: `${label.color}1a`,
-                                  borderColor: label.color,
-                                }}
-                              >
-                                {label.name}
-                              </span>
-                            ))}
-                          </div>
-                        ) : null}
-                      </div>
-                      <div className="issue-row-actions">
-                        <button
-                          className="small-button"
-                          onClick={() => {
-                            void handleSelectIssue(issue.id);
-                          }}
-                          type="button"
-                        >
-                          Open
-                        </button>
-                        <button
-                          className="small-button danger-button"
-                          disabled={archivingIssueIds.includes(issue.id)}
-                          onClick={() => {
-                            void handleArchiveIssue(issue);
-                          }}
-                          type="button"
-                        >
-                          {archivingIssueIds.includes(issue.id)
-                            ? "Archiving"
-                            : "Archive"}
-                        </button>
-                      </div>
-                    </article>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="project-empty">No issues yet</div>
-            )}
-          </div>
+          <IssueListPanel
+            archivingIssueIds={archivingIssueIds}
+            assigneeFilterId={issueFilterAssigneeId}
+            dueFilter={issueFilterDue}
+            isLoadingIssues={isLoadingIssues}
+            issues={issues}
+            issuesError={issuesError}
+            labelFilterId={issueFilterLabelId}
+            labels={labels}
+            onArchiveIssue={(issue) => {
+              void handleArchiveIssue(issue);
+            }}
+            onAssigneeFilterChange={setIssueFilterAssigneeId}
+            onClearFilters={() => {
+              setIssueFilterQuery("");
+              setIssueFilterProjectId("");
+              setIssueFilterStatus("");
+              setIssueFilterPriority("");
+              setIssueFilterAssigneeId("");
+              setIssueFilterLabelId("");
+              setIssueFilterDue("");
+            }}
+            onDueFilterChange={setIssueFilterDue}
+            onLabelFilterChange={setIssueFilterLabelId}
+            onOpenIssue={(issueId) => {
+              void handleSelectIssue(issueId);
+            }}
+            onPriorityFilterChange={setIssueFilterPriority}
+            onProjectFilterChange={setIssueFilterProjectId}
+            onQueryChange={setIssueFilterQuery}
+            onSortChange={setIssueSort}
+            onStatusFilterChange={setIssueFilterStatus}
+            priorityFilter={issueFilterPriority}
+            projectFilterId={issueFilterProjectId}
+            projects={projects}
+            query={issueFilterQuery}
+            sort={issueSort}
+            statusFilter={issueFilterStatus}
+            teamMembers={teamMembers}
+            today={today}
+          />
         </section>
 
         <section
