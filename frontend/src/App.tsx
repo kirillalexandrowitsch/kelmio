@@ -70,7 +70,6 @@ import {
   assignableTeamMembers,
   memberOptionLabel,
 } from "./lib/team-view";
-import { activityDescription, activityTitle } from "./lib/activity-view";
 import { formatDateTime } from "./lib/formatting";
 import {
   appSectionPath,
@@ -84,6 +83,8 @@ import { AccountSection } from "./features/account/account-section";
 import { BootingScreen, SignInScreen } from "./features/auth/auth-screens";
 import { BoardSection } from "./features/board/board-section";
 import { DashboardSection } from "./features/dashboard/dashboard-section";
+import { IssueActivitySection } from "./features/issues/issue-activity-section";
+import { IssueCommentsSection } from "./features/issues/issue-comments-section";
 import { IssueCreateForm } from "./features/issues/issue-create-form";
 import { IssueListPanel } from "./features/issues/issue-list-panel";
 import { LabelsSection } from "./features/labels/labels-section";
@@ -2122,184 +2123,37 @@ export function App() {
                   </>
                 )}
 
-                <section className="comments-section" aria-label="Issue comments">
-                  <header className="comments-header">
-                    <div>
-                      <p className="eyebrow">Comments</p>
-                      <h3>{issueComments.length}</h3>
-                    </div>
-                    {isLoadingComments ? (
-                      <span className="muted">Loading comments</span>
-                    ) : null}
-                  </header>
+                <IssueCommentsSection
+                  canCreateComment={canCreateComment}
+                  commentBody={commentBody}
+                  comments={issueComments}
+                  commentsError={commentsError}
+                  currentUser={user}
+                  deletingCommentIds={deletingCommentIds}
+                  editCommentBody={editCommentBody}
+                  editingCommentId={editingCommentId}
+                  isCreatingComment={isCreatingComment}
+                  isLoadingComments={isLoadingComments}
+                  onCancelEditingComment={cancelEditingComment}
+                  onCommentBodyChange={setCommentBody}
+                  onCreateComment={handleCreateComment}
+                  onDeleteComment={(comment) => {
+                    void handleDeleteComment(comment);
+                  }}
+                  onEditCommentBodyChange={setEditCommentBody}
+                  onStartEditingComment={startEditingComment}
+                  onUpdateComment={(event, comment) => {
+                    void handleUpdateComment(event, comment);
+                  }}
+                  updatingCommentIds={updatingCommentIds}
+                />
 
-                  {commentsError ? (
-                    <FormError message={commentsError} />
-                  ) : null}
-
-                  {issueComments.length > 0 ? (
-                    <div className="comment-list">
-                      {issueComments.map((comment) => {
-                        const isEditingComment = editingCommentId === comment.id;
-                        const isUpdatingComment = updatingCommentIds.includes(
-                          comment.id,
-                        );
-                        const isDeletingComment = deletingCommentIds.includes(
-                          comment.id,
-                        );
-                        const canEditComment =
-                          comment.author_id === user.id ||
-                          user.workspace.role === "admin";
-                        const wasEdited = comment.updated_at !== comment.created_at;
-
-                        return (
-                          <article className="comment-card" key={comment.id}>
-                            <header>
-                              <div className="comment-author">
-                                <strong>{comment.author_display_name}</strong>
-                                <span>
-                                  {formatDateTime(comment.created_at)}
-                                  {wasEdited
-                                    ? ` · edited ${formatDateTime(
-                                        comment.updated_at,
-                                      )}`
-                                    : ""}
-                                </span>
-                              </div>
-                              {canEditComment ? (
-                                <div className="comment-actions">
-                                  <button
-                                    className="small-button"
-                                    disabled={isUpdatingComment || isDeletingComment}
-                                    onClick={() => {
-                                      if (isEditingComment) {
-                                        cancelEditingComment();
-                                      } else {
-                                        startEditingComment(comment);
-                                      }
-                                    }}
-                                    type="button"
-                                  >
-                                    {isEditingComment ? "Cancel" : "Edit"}
-                                  </button>
-                                  <button
-                                    className="small-button danger-button"
-                                    disabled={isUpdatingComment || isDeletingComment}
-                                    onClick={() => {
-                                      void handleDeleteComment(comment);
-                                    }}
-                                    type="button"
-                                  >
-                                    {isDeletingComment ? "Deleting..." : "Delete"}
-                                  </button>
-                                </div>
-                              ) : null}
-                            </header>
-
-                            {isEditingComment ? (
-                              <form
-                                className="comment-edit-form"
-                                onSubmit={(event) => {
-                                  void handleUpdateComment(event, comment);
-                                }}
-                              >
-                                <textarea
-                                  maxLength={4000}
-                                  onChange={(event) =>
-                                    setEditCommentBody(event.target.value)
-                                  }
-                                  rows={3}
-                                  value={editCommentBody}
-                                />
-                                <div className="form-actions">
-                                  <button
-                                    disabled={
-                                      isUpdatingComment || !hasText(editCommentBody)
-                                    }
-                                    type="submit"
-                                  >
-                                    {isUpdatingComment ? "Saving..." : "Save"}
-                                  </button>
-                                  <button
-                                    className="ghost-button"
-                                    disabled={isUpdatingComment}
-                                    onClick={cancelEditingComment}
-                                    type="button"
-                                  >
-                                    Cancel
-                                  </button>
-                                </div>
-                              </form>
-                            ) : (
-                              <p>{comment.body}</p>
-                            )}
-                          </article>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="comments-empty">No comments yet</div>
-                  )}
-
-                  <form className="comment-form" onSubmit={handleCreateComment}>
-                    <label>
-                      <span>Add comment</span>
-                      <textarea
-                        maxLength={4000}
-                        onChange={(event) => setCommentBody(event.target.value)}
-                        placeholder="Share context, decisions, or next steps"
-                        rows={3}
-                        value={commentBody}
-                      />
-                    </label>
-                    <button
-                      disabled={!canCreateComment}
-                      type="submit"
-                    >
-                      {isCreatingComment ? "Posting..." : "Post comment"}
-                    </button>
-                  </form>
-                </section>
-
-                <section className="activity-section" aria-label="Issue activity">
-                  <header className="comments-header">
-                    <div>
-                      <p className="eyebrow">Activity</p>
-                      <h3>{issueActivity.length}</h3>
-                    </div>
-                    {isLoadingActivity ? (
-                      <span className="muted">Loading activity</span>
-                    ) : null}
-                  </header>
-
-                  {activityError ? (
-                    <FormError message={activityError} />
-                  ) : null}
-
-                  {issueActivity.length > 0 ? (
-                    <div className="activity-list">
-                      {issueActivity.map((activity) => (
-                        <article className="activity-card" key={activity.id}>
-                          <span className="activity-dot" aria-hidden="true" />
-                          <div>
-                            <header>
-                              <strong>{activityTitle(activity)}</strong>
-                              <span>{formatDateTime(activity.created_at)}</span>
-                            </header>
-                            <p>
-                              {activity.actor_display_name ?? "System"}
-                              {activityDescription(activity, teamMembers)
-                                ? ` · ${activityDescription(activity, teamMembers)}`
-                                : ""}
-                            </p>
-                          </div>
-                        </article>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="comments-empty">No activity yet</div>
-                  )}
-                </section>
+                <IssueActivitySection
+                  activity={issueActivity}
+                  activityError={activityError}
+                  isLoadingActivity={isLoadingActivity}
+                  teamMembers={teamMembers}
+                />
               </div>
 
               <aside className="issue-detail-sidebar">
