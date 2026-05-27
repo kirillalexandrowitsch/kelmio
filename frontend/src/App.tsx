@@ -69,17 +69,13 @@ import {
   currentAppSectionFromLocation,
   type AppSection,
 } from "./lib/routing";
-import { FormError } from "./components/form-feedback";
 import { AppSidebar, WorkspaceTopbar } from "./components/app-shell";
 import { AccountSection } from "./features/account/account-section";
 import { BootingScreen, SignInScreen } from "./features/auth/auth-screens";
 import { BoardSection } from "./features/board/board-section";
 import { DashboardSection } from "./features/dashboard/dashboard-section";
-import { IssueActivitySection } from "./features/issues/issue-activity-section";
-import { IssueCommentsSection } from "./features/issues/issue-comments-section";
 import { IssueCreateForm } from "./features/issues/issue-create-form";
-import { IssueDetailMainContent } from "./features/issues/issue-detail-main-content";
-import { IssueDetailSidebar } from "./features/issues/issue-detail-sidebar";
+import { IssueDetailSection } from "./features/issues/issue-detail-section";
 import { IssueListPanel } from "./features/issues/issue-list-panel";
 import { LabelsSection } from "./features/labels/labels-section";
 import { ProjectsSection } from "./features/projects/projects-section";
@@ -1915,153 +1911,80 @@ export function App() {
           />
         </section>
 
-        <section
-          className="issue-detail-panel"
-          aria-label="Issue details"
-          hidden={activeSection !== "issues"}
-        >
-          <header className="section-header">
-            <div>
-              <p className="eyebrow">Issue details</p>
-              <h2>
-                {selectedIssue
-                  ? `${selectedIssue.issue_key} · ${selectedIssue.title}`
-                  : "Select an issue"}
-              </h2>
-            </div>
-            {selectedIssue ? (
-              <div className="detail-actions">
-                <button
-                  className="ghost-button"
-                  onClick={() => {
-                    if (isEditingIssueDetails) {
-                      setIsEditingIssueDetails(false);
-                    } else {
-                      startEditingIssue(selectedIssue);
-                    }
-                  }}
-                  type="button"
-                >
-                  {isEditingIssueDetails ? "Cancel edit" : "Edit"}
-                </button>
-                <button
-                  className="ghost-button"
-                  onClick={() => {
-                    setSelectedIssue(null);
-                    setSelectedIssueError("");
-                    setIsEditingIssueDetails(false);
-                    setEditingCommentId("");
-                    setEditCommentBody("");
-                    setUpdatingCommentIds([]);
-                    setDeletingCommentIds([]);
-                  }}
-                  type="button"
-                >
-                  Close
-                </button>
-                <button
-                  className="ghost-button danger-button"
-                  disabled={archivingIssueIds.includes(selectedIssue.id)}
-                  onClick={() => {
-                    void handleArchiveIssue(selectedIssue);
-                  }}
-                  type="button"
-                >
-                  {archivingIssueIds.includes(selectedIssue.id)
-                    ? "Archiving"
-                    : "Archive"}
-                </button>
-              </div>
-            ) : null}
-          </header>
-
-          {selectedIssueError ? (
-            <FormError message={selectedIssueError} />
-          ) : null}
-
-          {isLoadingSelectedIssue ? (
-            <span className="muted">Loading details</span>
-          ) : null}
-
-          {selectedIssue ? (
-            <div className="issue-detail-body">
-              <div className="issue-detail-main">
-                <IssueDetailMainContent
-                  editDescription={editIssueDescription}
-                  editDueDate={editIssueDueDate}
-                  editPriority={editIssuePriority}
-                  editTitle={editIssueTitle}
-                  editType={editIssueType}
-                  isEditing={isEditingIssueDetails}
-                  isUpdating={isUpdatingIssue}
-                  issue={selectedIssue}
-                  onCancelEdit={() => setIsEditingIssueDetails(false)}
-                  onDescriptionChange={setEditIssueDescription}
-                  onDueDateChange={setEditIssueDueDate}
-                  onPriorityChange={setEditIssuePriority}
-                  onSubmit={handleUpdateSelectedIssue}
-                  onTitleChange={setEditIssueTitle}
-                  onTypeChange={setEditIssueType}
-                />
-
-                <IssueCommentsSection
-                  canCreateComment={canCreateComment}
-                  commentBody={commentBody}
-                  comments={issueComments}
-                  commentsError={commentsError}
-                  currentUser={user}
-                  deletingCommentIds={deletingCommentIds}
-                  editCommentBody={editCommentBody}
-                  editingCommentId={editingCommentId}
-                  isCreatingComment={isCreatingComment}
-                  isLoadingComments={isLoadingComments}
-                  onCancelEditingComment={cancelEditingComment}
-                  onCommentBodyChange={setCommentBody}
-                  onCreateComment={handleCreateComment}
-                  onDeleteComment={(comment) => {
-                    void handleDeleteComment(comment);
-                  }}
-                  onEditCommentBodyChange={setEditCommentBody}
-                  onStartEditingComment={startEditingComment}
-                  onUpdateComment={(event, comment) => {
-                    void handleUpdateComment(event, comment);
-                  }}
-                  updatingCommentIds={updatingCommentIds}
-                />
-
-                <IssueActivitySection
-                  activity={issueActivity}
-                  activityError={activityError}
-                  isLoadingActivity={isLoadingActivity}
-                  teamMembers={teamMembers}
-                />
-              </div>
-
-              <IssueDetailSidebar
-                assigningIssueIds={assigningIssueIds}
-                issue={selectedIssue}
-                labelingIssueIds={labelingIssueIds}
-                labels={labels}
-                onAssignIssue={(issueId, assigneeId) => {
-                  void handleAssignIssue(issueId, assigneeId);
-                }}
-                onSetIssueLabel={(issue, labelId, shouldAttach) => {
-                  void handleSetIssueLabel(issue, labelId, shouldAttach);
-                }}
-                onTransitionIssue={(issueId, status) => {
-                  void handleTransitionIssue(issueId, status);
-                }}
-                teamMembers={teamMembers}
-                today={today}
-                transitioningIssueIds={transitioningIssueIds}
-              />
-            </div>
-          ) : (
-            <div className="issue-detail-empty">
-              Open a card from Recent issues or the board to inspect its details.
-            </div>
-          )}
-        </section>
+        <IssueDetailSection
+          activity={issueActivity}
+          activityError={activityError}
+          archivingIssueIds={archivingIssueIds}
+          assigningIssueIds={assigningIssueIds}
+          canCreateComment={canCreateComment}
+          commentBody={commentBody}
+          comments={issueComments}
+          commentsError={commentsError}
+          currentUser={user}
+          deletingCommentIds={deletingCommentIds}
+          editCommentBody={editCommentBody}
+          editIssueDescription={editIssueDescription}
+          editIssueDueDate={editIssueDueDate}
+          editIssuePriority={editIssuePriority}
+          editIssueTitle={editIssueTitle}
+          editIssueType={editIssueType}
+          editingCommentId={editingCommentId}
+          isActive={activeSection === "issues"}
+          isCreatingComment={isCreatingComment}
+          isEditingIssueDetails={isEditingIssueDetails}
+          isLoadingActivity={isLoadingActivity}
+          isLoadingComments={isLoadingComments}
+          isLoadingIssue={isLoadingSelectedIssue}
+          isUpdatingIssue={isUpdatingIssue}
+          issue={selectedIssue}
+          issueError={selectedIssueError}
+          labelingIssueIds={labelingIssueIds}
+          labels={labels}
+          onArchiveIssue={(issue) => {
+            void handleArchiveIssue(issue);
+          }}
+          onAssignIssue={(issueId, assigneeId) => {
+            void handleAssignIssue(issueId, assigneeId);
+          }}
+          onCancelEditingComment={cancelEditingComment}
+          onCancelIssueEdit={() => setIsEditingIssueDetails(false)}
+          onCloseIssue={() => {
+            setSelectedIssue(null);
+            setSelectedIssueError("");
+            setIsEditingIssueDetails(false);
+            setEditingCommentId("");
+            setEditCommentBody("");
+            setUpdatingCommentIds([]);
+            setDeletingCommentIds([]);
+          }}
+          onCommentBodyChange={setCommentBody}
+          onCreateComment={handleCreateComment}
+          onDeleteComment={(comment) => {
+            void handleDeleteComment(comment);
+          }}
+          onEditCommentBodyChange={setEditCommentBody}
+          onIssueDescriptionChange={setEditIssueDescription}
+          onIssueDueDateChange={setEditIssueDueDate}
+          onIssuePriorityChange={setEditIssuePriority}
+          onIssueTitleChange={setEditIssueTitle}
+          onIssueTypeChange={setEditIssueType}
+          onSetIssueLabel={(issue, labelId, shouldAttach) => {
+            void handleSetIssueLabel(issue, labelId, shouldAttach);
+          }}
+          onStartEditingComment={startEditingComment}
+          onStartEditingIssue={startEditingIssue}
+          onTransitionIssue={(issueId, status) => {
+            void handleTransitionIssue(issueId, status);
+          }}
+          onUpdateComment={(event, comment) => {
+            void handleUpdateComment(event, comment);
+          }}
+          onUpdateIssue={handleUpdateSelectedIssue}
+          teamMembers={teamMembers}
+          today={today}
+          transitioningIssueIds={transitioningIssueIds}
+          updatingCommentIds={updatingCommentIds}
+        />
 
         <BoardSection
           archivingIssueIds={archivingIssueIds}
