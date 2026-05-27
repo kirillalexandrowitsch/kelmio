@@ -86,6 +86,7 @@ import { FormError } from "./components/form-feedback";
 import { AppSidebar, WorkspaceTopbar } from "./components/app-shell";
 import { AccountSection } from "./features/account/account-section";
 import { BootingScreen, SignInScreen } from "./features/auth/auth-screens";
+import { BoardSection } from "./features/board/board-section";
 import { DashboardSection } from "./features/dashboard/dashboard-section";
 import { LabelsSection } from "./features/labels/labels-section";
 import { ProjectsSection } from "./features/projects/projects-section";
@@ -2743,126 +2744,26 @@ export function App() {
           )}
         </section>
 
-        <section
-          className="board"
-          aria-label="Kanban board"
-          hidden={activeSection !== "board"}
-        >
-          {columns.map((column) => (
-            <article
-              className="board-column"
-              key={column.title}
-              onDragOver={handleIssueDragOver}
-              onDrop={(event) => handleIssueDrop(event, column.status)}
-            >
-              <header>
-                <h2>{column.title}</h2>
-                <span>
-                  {issues.filter((issue) => issue.status === column.status).length}
-                </span>
-              </header>
-              <div className="board-card-list">
-                {issues
-                  .filter((issue) => issue.status === column.status)
-                  .map((issue) => {
-                    const dueInfo = issueDueInfo(issue, today);
-
-	                    return (
-	                      <article
-	                        className="issue-card"
-	                        draggable
-	                        key={issue.id}
-	                        onDragStart={(event) =>
-	                          handleIssueDragStart(event, issue.id)
-	                        }
-	                      >
-                        <div className="issue-card-meta">
-                          <span>{issue.issue_key}</span>
-                          <span>{priorityLabels[issue.priority]}</span>
-                        </div>
-                        <h3>{issue.title}</h3>
-                        {dueInfo ? (
-                          <span className={`due-badge due-badge-${dueInfo.tone}`}>
-                            {dueInfo.label}
-                          </span>
-                        ) : null}
-                        <p>
-                          Assignee: {memberDisplayName(teamMembers, issue.assignee_id)}
-                        </p>
-                        {issue.labels.length > 0 ? (
-                          <div className="issue-label-row">
-                            {issue.labels.map((label) => (
-                              <span
-                                className="label-chip label-chip-small"
-                                key={label.id}
-                                style={{
-                                  backgroundColor: `${label.color}1a`,
-                                  borderColor: label.color,
-                                }}
-                              >
-                                {label.name}
-                              </span>
-                            ))}
-                          </div>
-                        ) : null}
-                        <div className="issue-card-actions">
-                          <button
-                            className="small-button"
-                            onClick={() => {
-                              void handleSelectIssue(issue.id);
-                            }}
-                            type="button"
-                          >
-                            Open
-                          </button>
-                          <button
-                            className="small-button danger-button"
-                            disabled={archivingIssueIds.includes(issue.id)}
-                            onClick={() => {
-                              void handleArchiveIssue(issue);
-                            }}
-                            type="button"
-                          >
-                            {archivingIssueIds.includes(issue.id)
-                              ? "Archiving"
-                              : "Archive"}
-                          </button>
-                          <label>
-                            <span>Status</span>
-                            <select
-                              aria-label={`Status for ${issue.issue_key}`}
-                              disabled={transitioningIssueIds.includes(issue.id)}
-                              onChange={(event) => {
-                                void handleTransitionIssue(
-                                  issue.id,
-                                  event.target.value as IssueStatus,
-                                );
-                              }}
-                              value={issue.status}
-                            >
-                              {columns.map((nextColumn) => (
-                                <option
-                                  key={nextColumn.status}
-                                  value={nextColumn.status}
-                                >
-                                  {nextColumn.title}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-                        </div>
-                      </article>
-                    );
-                  })}
-
-                {issues.filter((issue) => issue.status === column.status).length ===
-                0 ? (
-                  <div className="empty-state">No issues yet</div>
-                ) : null}
-              </div>
-            </article>
-          ))}
-        </section>
+        <BoardSection
+          archivingIssueIds={archivingIssueIds}
+          isActive={activeSection === "board"}
+          issues={issues}
+          onArchiveIssue={(issue) => {
+            void handleArchiveIssue(issue);
+          }}
+          onIssueDragOver={handleIssueDragOver}
+          onIssueDragStart={handleIssueDragStart}
+          onIssueDrop={handleIssueDrop}
+          onOpenIssue={(issueId) => {
+            void handleSelectIssue(issueId);
+          }}
+          onTransitionIssue={(issueId, status) => {
+            void handleTransitionIssue(issueId, status);
+          }}
+          teamMembers={teamMembers}
+          today={today}
+          transitioningIssueIds={transitioningIssueIds}
+        />
       </section>
     </main>
   );
