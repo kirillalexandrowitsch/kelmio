@@ -5,7 +5,11 @@ import {
   type IssuePriority,
   type IssueType,
 } from "../../lib/api-types";
-import { issueTypeLabels, priorityLabels } from "../../lib/issue-model";
+import {
+  editableIssueTypeOptions,
+  issueTypeLabels,
+  priorityLabels,
+} from "../../lib/issue-model";
 import { hasText } from "../../lib/validation";
 
 type IssueDetailMainContentProps = {
@@ -71,9 +75,9 @@ export function IssueDetailMainContent({
               onChange={(event) => onTypeChange(event.target.value as IssueType)}
               value={editType}
             >
-              {Object.entries(issueTypeLabels).map(([value, label]) => (
+              {editableIssueTypeOptions(issue).map((value) => (
                 <option key={value} value={value}>
-                  {label}
+                  {issueTypeLabels[value]}
                 </option>
               ))}
             </select>

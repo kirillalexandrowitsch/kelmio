@@ -5,6 +5,8 @@ import {
   issueDueInfo,
   issueLabelIds,
   issueMatchesFilters,
+  editableIssueTypeOptions,
+  rootIssueTypeOptions,
   statusLabel,
 } from "./issue-model.ts";
 import { type Issue } from "./api-types.ts";
@@ -23,6 +25,7 @@ function makeIssue(overrides: Partial<Issue> = {}): Issue {
     priority: "medium",
     reporter_id: "user-1",
     assignee_id: "user-2",
+    parent_issue_id: null,
     due_date: "2026-05-28",
     labels: [{ id: "label-1", name: "frontend", color: "#4e795d" }],
     created_at: "2026-05-26T10:00:00Z",
@@ -47,6 +50,20 @@ test("extracts issue label ids in display order", () => {
       }),
     ),
     ["backend", "bug"],
+  );
+});
+
+test("keeps safe issue type options for root and child issues", () => {
+  assert.deepEqual(rootIssueTypeOptions, ["task", "bug", "story", "epic"]);
+  assert.deepEqual(editableIssueTypeOptions(makeIssue()), [
+    "task",
+    "bug",
+    "story",
+    "epic",
+  ]);
+  assert.deepEqual(
+    editableIssueTypeOptions(makeIssue({ parent_issue_id: "parent-1" })),
+    ["task", "bug", "story", "subtask"],
   );
 });
 

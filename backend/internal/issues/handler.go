@@ -52,10 +52,21 @@ type Handler struct {
 }
 
 type createIssueRequest struct {
-	ProjectID   string   `json:"project_id"`
+	ProjectID     string   `json:"project_id"`
+	ParentIssueID string   `json:"parent_issue_id"`
+	Title         string   `json:"title"`
+	Description   string   `json:"description"`
+	IssueType     string   `json:"issue_type"`
+	Status        string   `json:"status"`
+	Priority      string   `json:"priority"`
+	AssigneeID    string   `json:"assignee_id"`
+	DueDate       string   `json:"due_date"`
+	LabelIDs      []string `json:"label_ids"`
+}
+
+type createSubtaskRequest struct {
 	Title       string   `json:"title"`
 	Description string   `json:"description"`
-	IssueType   string   `json:"issue_type"`
 	Status      string   `json:"status"`
 	Priority    string   `json:"priority"`
 	AssigneeID  string   `json:"assignee_id"`
@@ -83,6 +94,10 @@ type setIssueLabelsRequest struct {
 	LabelIDs []string `json:"label_ids"`
 }
 
+type setIssueParentRequest struct {
+	ParentIssueID *string `json:"parent_issue_id"`
+}
+
 type createCommentRequest struct {
 	Body string `json:"body"`
 }
@@ -98,22 +113,23 @@ type issueLabelResponse struct {
 }
 
 type issueResponse struct {
-	ID          string               `json:"id"`
-	ProjectID   string               `json:"project_id"`
-	ProjectKey  string               `json:"project_key"`
-	Number      int                  `json:"number"`
-	IssueKey    string               `json:"issue_key"`
-	Title       string               `json:"title"`
-	Description string               `json:"description"`
-	IssueType   string               `json:"issue_type"`
-	Status      string               `json:"status"`
-	Priority    string               `json:"priority"`
-	ReporterID  string               `json:"reporter_id"`
-	AssigneeID  *string              `json:"assignee_id"`
-	DueDate     *string              `json:"due_date"`
-	Labels      []issueLabelResponse `json:"labels"`
-	CreatedAt   time.Time            `json:"created_at"`
-	UpdatedAt   time.Time            `json:"updated_at"`
+	ID            string               `json:"id"`
+	ProjectID     string               `json:"project_id"`
+	ProjectKey    string               `json:"project_key"`
+	Number        int                  `json:"number"`
+	IssueKey      string               `json:"issue_key"`
+	Title         string               `json:"title"`
+	Description   string               `json:"description"`
+	IssueType     string               `json:"issue_type"`
+	Status        string               `json:"status"`
+	Priority      string               `json:"priority"`
+	ReporterID    string               `json:"reporter_id"`
+	AssigneeID    *string              `json:"assignee_id"`
+	ParentIssueID *string              `json:"parent_issue_id"`
+	DueDate       *string              `json:"due_date"`
+	Labels        []issueLabelResponse `json:"labels"`
+	CreatedAt     time.Time            `json:"created_at"`
+	UpdatedAt     time.Time            `json:"updated_at"`
 }
 
 type listIssuesResponse struct {
@@ -149,15 +165,16 @@ type listActivityResponse struct {
 }
 
 type normalizedCreateIssue struct {
-	ProjectID   string
-	Title       string
-	Description string
-	IssueType   string
-	Status      string
-	Priority    string
-	AssigneeID  string
-	DueDate     string
-	LabelIDs    []string
+	ProjectID     string
+	ParentIssueID string
+	Title         string
+	Description   string
+	IssueType     string
+	Status        string
+	Priority      string
+	AssigneeID    string
+	DueDate       string
+	LabelIDs      []string
 }
 
 type normalizedUpdateIssue struct {
@@ -180,6 +197,9 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/issues", h.create)
 	mux.HandleFunc("GET /api/v1/issues/{id}", h.get)
 	mux.HandleFunc("PATCH /api/v1/issues/{id}", h.update)
+	mux.HandleFunc("GET /api/v1/issues/{id}/children", h.listChildren)
+	mux.HandleFunc("POST /api/v1/issues/{id}/subtasks", h.createSubtask)
+	mux.HandleFunc("PATCH /api/v1/issues/{id}/parent", h.setParent)
 	mux.HandleFunc("POST /api/v1/issues/{id}/transition", h.transition)
 	mux.HandleFunc("POST /api/v1/issues/{id}/assign", h.assign)
 	mux.HandleFunc("PUT /api/v1/issues/{id}/labels", h.setLabels)
@@ -244,6 +264,10 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 		}
 		if errors.Is(err, errInvalidLabel) {
 			writeError(w, http.StatusBadRequest, "invalid_label", "label is not in this workspace")
+			return
+		}
+		if errors.Is(err, errInvalidIssueParent) {
+			writeError(w, http.StatusBadRequest, "invalid_parent", "parent issue must be accessible in this workspace")
 			return
 		}
 
@@ -316,8 +340,171 @@ func (h *Handler) update(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusNotFound, "issue_not_found", "issue was not found")
 			return
 		}
+		if errors.Is(err, errIssueParentRequired) {
+			writeError(w, http.StatusBadRequest, "invalid_parent", "parent_issue_id is required for subtask")
+			return
+		}
+		if errors.Is(err, errIssueParentForbidden) {
+			writeError(w, http.StatusBadRequest, "invalid_parent", "epic cannot have a parent issue")
+			return
+		}
 
 		writeError(w, http.StatusInternalServerError, "internal_error", "could not update issue")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, issue)
+}
+
+func (h *Handler) listChildren(w http.ResponseWriter, r *http.Request) {
+	user, ok := h.requireUser(w, r)
+	if !ok {
+		return
+	}
+
+	issueID, err := normalizeIssueID(r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	if _, err := h.getIssue(ctx, user.WorkspaceID, issueID); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "issue_not_found", "issue was not found")
+			return
+		}
+
+		writeError(w, http.StatusInternalServerError, "internal_error", "could not load issue")
+		return
+	}
+
+	children, err := h.listIssueChildren(ctx, user.WorkspaceID, issueID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "internal_error", "could not list child issues")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, listIssuesResponse{Issues: children})
+}
+
+func (h *Handler) createSubtask(w http.ResponseWriter, r *http.Request) {
+	user, ok := h.requireUser(w, r)
+	if !ok {
+		return
+	}
+
+	parentIssueID, err := normalizeIssueID(r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	var req createSubtaskRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	parent, err := h.getIssue(ctx, user.WorkspaceID, parentIssueID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "issue_not_found", "parent issue was not found")
+			return
+		}
+
+		writeError(w, http.StatusInternalServerError, "internal_error", "could not load parent issue")
+		return
+	}
+
+	input, err := normalizeCreateSubtask(parent, req)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	issue, err := h.createIssue(ctx, user, input)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "issue_not_found", "parent issue was not found")
+			return
+		}
+		if errors.Is(err, errInvalidAssignee) {
+			writeError(w, http.StatusBadRequest, "invalid_assignee", "assignee must be an active workspace member")
+			return
+		}
+		if errors.Is(err, errInvalidLabel) {
+			writeError(w, http.StatusBadRequest, "invalid_label", "label is not in this workspace")
+			return
+		}
+		if errors.Is(err, errInvalidIssueParent) {
+			writeError(w, http.StatusBadRequest, "invalid_parent", "parent issue must be accessible in this workspace")
+			return
+		}
+
+		writeError(w, http.StatusInternalServerError, "internal_error", "could not create subtask")
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, issue)
+}
+
+func (h *Handler) setParent(w http.ResponseWriter, r *http.Request) {
+	user, ok := h.requireUser(w, r)
+	if !ok {
+		return
+	}
+
+	issueID, err := normalizeIssueID(r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	var req setIssueParentRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	parentIssueID, err := normalizeSetIssueParent(req)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	issue, err := h.setIssueParent(ctx, user, issueID, parentIssueID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "issue_not_found", "issue was not found")
+			return
+		}
+		if errors.Is(err, errInvalidIssueParent) {
+			writeError(w, http.StatusBadRequest, "invalid_parent", "parent issue must be accessible in this workspace")
+			return
+		}
+		if errors.Is(err, errIssueParentCycle) {
+			writeError(w, http.StatusBadRequest, "invalid_parent", "parent issue cannot create a hierarchy cycle")
+			return
+		}
+		if errors.Is(err, errIssueParentRequired) {
+			writeError(w, http.StatusBadRequest, "invalid_parent", "parent_issue_id is required for subtask")
+			return
+		}
+		if errors.Is(err, errIssueParentForbidden) {
+			writeError(w, http.StatusBadRequest, "invalid_parent", "epic cannot have a parent issue")
+			return
+		}
+
+		writeError(w, http.StatusInternalServerError, "internal_error", "could not update issue parent")
 		return
 	}
 
@@ -840,6 +1027,7 @@ func (h *Handler) listIssues(ctx context.Context, workspaceID string, query map[
 			i.priority,
 			i.reporter_id::text,
 			i.assignee_id::text,
+			i.parent_issue_id::text,
 			i.due_date::text,
 			i.created_at,
 			i.updated_at,
@@ -891,6 +1079,10 @@ func (h *Handler) listIssues(ctx context.Context, workspaceID string, query map[
 
 var errInvalidAssignee = errors.New("invalid assignee")
 var errInvalidLabel = errors.New("invalid label")
+var errInvalidIssueParent = errors.New("invalid issue parent")
+var errIssueParentCycle = errors.New("issue parent cycle")
+var errIssueParentRequired = errors.New("issue parent required")
+var errIssueParentForbidden = errors.New("issue parent forbidden")
 
 func (h *Handler) getIssue(ctx context.Context, workspaceID string, issueID string) (issueResponse, error) {
 	return scanIssue(h.db.QueryRow(ctx, `
@@ -907,6 +1099,7 @@ func (h *Handler) getIssue(ctx context.Context, workspaceID string, issueID stri
 			i.priority,
 			i.reporter_id::text,
 			i.assignee_id::text,
+			i.parent_issue_id::text,
 			i.due_date::text,
 			i.created_at,
 			i.updated_at,
@@ -964,6 +1157,10 @@ func (h *Handler) createIssue(ctx context.Context, user auth.CurrentUser, input 
 		return issueResponse{}, err
 	}
 
+	if err := verifyIssueParent(ctx, tx, user.WorkspaceID, "", input.ParentIssueID); err != nil {
+		return issueResponse{}, err
+	}
+
 	var nextNumber int
 	if err := tx.QueryRow(ctx, `
 		SELECT COALESCE(MAX(number), 0) + 1
@@ -977,6 +1174,10 @@ func (h *Handler) createIssue(ctx context.Context, user auth.CurrentUser, input 
 	var assigneeID any
 	if input.AssigneeID != "" {
 		assigneeID = input.AssigneeID
+	}
+	var parentIssueID any
+	if input.ParentIssueID != "" {
+		parentIssueID = input.ParentIssueID
 	}
 
 	var dueDate any
@@ -996,13 +1197,14 @@ func (h *Handler) createIssue(ctx context.Context, user auth.CurrentUser, input 
 			priority,
 			reporter_id,
 			assignee_id,
+			parent_issue_id,
 			due_date
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 		RETURNING
 			id::text,
 			project_id::text,
-			$12::text,
+			$13::text,
 			number,
 			issue_key,
 			title,
@@ -1012,11 +1214,12 @@ func (h *Handler) createIssue(ctx context.Context, user auth.CurrentUser, input 
 			priority,
 			reporter_id::text,
 			assignee_id::text,
+			parent_issue_id::text,
 			due_date::text,
 			created_at,
 			updated_at,
 			'[]'::jsonb
-	`, input.ProjectID, nextNumber, issueKey, input.Title, input.Description, input.IssueType, input.Status, input.Priority, user.ID, assigneeID, dueDate, projectKey))
+	`, input.ProjectID, nextNumber, issueKey, input.Title, input.Description, input.IssueType, input.Status, input.Priority, user.ID, assigneeID, parentIssueID, dueDate, projectKey))
 	if err != nil {
 		return issueResponse{}, err
 	}
@@ -1037,12 +1240,16 @@ func (h *Handler) createIssue(ctx context.Context, user auth.CurrentUser, input 
 		}
 	}
 
-	if err := insertIssueActivity(ctx, tx, issue.ID, user.ID, "issue_created", map[string]string{
+	activityPayload := map[string]string{
 		"issue_key": issue.IssueKey,
 		"title":     issue.Title,
 		"status":    issue.Status,
 		"priority":  issue.Priority,
-	}); err != nil {
+	}
+	if input.ParentIssueID != "" {
+		activityPayload["parent_issue_id"] = input.ParentIssueID
+	}
+	if err := insertIssueActivity(ctx, tx, issue.ID, user.ID, "issue_created", activityPayload); err != nil {
 		return issueResponse{}, err
 	}
 
@@ -1076,6 +1283,7 @@ func (h *Handler) updateIssue(ctx context.Context, user auth.CurrentUser, issueI
 			i.priority,
 			i.reporter_id::text,
 			i.assignee_id::text,
+			i.parent_issue_id::text,
 			i.due_date::text,
 			i.created_at,
 			i.updated_at,
@@ -1105,6 +1313,13 @@ func (h *Handler) updateIssue(ctx context.Context, user auth.CurrentUser, issueI
 	`, issueID, user.WorkspaceID))
 	if err != nil {
 		return issueResponse{}, err
+	}
+
+	if input.IssueType == "subtask" && stringOrEmpty(previous.ParentIssueID) == "" {
+		return issueResponse{}, errIssueParentRequired
+	}
+	if input.IssueType == "epic" && stringOrEmpty(previous.ParentIssueID) != "" {
+		return issueResponse{}, errIssueParentForbidden
 	}
 
 	var dueDate any
@@ -1139,6 +1354,7 @@ func (h *Handler) updateIssue(ctx context.Context, user auth.CurrentUser, issueI
 			i.priority,
 			i.reporter_id::text,
 			i.assignee_id::text,
+			i.parent_issue_id::text,
 			i.due_date::text,
 			i.created_at,
 			i.updated_at,
@@ -1170,6 +1386,213 @@ func (h *Handler) updateIssue(ctx context.Context, user auth.CurrentUser, issueI
 		}); err != nil {
 			return issueResponse{}, err
 		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return issueResponse{}, err
+	}
+
+	return issue, nil
+}
+
+func (h *Handler) listIssueChildren(ctx context.Context, workspaceID string, issueID string) ([]issueResponse, error) {
+	rows, err := h.db.Query(ctx, `
+		SELECT
+			i.id::text,
+			i.project_id::text,
+			p.key,
+			i.number,
+			i.issue_key,
+			i.title,
+			i.description,
+			i.issue_type,
+			i.status,
+			i.priority,
+			i.reporter_id::text,
+			i.assignee_id::text,
+			i.parent_issue_id::text,
+			i.due_date::text,
+			i.created_at,
+			i.updated_at,
+			(
+				SELECT COALESCE(
+					jsonb_agg(
+						jsonb_build_object(
+							'id', l.id::text,
+							'name', l.name,
+							'color', l.color
+						)
+						ORDER BY l.name
+					),
+					'[]'::jsonb
+				)
+				FROM issue_labels il
+				JOIN labels l ON l.id = il.label_id
+				WHERE il.issue_id = i.id
+			)
+		FROM issues i
+		JOIN projects p ON p.id = i.project_id
+		WHERE i.parent_issue_id = $1
+			AND p.workspace_id = $2
+			AND p.archived_at IS NULL
+			AND i.archived_at IS NULL
+		ORDER BY i.number ASC
+		LIMIT 100
+	`, issueID, workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	children := make([]issueResponse, 0)
+	for rows.Next() {
+		issue, err := scanIssue(rows)
+		if err != nil {
+			return nil, err
+		}
+
+		children = append(children, issue)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return children, nil
+}
+
+func (h *Handler) setIssueParent(ctx context.Context, user auth.CurrentUser, issueID string, parentIssueID string) (issueResponse, error) {
+	tx, err := h.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return issueResponse{}, err
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	previous, err := scanIssue(tx.QueryRow(ctx, `
+		SELECT
+			i.id::text,
+			i.project_id::text,
+			p.key,
+			i.number,
+			i.issue_key,
+			i.title,
+			i.description,
+			i.issue_type,
+			i.status,
+			i.priority,
+			i.reporter_id::text,
+			i.assignee_id::text,
+			i.parent_issue_id::text,
+			i.due_date::text,
+			i.created_at,
+			i.updated_at,
+			(
+				SELECT COALESCE(
+					jsonb_agg(
+						jsonb_build_object(
+							'id', l.id::text,
+							'name', l.name,
+							'color', l.color
+						)
+						ORDER BY l.name
+					),
+					'[]'::jsonb
+				)
+				FROM issue_labels il
+				JOIN labels l ON l.id = il.label_id
+				WHERE il.issue_id = i.id
+			)
+		FROM issues i
+		JOIN projects p ON p.id = i.project_id
+	WHERE i.id = $1
+		AND p.workspace_id = $2
+		AND p.archived_at IS NULL
+		AND i.archived_at IS NULL
+	FOR UPDATE OF i
+	`, issueID, user.WorkspaceID))
+	if err != nil {
+		return issueResponse{}, err
+	}
+
+	if previous.IssueType == "epic" && parentIssueID != "" {
+		return issueResponse{}, errIssueParentForbidden
+	}
+	if previous.IssueType == "subtask" && parentIssueID == "" {
+		return issueResponse{}, errIssueParentRequired
+	}
+
+	previousParentIssueID := stringOrEmpty(previous.ParentIssueID)
+	if previousParentIssueID == parentIssueID {
+		if err := tx.Commit(ctx); err != nil {
+			return issueResponse{}, err
+		}
+		return previous, nil
+	}
+
+	if err := verifyIssueParent(ctx, tx, user.WorkspaceID, issueID, parentIssueID); err != nil {
+		return issueResponse{}, err
+	}
+
+	var nextParentIssueID any
+	if parentIssueID != "" {
+		nextParentIssueID = parentIssueID
+	}
+
+	issue, err := scanIssue(tx.QueryRow(ctx, `
+		UPDATE issues i
+		SET parent_issue_id = $3::uuid,
+			updated_at = now()
+		FROM projects p
+		WHERE i.project_id = p.id
+			AND i.id = $1
+			AND p.workspace_id = $2
+			AND p.archived_at IS NULL
+			AND i.archived_at IS NULL
+		RETURNING
+			i.id::text,
+			i.project_id::text,
+			p.key,
+			i.number,
+			i.issue_key,
+			i.title,
+			i.description,
+			i.issue_type,
+			i.status,
+			i.priority,
+			i.reporter_id::text,
+			i.assignee_id::text,
+			i.parent_issue_id::text,
+			i.due_date::text,
+			i.created_at,
+			i.updated_at,
+			(
+				SELECT COALESCE(
+					jsonb_agg(
+						jsonb_build_object(
+							'id', l.id::text,
+							'name', l.name,
+							'color', l.color
+						)
+						ORDER BY l.name
+					),
+					'[]'::jsonb
+				)
+				FROM issue_labels il
+				JOIN labels l ON l.id = il.label_id
+				WHERE il.issue_id = i.id
+			)
+	`, issueID, user.WorkspaceID, nextParentIssueID))
+	if err != nil {
+		return issueResponse{}, err
+	}
+
+	if err := insertIssueActivity(ctx, tx, issue.ID, user.ID, "issue_parent_changed", map[string]string{
+		"from_parent_issue_id": previousParentIssueID,
+		"to_parent_issue_id":   stringOrEmpty(issue.ParentIssueID),
+	}); err != nil {
+		return issueResponse{}, err
 	}
 
 	if err := tx.Commit(ctx); err != nil {
@@ -1225,6 +1648,7 @@ func (h *Handler) transitionIssueStatus(ctx context.Context, user auth.CurrentUs
 			i.priority,
 			i.reporter_id::text,
 			i.assignee_id::text,
+			i.parent_issue_id::text,
 			i.due_date::text,
 			i.created_at,
 			i.updated_at,
@@ -1320,6 +1744,7 @@ func (h *Handler) assignIssue(ctx context.Context, user auth.CurrentUser, issueI
 			i.priority,
 			i.reporter_id::text,
 			i.assignee_id::text,
+			i.parent_issue_id::text,
 			i.due_date::text,
 			i.created_at,
 			i.updated_at,
@@ -1437,6 +1862,7 @@ func (h *Handler) setIssueLabels(ctx context.Context, user auth.CurrentUser, iss
 			i.priority,
 			i.reporter_id::text,
 			i.assignee_id::text,
+			i.parent_issue_id::text,
 			i.due_date::text,
 			i.created_at,
 			i.updated_at,
@@ -1825,6 +2251,12 @@ func normalizeCreateIssue(req createIssueRequest) (normalizedCreateIssue, error)
 		LabelIDs:    labelIDs,
 	}
 
+	parentIssueID, err := normalizeOptionalIssueID(req.ParentIssueID)
+	if err != nil {
+		return input, err
+	}
+	input.ParentIssueID = parentIssueID
+
 	if input.ProjectID == "" {
 		return input, errors.New("project_id is required")
 	}
@@ -1838,7 +2270,12 @@ func normalizeCreateIssue(req createIssueRequest) (normalizedCreateIssue, error)
 		return input, errors.New("issue_type is invalid")
 	}
 	if input.IssueType == "subtask" {
-		return input, errors.New("parent_issue_id is required for subtask")
+		if input.ParentIssueID == "" {
+			return input, errors.New("parent_issue_id is required for subtask")
+		}
+	}
+	if input.IssueType == "epic" && input.ParentIssueID != "" {
+		return input, errors.New("epic cannot have a parent issue")
 	}
 	if !validIssueStatuses[input.Status] {
 		return input, errors.New("status is invalid")
@@ -1853,6 +2290,21 @@ func normalizeCreateIssue(req createIssueRequest) (normalizedCreateIssue, error)
 	}
 
 	return input, nil
+}
+
+func normalizeCreateSubtask(parent issueResponse, req createSubtaskRequest) (normalizedCreateIssue, error) {
+	return normalizeCreateIssue(createIssueRequest{
+		ProjectID:     parent.ProjectID,
+		ParentIssueID: parent.ID,
+		Title:         req.Title,
+		Description:   req.Description,
+		IssueType:     "subtask",
+		Status:        req.Status,
+		Priority:      req.Priority,
+		AssigneeID:    req.AssigneeID,
+		DueDate:       req.DueDate,
+		LabelIDs:      req.LabelIDs,
+	})
 }
 
 func normalizeTransitionIssue(req transitionIssueRequest) (string, error) {
@@ -1888,9 +2340,6 @@ func normalizeUpdateIssue(req updateIssueRequest) (normalizedUpdateIssue, error)
 	if !validIssueTypes[input.IssueType] {
 		return input, errors.New("issue_type is invalid")
 	}
-	if input.IssueType == "subtask" {
-		return input, errors.New("parent_issue_id is required for subtask")
-	}
 	if input.Priority == "" {
 		return input, errors.New("priority is required")
 	}
@@ -1906,6 +2355,14 @@ func normalizeUpdateIssue(req updateIssueRequest) (normalizedUpdateIssue, error)
 	return input, nil
 }
 
+func normalizeSetIssueParent(req setIssueParentRequest) (string, error) {
+	if req.ParentIssueID == nil {
+		return "", nil
+	}
+
+	return normalizeOptionalIssueID(*req.ParentIssueID)
+}
+
 func normalizeIssueID(id string) (string, error) {
 	id = strings.ToLower(strings.TrimSpace(id))
 	if id == "" {
@@ -1913,6 +2370,18 @@ func normalizeIssueID(id string) (string, error) {
 	}
 	if !uuidPattern.MatchString(id) {
 		return "", errors.New("issue id is invalid")
+	}
+
+	return id, nil
+}
+
+func normalizeOptionalIssueID(id string) (string, error) {
+	id = strings.ToLower(strings.TrimSpace(id))
+	if id == "" {
+		return "", nil
+	}
+	if !uuidPattern.MatchString(id) {
+		return "", errors.New("parent_issue_id must be a valid issue id")
 	}
 
 	return id, nil
@@ -2169,6 +2638,72 @@ func verifyActiveWorkspaceMember(ctx context.Context, tx pgx.Tx, workspaceID str
 	return nil
 }
 
+func verifyIssueParent(ctx context.Context, tx pgx.Tx, workspaceID string, issueID string, parentIssueID string) error {
+	if parentIssueID == "" {
+		return nil
+	}
+	if issueID != "" && parentIssueID == issueID {
+		return errIssueParentCycle
+	}
+
+	var parentExists bool
+	if err := tx.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1
+			FROM issues i
+			JOIN projects p ON p.id = i.project_id
+			WHERE i.id = $1
+				AND p.workspace_id = $2
+				AND p.archived_at IS NULL
+				AND i.archived_at IS NULL
+		)
+	`, parentIssueID, workspaceID).Scan(&parentExists); err != nil {
+		return err
+	}
+	if !parentExists {
+		return errInvalidIssueParent
+	}
+
+	if issueID == "" {
+		return nil
+	}
+
+	var createsCycle bool
+	if err := tx.QueryRow(ctx, `
+		WITH RECURSIVE ancestors AS (
+			SELECT i.id, i.parent_issue_id
+			FROM issues i
+			JOIN projects p ON p.id = i.project_id
+			WHERE i.id = $1
+				AND p.workspace_id = $2
+				AND p.archived_at IS NULL
+				AND i.archived_at IS NULL
+
+			UNION ALL
+
+			SELECT parent.id, parent.parent_issue_id
+			FROM issues parent
+			JOIN ancestors child ON child.parent_issue_id = parent.id
+			JOIN projects p ON p.id = parent.project_id
+			WHERE p.workspace_id = $2
+				AND p.archived_at IS NULL
+				AND parent.archived_at IS NULL
+		)
+		SELECT EXISTS (
+			SELECT 1
+			FROM ancestors
+			WHERE id = $3
+		)
+	`, parentIssueID, workspaceID, issueID).Scan(&createsCycle); err != nil {
+		return err
+	}
+	if createsCycle {
+		return errIssueParentCycle
+	}
+
+	return nil
+}
+
 func getIssueInTx(ctx context.Context, tx pgx.Tx, workspaceID string, issueID string) (issueResponse, error) {
 	return scanIssue(tx.QueryRow(ctx, `
 		SELECT
@@ -2184,6 +2719,7 @@ func getIssueInTx(ctx context.Context, tx pgx.Tx, workspaceID string, issueID st
 			i.priority,
 			i.reporter_id::text,
 			i.assignee_id::text,
+			i.parent_issue_id::text,
 			i.due_date::text,
 			i.created_at,
 			i.updated_at,
@@ -2241,6 +2777,7 @@ type rowScanner interface {
 func scanIssue(row rowScanner) (issueResponse, error) {
 	var issue issueResponse
 	var assigneeID pgtype.Text
+	var parentIssueID pgtype.Text
 	var dueDate pgtype.Text
 	var labelsJSON []byte
 
@@ -2257,6 +2794,7 @@ func scanIssue(row rowScanner) (issueResponse, error) {
 		&issue.Priority,
 		&issue.ReporterID,
 		&assigneeID,
+		&parentIssueID,
 		&dueDate,
 		&issue.CreatedAt,
 		&issue.UpdatedAt,
@@ -2266,6 +2804,7 @@ func scanIssue(row rowScanner) (issueResponse, error) {
 	}
 
 	issue.AssigneeID = nullableText(assigneeID)
+	issue.ParentIssueID = nullableText(parentIssueID)
 	issue.DueDate = nullableText(dueDate)
 	labels, err := decodeIssueLabels(labelsJSON)
 	if err != nil {

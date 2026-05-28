@@ -41,7 +41,7 @@ export type Label = {
 
 export type IssueStatus = "backlog" | "todo" | "in_progress" | "blocked" | "done";
 export type IssuePriority = "low" | "medium" | "high" | "critical";
-export type IssueType = "task" | "bug" | "story";
+export type IssueType = "task" | "bug" | "story" | "epic" | "subtask";
 export type IssueSort = "created_desc" | "created_asc" | "priority_desc" | "due_date_asc";
 export type IssueDueFilter = "overdue" | "today" | "due_soon" | "no_due";
 
@@ -58,6 +58,7 @@ export type Issue = {
   priority: IssuePriority;
   reporter_id: string;
   assignee_id: string | null;
+  parent_issue_id: string | null;
   due_date: string | null;
   labels: Label[];
   created_at: string;
@@ -83,6 +84,7 @@ export type IssueActivity = {
     | "status_changed"
     | "assignee_changed"
     | "labels_changed"
+    | "issue_parent_changed"
     | "issue_archived"
     | "comment_added"
     | "comment_updated"
@@ -155,9 +157,20 @@ export type UpdateProjectInput = {
 
 export type CreateIssueInput = {
   project_id: string;
+  parent_issue_id?: string;
   title: string;
   description: string;
   issue_type: IssueType;
+  status: IssueStatus;
+  priority: IssuePriority;
+  assignee_id: string;
+  due_date: string;
+  label_ids: string[];
+};
+
+export type CreateSubtaskInput = {
+  title: string;
+  description: string;
   status: IssueStatus;
   priority: IssuePriority;
   assignee_id: string;

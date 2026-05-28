@@ -3,6 +3,7 @@ import {
   type CreateIssueInput,
   type CreateLabelInput,
   type CreateProjectInput,
+  type CreateSubtaskInput,
   type CreateTeamMemberInput,
   type Issue,
   type IssueComment,
@@ -35,6 +36,7 @@ export type {
   Label,
   Project,
   TeamMember,
+  CreateSubtaskInput,
   UpdateIssueInput,
 } from "./api-types";
 
@@ -214,8 +216,21 @@ export async function listIssueActivity(issueId: string) {
   );
 }
 
+export async function listIssueChildren(issueId: string) {
+  return request<ListIssuesResponse>(
+    `/api/v1/issues/${encodeURIComponent(issueId)}/children`,
+  );
+}
+
 export async function createIssue(input: CreateIssueInput) {
   return request<Issue>("/api/v1/issues", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function createSubtask(issueId: string, input: CreateSubtaskInput) {
+  return request<Issue>(`/api/v1/issues/${encodeURIComponent(issueId)}/subtasks`, {
     method: "POST",
     body: JSON.stringify(input),
   });
@@ -225,6 +240,13 @@ export async function updateIssue(issueId: string, input: UpdateIssueInput) {
   return request<Issue>(`/api/v1/issues/${encodeURIComponent(issueId)}`, {
     method: "PATCH",
     body: JSON.stringify(input),
+  });
+}
+
+export async function setIssueParent(issueId: string, parentIssueId: string | null) {
+  return request<Issue>(`/api/v1/issues/${encodeURIComponent(issueId)}/parent`, {
+    method: "PATCH",
+    body: JSON.stringify({ parent_issue_id: parentIssueId }),
   });
 }
 

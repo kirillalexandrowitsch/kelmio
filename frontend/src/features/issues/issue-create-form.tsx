@@ -9,7 +9,12 @@ import {
   type Project,
   type TeamMember,
 } from "../../lib/api-types";
-import { columns, issueTypeLabels, priorityLabels } from "../../lib/issue-model";
+import {
+  columns,
+  issueTypeLabels,
+  priorityLabels,
+  rootIssueTypeOptions,
+} from "../../lib/issue-model";
 import { activeTeamMembers, memberOptionLabel } from "../../lib/team-view";
 
 type IssueCreateFormProps = {
@@ -163,9 +168,9 @@ export function IssueCreateForm({
             onChange={(event) => onTypeChange(event.target.value as IssueType)}
             value={type}
           >
-            {Object.entries(issueTypeLabels).map(([value, label]) => (
+            {rootIssueTypeOptions.map((value) => (
               <option key={value} value={value}>
-                {label}
+                {issueTypeLabels[value]}
               </option>
             ))}
           </select>

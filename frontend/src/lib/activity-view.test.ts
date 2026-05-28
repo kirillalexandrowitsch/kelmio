@@ -41,6 +41,10 @@ function makeActivity(overrides: Partial<IssueActivity>): IssueActivity {
 test("formats known and unknown activity titles", () => {
   assert.equal(activityTitle(makeActivity({ action: "comment_added" })), "Added comment");
   assert.equal(
+    activityTitle(makeActivity({ action: "issue_parent_changed" })),
+    "Changed parent",
+  );
+  assert.equal(
     activityTitle(makeActivity({ action: "custom_action" })),
     "custom action",
   );
@@ -76,5 +80,18 @@ test("formats activity descriptions with issue and member context", () => {
       members,
     ),
     "\"Looks good\"",
+  );
+  assert.equal(
+    activityDescription(
+      makeActivity({
+        action: "issue_parent_changed",
+        payload: {
+          from_parent_issue_id: "parent-1",
+          to_parent_issue_id: "parent-2",
+        },
+      }),
+      members,
+    ),
+    "parent-1 -> parent-2",
   );
 });

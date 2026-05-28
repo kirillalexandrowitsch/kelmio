@@ -18,6 +18,9 @@ export function activityTitle(activity: IssueActivity) {
   if (activity.action === "labels_changed") {
     return "Changed labels";
   }
+  if (activity.action === "issue_parent_changed") {
+    return "Changed parent";
+  }
   if (activity.action === "issue_archived") {
     return "Archived issue";
   }
@@ -68,6 +71,11 @@ export function activityDescription(
   }
   if (activity.action === "labels_changed") {
     return "Labels updated";
+  }
+  if (activity.action === "issue_parent_changed") {
+    return `${activity.payload.from_parent_issue_id || "No parent"} -> ${
+      activity.payload.to_parent_issue_id || "No parent"
+    }`;
   }
 
   return "";

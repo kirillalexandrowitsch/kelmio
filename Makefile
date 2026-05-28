@@ -62,7 +62,7 @@ backend-test:
 	cd backend && go test ./...
 
 backend-integration-test: wait-db
-	cd backend && go test -tags=integration ./internal/database
+	cd backend && go test -tags=integration ./internal/...
 
 frontend-install:
 	cd frontend && npm install

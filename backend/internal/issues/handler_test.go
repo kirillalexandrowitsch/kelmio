@@ -7,6 +7,8 @@ import (
 	"team-task-tracker/backend/internal/auth"
 )
 
+const testIssueID = "6d5257d4-002e-44da-8925-d9108699c504"
+
 func TestNormalizeCreateIssueDefaults(t *testing.T) {
 	t.Parallel()
 
@@ -64,6 +66,27 @@ func TestNormalizeCreateIssueAcceptsEpic(t *testing.T) {
 	}
 }
 
+func TestNormalizeCreateIssueAcceptsSubtaskWithParent(t *testing.T) {
+	t.Parallel()
+
+	got, err := normalizeCreateIssue(createIssueRequest{
+		ProjectID:     "project-id",
+		ParentIssueID: " 6D5257D4-002E-44DA-8925-D9108699C504 ",
+		Title:         "Subtask issue",
+		IssueType:     "subtask",
+	})
+	if err != nil {
+		t.Fatalf("normalize create subtask issue: %v", err)
+	}
+
+	if got.IssueType != "subtask" {
+		t.Fatalf("IssueType = %q, want %q", got.IssueType, "subtask")
+	}
+	if got.ParentIssueID != testIssueID {
+		t.Fatalf("ParentIssueID = %q, want %q", got.ParentIssueID, testIssueID)
+	}
+}
+
 func TestNormalizeCreateIssueValidation(t *testing.T) {
 	t.Parallel()
 
@@ -100,6 +123,23 @@ func TestNormalizeCreateIssueValidation(t *testing.T) {
 			},
 		},
 		{
+			name: "epic with parent",
+			req: createIssueRequest{
+				ProjectID:     "project-id",
+				ParentIssueID: testIssueID,
+				Title:         "First issue",
+				IssueType:     "epic",
+			},
+		},
+		{
+			name: "bad parent id",
+			req: createIssueRequest{
+				ProjectID:     "project-id",
+				ParentIssueID: "not-a-uuid",
+				Title:         "First issue",
+			},
+		},
+		{
 			name: "bad date",
 			req: createIssueRequest{
 				ProjectID: "project-id",
@@ -126,6 +166,35 @@ func TestNormalizeCreateIssueValidation(t *testing.T) {
 				t.Fatal("expected error")
 			}
 		})
+	}
+}
+
+func TestNormalizeCreateSubtask(t *testing.T) {
+	t.Parallel()
+
+	parent := issueResponse{
+		ID:        testIssueID,
+		ProjectID: "project-id",
+	}
+	got, err := normalizeCreateSubtask(parent, createSubtaskRequest{
+		Title:    " Child issue ",
+		Priority: "high",
+	})
+	if err != nil {
+		t.Fatalf("normalize create subtask: %v", err)
+	}
+
+	if got.ProjectID != "project-id" {
+		t.Fatalf("ProjectID = %q, want %q", got.ProjectID, "project-id")
+	}
+	if got.ParentIssueID != testIssueID {
+		t.Fatalf("ParentIssueID = %q, want %q", got.ParentIssueID, testIssueID)
+	}
+	if got.IssueType != "subtask" {
+		t.Fatalf("IssueType = %q, want %q", got.IssueType, "subtask")
+	}
+	if got.Title != "Child issue" {
+		t.Fatalf("Title = %q, want %q", got.Title, "Child issue")
 	}
 }
 
@@ -205,6 +274,23 @@ func TestNormalizeUpdateIssue(t *testing.T) {
 	}
 }
 
+func TestNormalizeUpdateIssueAcceptsSubtask(t *testing.T) {
+	t.Parallel()
+
+	got, err := normalizeUpdateIssue(updateIssueRequest{
+		Title:     "Updated subtask",
+		IssueType: "subtask",
+		Priority:  "medium",
+	})
+	if err != nil {
+		t.Fatalf("normalize update subtask issue: %v", err)
+	}
+
+	if got.IssueType != "subtask" {
+		t.Fatalf("IssueType = %q, want %q", got.IssueType, "subtask")
+	}
+}
+
 func TestNormalizeUpdateIssueValidation(t *testing.T) {
 	t.Parallel()
 
@@ -224,14 +310,6 @@ func TestNormalizeUpdateIssueValidation(t *testing.T) {
 			req: updateIssueRequest{
 				Title:     "Updated issue",
 				IssueType: "incident",
-				Priority:  "medium",
-			},
-		},
-		{
-			name: "subtask without parent",
-			req: updateIssueRequest{
-				Title:     "Updated issue",
-				IssueType: "subtask",
 				Priority:  "medium",
 			},
 		},
@@ -305,6 +383,38 @@ func TestNormalizeIssueIDValidation(t *testing.T) {
 				t.Fatal("expected error")
 			}
 		})
+	}
+}
+
+func TestNormalizeSetIssueParent(t *testing.T) {
+	t.Parallel()
+
+	parentID := " 6D5257D4-002E-44DA-8925-D9108699C504 "
+	got, err := normalizeSetIssueParent(setIssueParentRequest{
+		ParentIssueID: &parentID,
+	})
+	if err != nil {
+		t.Fatalf("normalize set issue parent: %v", err)
+	}
+	if got != testIssueID {
+		t.Fatalf("parent issue id = %q, want %q", got, testIssueID)
+	}
+
+	cleared, err := normalizeSetIssueParent(setIssueParentRequest{})
+	if err != nil {
+		t.Fatalf("normalize empty set issue parent: %v", err)
+	}
+	if cleared != "" {
+		t.Fatalf("cleared parent issue id = %q, want empty string", cleared)
+	}
+}
+
+func TestNormalizeSetIssueParentValidation(t *testing.T) {
+	t.Parallel()
+
+	parentID := "not-a-uuid"
+	if _, err := normalizeSetIssueParent(setIssueParentRequest{ParentIssueID: &parentID}); err == nil {
+		t.Fatal("expected error")
 	}
 }
 

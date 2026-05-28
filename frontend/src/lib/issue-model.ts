@@ -26,7 +26,24 @@ export const issueTypeLabels: Record<IssueType, string> = {
   task: "Task",
   bug: "Bug",
   story: "Story",
+  epic: "Epic",
+  subtask: "Subtask",
 };
+
+export const rootIssueTypeOptions = [
+  "task",
+  "bug",
+  "story",
+  "epic",
+] satisfies IssueType[];
+
+export function editableIssueTypeOptions(issue: Issue) {
+  if (issue.parent_issue_id) {
+    return ["task", "bug", "story", "subtask"] satisfies IssueType[];
+  }
+
+  return rootIssueTypeOptions;
+}
 
 export const issueSortLabels: Record<IssueSort, string> = {
   created_desc: "Newest first",
