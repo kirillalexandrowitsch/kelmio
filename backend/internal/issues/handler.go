@@ -20,9 +20,11 @@ import (
 )
 
 var validIssueTypes = map[string]bool{
-	"task":  true,
-	"bug":   true,
-	"story": true,
+	"task":    true,
+	"bug":     true,
+	"story":   true,
+	"epic":    true,
+	"subtask": true,
 }
 
 var validIssueStatuses = map[string]bool{
@@ -1835,6 +1837,9 @@ func normalizeCreateIssue(req createIssueRequest) (normalizedCreateIssue, error)
 	if !validIssueTypes[input.IssueType] {
 		return input, errors.New("issue_type is invalid")
 	}
+	if input.IssueType == "subtask" {
+		return input, errors.New("parent_issue_id is required for subtask")
+	}
 	if !validIssueStatuses[input.Status] {
 		return input, errors.New("status is invalid")
 	}
@@ -1882,6 +1887,9 @@ func normalizeUpdateIssue(req updateIssueRequest) (normalizedUpdateIssue, error)
 	}
 	if !validIssueTypes[input.IssueType] {
 		return input, errors.New("issue_type is invalid")
+	}
+	if input.IssueType == "subtask" {
+		return input, errors.New("parent_issue_id is required for subtask")
 	}
 	if input.Priority == "" {
 		return input, errors.New("priority is required")

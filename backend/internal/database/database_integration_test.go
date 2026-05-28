@@ -111,4 +111,111 @@ func TestPostgresMigrationsCreateCoreSchema(t *testing.T) {
 	if workspaceID == "" {
 		t.Fatal("expected generated workspace id")
 	}
+
+	var hasParentIssueID bool
+	if err := db.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1
+			FROM information_schema.columns
+			WHERE table_schema = $1
+				AND table_name = 'issues'
+				AND column_name = 'parent_issue_id'
+		)
+	`, schemaName).Scan(&hasParentIssueID); err != nil {
+		t.Fatalf("check parent_issue_id column: %v", err)
+	}
+	if !hasParentIssueID {
+		t.Fatal("expected issues.parent_issue_id to exist")
+	}
+
+	var userID string
+	if err := db.QueryRow(ctx, `
+		INSERT INTO users (email, username, password_hash, display_name)
+		VALUES ($1, $2, $3, $4)
+		RETURNING id::text
+	`, "integration@example.com", "integration", "hash", "Integration User").Scan(&userID); err != nil {
+		t.Fatalf("insert user: %v", err)
+	}
+
+	var projectID string
+	if err := db.QueryRow(ctx, `
+		INSERT INTO projects (workspace_id, key, name, created_by)
+		VALUES ($1, $2, $3, $4)
+		RETURNING id::text
+	`, workspaceID, "INT", "Integration Project", userID).Scan(&projectID); err != nil {
+		t.Fatalf("insert project: %v", err)
+	}
+
+	var epicID string
+	if err := db.QueryRow(ctx, `
+		INSERT INTO issues (
+			project_id,
+			number,
+			issue_key,
+			title,
+			issue_type,
+			status,
+			priority,
+			reporter_id
+		)
+		VALUES ($1, 1, 'INT-1', 'Integration epic', 'epic', 'todo', 'medium', $2)
+		RETURNING id::text
+	`, projectID, userID).Scan(&epicID); err != nil {
+		t.Fatalf("insert epic issue: %v", err)
+	}
+
+	var subtaskID string
+	if err := db.QueryRow(ctx, `
+		INSERT INTO issues (
+			project_id,
+			number,
+			issue_key,
+			title,
+			issue_type,
+			status,
+			priority,
+			reporter_id,
+			parent_issue_id
+		)
+		VALUES ($1, 2, 'INT-2', 'Integration subtask', 'subtask', 'todo', 'medium', $2, $3)
+		RETURNING id::text
+	`, projectID, userID, epicID).Scan(&subtaskID); err != nil {
+		t.Fatalf("insert subtask issue: %v", err)
+	}
+	if subtaskID == "" {
+		t.Fatal("expected generated subtask id")
+	}
+
+	if _, err := db.Exec(ctx, `
+		INSERT INTO issues (
+			project_id,
+			number,
+			issue_key,
+			title,
+			issue_type,
+			status,
+			priority,
+			reporter_id
+		)
+		VALUES ($1, 3, 'INT-3', 'Invalid subtask', 'subtask', 'todo', 'medium', $2)
+	`, projectID, userID); err == nil {
+		t.Fatal("expected subtask without parent to fail")
+	}
+
+	if _, err := db.Exec(ctx, `
+		INSERT INTO issues (
+			project_id,
+			number,
+			issue_key,
+			title,
+			issue_type,
+			status,
+			priority,
+			reporter_id,
+			parent_issue_id
+		)
+		VALUES ($1, 4, 'INT-4', 'Invalid epic', 'epic', 'todo', 'medium', $2, $3)
+	`, projectID, userID, epicID); err == nil {
+		t.Fatal("expected epic with parent to fail")
+	}
 }

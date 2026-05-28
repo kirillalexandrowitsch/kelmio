@@ -47,6 +47,23 @@ func TestNormalizeCreateIssueDefaults(t *testing.T) {
 	}
 }
 
+func TestNormalizeCreateIssueAcceptsEpic(t *testing.T) {
+	t.Parallel()
+
+	got, err := normalizeCreateIssue(createIssueRequest{
+		ProjectID: "project-id",
+		Title:     "Epic issue",
+		IssueType: "epic",
+	})
+	if err != nil {
+		t.Fatalf("normalize create epic issue: %v", err)
+	}
+
+	if got.IssueType != "epic" {
+		t.Fatalf("IssueType = %q, want %q", got.IssueType, "epic")
+	}
+}
+
 func TestNormalizeCreateIssueValidation(t *testing.T) {
 	t.Parallel()
 
@@ -72,6 +89,14 @@ func TestNormalizeCreateIssueValidation(t *testing.T) {
 				ProjectID: "project-id",
 				Title:     "First issue",
 				IssueType: "incident",
+			},
+		},
+		{
+			name: "subtask without parent",
+			req: createIssueRequest{
+				ProjectID: "project-id",
+				Title:     "First issue",
+				IssueType: "subtask",
 			},
 		},
 		{
@@ -155,7 +180,7 @@ func TestNormalizeUpdateIssue(t *testing.T) {
 	got, err := normalizeUpdateIssue(updateIssueRequest{
 		Title:       "  Updated issue  ",
 		Description: "  More context  ",
-		IssueType:   "bug",
+		IssueType:   "epic",
 		Priority:    "high",
 		DueDate:     "2026-05-19",
 	})
@@ -169,8 +194,8 @@ func TestNormalizeUpdateIssue(t *testing.T) {
 	if got.Description != "More context" {
 		t.Fatalf("Description = %q, want %q", got.Description, "More context")
 	}
-	if got.IssueType != "bug" {
-		t.Fatalf("IssueType = %q, want %q", got.IssueType, "bug")
+	if got.IssueType != "epic" {
+		t.Fatalf("IssueType = %q, want %q", got.IssueType, "epic")
 	}
 	if got.Priority != "high" {
 		t.Fatalf("Priority = %q, want %q", got.Priority, "high")
@@ -199,6 +224,14 @@ func TestNormalizeUpdateIssueValidation(t *testing.T) {
 			req: updateIssueRequest{
 				Title:     "Updated issue",
 				IssueType: "incident",
+				Priority:  "medium",
+			},
+		},
+		{
+			name: "subtask without parent",
+			req: updateIssueRequest{
+				Title:     "Updated issue",
+				IssueType: "subtask",
 				Priority:  "medium",
 			},
 		},
