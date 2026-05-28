@@ -16,6 +16,7 @@ import { IssueActivitySection } from "./issue-activity-section";
 import { IssueCommentsSection } from "./issue-comments-section";
 import { IssueDetailMainContent } from "./issue-detail-main-content";
 import { IssueDetailSidebar } from "./issue-detail-sidebar";
+import { IssueHierarchySection } from "./issue-hierarchy-section";
 
 type IssueDetailSectionProps = {
   activity: IssueActivity[];
@@ -23,6 +24,8 @@ type IssueDetailSectionProps = {
   archivingIssueIds: string[];
   assigningIssueIds: string[];
   canCreateComment: boolean;
+  canCreateSubtask: boolean;
+  childIssues: Issue[];
   commentBody: string;
   comments: IssueComment[];
   commentsError: string;
@@ -37,13 +40,16 @@ type IssueDetailSectionProps = {
   editingCommentId: string;
   isActive: boolean;
   isCreatingComment: boolean;
+  isCreatingSubtask: boolean;
   isEditingIssueDetails: boolean;
   isLoadingActivity: boolean;
+  isLoadingChildIssues: boolean;
   isLoadingComments: boolean;
   isLoadingIssue: boolean;
   isUpdatingIssue: boolean;
   issue: Issue | null;
   issueError: string;
+  hierarchyError: string;
   labelingIssueIds: string[];
   labels: Label[];
   onArchiveIssue: (issue: Issue) => void;
@@ -53,6 +59,7 @@ type IssueDetailSectionProps = {
   onCloseIssue: () => void;
   onCommentBodyChange: (value: string) => void;
   onCreateComment: (event: FormEvent<HTMLFormElement>) => void;
+  onCreateSubtask: (event: FormEvent<HTMLFormElement>) => void;
   onDeleteComment: (comment: IssueComment) => void;
   onEditCommentBodyChange: (value: string) => void;
   onIssueDescriptionChange: (value: string) => void;
@@ -60,6 +67,10 @@ type IssueDetailSectionProps = {
   onIssuePriorityChange: (value: IssuePriority) => void;
   onIssueTitleChange: (value: string) => void;
   onIssueTypeChange: (value: IssueType) => void;
+  onOpenIssue: (issueId: string) => void;
+  onSubtaskPriorityChange: (value: IssuePriority) => void;
+  onSubtaskStatusChange: (value: IssueStatus) => void;
+  onSubtaskTitleChange: (value: string) => void;
   onSetIssueLabel: (
     issue: Issue,
     labelId: string,
@@ -76,6 +87,11 @@ type IssueDetailSectionProps = {
   teamMembers: TeamMember[];
   today: Date;
   transitioningIssueIds: string[];
+  parentIssue: Issue | null;
+  subtaskFormError: string;
+  subtaskPriority: IssuePriority;
+  subtaskStatus: IssueStatus;
+  subtaskTitle: string;
   updatingCommentIds: string[];
 };
 
@@ -85,6 +101,8 @@ export function IssueDetailSection({
   archivingIssueIds,
   assigningIssueIds,
   canCreateComment,
+  canCreateSubtask,
+  childIssues,
   commentBody,
   comments,
   commentsError,
@@ -99,13 +117,16 @@ export function IssueDetailSection({
   editingCommentId,
   isActive,
   isCreatingComment,
+  isCreatingSubtask,
   isEditingIssueDetails,
   isLoadingActivity,
+  isLoadingChildIssues,
   isLoadingComments,
   isLoadingIssue,
   isUpdatingIssue,
   issue,
   issueError,
+  hierarchyError,
   labelingIssueIds,
   labels,
   onArchiveIssue,
@@ -115,6 +136,7 @@ export function IssueDetailSection({
   onCloseIssue,
   onCommentBodyChange,
   onCreateComment,
+  onCreateSubtask,
   onDeleteComment,
   onEditCommentBodyChange,
   onIssueDescriptionChange,
@@ -122,15 +144,24 @@ export function IssueDetailSection({
   onIssuePriorityChange,
   onIssueTitleChange,
   onIssueTypeChange,
+  onOpenIssue,
   onSetIssueLabel,
   onStartEditingComment,
   onStartEditingIssue,
+  onSubtaskPriorityChange,
+  onSubtaskStatusChange,
+  onSubtaskTitleChange,
   onTransitionIssue,
   onUpdateComment,
   onUpdateIssue,
   teamMembers,
   today,
   transitioningIssueIds,
+  parentIssue,
+  subtaskFormError,
+  subtaskPriority,
+  subtaskStatus,
+  subtaskTitle,
   updatingCommentIds,
 }: IssueDetailSectionProps) {
   return (
@@ -203,6 +234,25 @@ export function IssueDetailSection({
               onSubmit={onUpdateIssue}
               onTitleChange={onIssueTitleChange}
               onTypeChange={onIssueTypeChange}
+            />
+
+            <IssueHierarchySection
+              canCreateSubtask={canCreateSubtask}
+              children={childIssues}
+              formError={subtaskFormError}
+              hierarchyError={hierarchyError}
+              isCreatingSubtask={isCreatingSubtask}
+              isLoadingChildren={isLoadingChildIssues}
+              issue={issue}
+              onCreateSubtask={onCreateSubtask}
+              onOpenIssue={onOpenIssue}
+              onPriorityChange={onSubtaskPriorityChange}
+              onStatusChange={onSubtaskStatusChange}
+              onTitleChange={onSubtaskTitleChange}
+              parentIssue={parentIssue}
+              subtaskPriority={subtaskPriority}
+              subtaskStatus={subtaskStatus}
+              subtaskTitle={subtaskTitle}
             />
 
             <IssueCommentsSection

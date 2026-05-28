@@ -23,6 +23,7 @@ import {
   createIssue,
   createIssueComment,
   createProject,
+  createSubtask,
   createTeamMember,
   deleteLabel,
   deleteIssueComment,
@@ -31,6 +32,7 @@ import {
   getProject,
   listIssueActivity,
   listIssueComments,
+  listIssueChildren,
   listIssues,
   listLabels,
   listProjects,
@@ -195,6 +197,15 @@ export function App() {
   const [issueActivity, setIssueActivity] = useState<IssueActivity[]>([]);
   const [activityError, setActivityError] = useState("");
   const [isLoadingActivity, setIsLoadingActivity] = useState(false);
+  const [issueChildren, setIssueChildren] = useState<Issue[]>([]);
+  const [hierarchyError, setHierarchyError] = useState("");
+  const [subtaskFormError, setSubtaskFormError] = useState("");
+  const [isLoadingIssueChildren, setIsLoadingIssueChildren] = useState(false);
+  const [isCreatingSubtask, setIsCreatingSubtask] = useState(false);
+  const [subtaskTitle, setSubtaskTitle] = useState("");
+  const [subtaskPriority, setSubtaskPriority] =
+    useState<IssuePriority>("medium");
+  const [subtaskStatus, setSubtaskStatus] = useState<IssueStatus>("todo");
   const selectedIssueId = selectedIssue?.id ?? "";
 
   function navigateToSection(
@@ -541,6 +552,45 @@ export function App() {
     };
   }, [selectedIssueId]);
 
+  useEffect(() => {
+    if (!selectedIssueId) {
+      setIssueChildren([]);
+      setHierarchyError("");
+      setSubtaskFormError("");
+      setSubtaskTitle("");
+      setSubtaskPriority("medium");
+      setSubtaskStatus("todo");
+      return;
+    }
+
+    let isMounted = true;
+    setHierarchyError("");
+    setIsLoadingIssueChildren(true);
+
+    listIssueChildren(selectedIssueId)
+      .then((response) => {
+        if (isMounted) {
+          setIssueChildren(response.issues);
+        }
+      })
+      .catch((err) => {
+        if (isMounted) {
+          setHierarchyError(
+            apiErrorMessage(err, "Could not load child issues."),
+          );
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsLoadingIssueChildren(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedIssueId]);
+
   async function handleLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
@@ -660,6 +710,14 @@ export function App() {
     setDeletingCommentIds([]);
     setIssueActivity([]);
     setActivityError("");
+    setIssueChildren([]);
+    setHierarchyError("");
+    setSubtaskFormError("");
+    setIsLoadingIssueChildren(false);
+    setIsCreatingSubtask(false);
+    setSubtaskTitle("");
+    setSubtaskPriority("medium");
+    setSubtaskStatus("todo");
   }
 
   async function handleUpdateProfile(event: FormEvent<HTMLFormElement>) {
@@ -1122,6 +1180,17 @@ export function App() {
     }
   }
 
+  async function refreshIssueChildren(issueId: string) {
+    setHierarchyError("");
+
+    try {
+      const response = await listIssueChildren(issueId);
+      setIssueChildren(response.issues);
+    } catch (err) {
+      setHierarchyError(apiErrorMessage(err, "Could not load child issues."));
+    }
+  }
+
   function startEditingIssue(issue: Issue) {
     setSelectedIssueError("");
     setEditIssueTitle(issue.title);
@@ -1350,6 +1419,12 @@ export function App() {
       if (selectedIssue?.id === issue.id) {
         setIssueComments([]);
         setIssueActivity([]);
+        setIssueChildren([]);
+        setHierarchyError("");
+        setSubtaskFormError("");
+        setSubtaskTitle("");
+        setSubtaskPriority("medium");
+        setSubtaskStatus("todo");
         setCommentBody("");
         setEditingCommentId("");
         setEditCommentBody("");
@@ -1465,6 +1540,65 @@ export function App() {
       setIssueFormError(apiErrorMessage(err, "Could not create issue."));
     } finally {
       setIsCreatingIssue(false);
+    }
+  }
+
+  async function handleCreateSubtask(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selectedIssue) {
+      return;
+    }
+
+    setSubtaskFormError("");
+    setHierarchyError("");
+
+    const title = normalizeText(subtaskTitle);
+    if (!hasText(title)) {
+      setSubtaskFormError("Subtask title is required.");
+      return;
+    }
+
+    setIsCreatingSubtask(true);
+
+    try {
+      const subtask = await createSubtask(selectedIssue.id, {
+        title,
+        description: "",
+        status: subtaskStatus,
+        priority: subtaskPriority,
+        assignee_id: "",
+        due_date: "",
+        label_ids: [],
+      });
+
+      setIssueChildren((currentChildren) => [...currentChildren, subtask]);
+      setIssues((currentIssues) => {
+        if (
+          !issueMatchesFilters(
+            subtask,
+            issueFilterProjectId,
+            issueFilterStatus,
+            issueFilterPriority,
+            issueFilterAssigneeId,
+            issueFilterLabelId,
+            issueFilterDue,
+            issueFilterQuery,
+            today,
+          )
+        ) {
+          return currentIssues;
+        }
+
+        return [subtask, ...currentIssues];
+      });
+      setSubtaskTitle("");
+      setSubtaskPriority("medium");
+      setSubtaskStatus("todo");
+      await refreshIssueChildren(selectedIssue.id);
+    } catch (err) {
+      setSubtaskFormError(apiErrorMessage(err, "Could not create subtask."));
+    } finally {
+      setIsCreatingSubtask(false);
     }
   }
 
@@ -1656,6 +1790,12 @@ export function App() {
     selectedProjectId !== "" && hasText(issueTitle) && !isCreatingIssue;
   const canCreateComment =
     selectedIssue !== null && hasText(commentBody) && !isCreatingComment;
+  const canCreateSubtask =
+    selectedIssue !== null && hasText(subtaskTitle) && !isCreatingSubtask;
+  const selectedParentIssue =
+    selectedIssue?.parent_issue_id
+      ? issues.find((issue) => issue.id === selectedIssue.parent_issue_id) ?? null
+      : null;
   const activeSectionTitle =
     appSections.find((section) => section.id === activeSection)?.title ?? "Dashboard";
   const activeSectionSubtitle =
@@ -1917,6 +2057,8 @@ export function App() {
           archivingIssueIds={archivingIssueIds}
           assigningIssueIds={assigningIssueIds}
           canCreateComment={canCreateComment}
+          canCreateSubtask={canCreateSubtask}
+          childIssues={issueChildren}
           commentBody={commentBody}
           comments={issueComments}
           commentsError={commentsError}
@@ -1931,13 +2073,16 @@ export function App() {
           editingCommentId={editingCommentId}
           isActive={activeSection === "issues"}
           isCreatingComment={isCreatingComment}
+          isCreatingSubtask={isCreatingSubtask}
           isEditingIssueDetails={isEditingIssueDetails}
           isLoadingActivity={isLoadingActivity}
+          isLoadingChildIssues={isLoadingIssueChildren}
           isLoadingComments={isLoadingComments}
           isLoadingIssue={isLoadingSelectedIssue}
           isUpdatingIssue={isUpdatingIssue}
           issue={selectedIssue}
           issueError={selectedIssueError}
+          hierarchyError={hierarchyError}
           labelingIssueIds={labelingIssueIds}
           labels={labels}
           onArchiveIssue={(issue) => {
@@ -1952,6 +2097,12 @@ export function App() {
             setSelectedIssue(null);
             setSelectedIssueError("");
             setIsEditingIssueDetails(false);
+            setIssueChildren([]);
+            setHierarchyError("");
+            setSubtaskFormError("");
+            setSubtaskTitle("");
+            setSubtaskPriority("medium");
+            setSubtaskStatus("todo");
             setEditingCommentId("");
             setEditCommentBody("");
             setUpdatingCommentIds([]);
@@ -1959,6 +2110,7 @@ export function App() {
           }}
           onCommentBodyChange={setCommentBody}
           onCreateComment={handleCreateComment}
+          onCreateSubtask={handleCreateSubtask}
           onDeleteComment={(comment) => {
             void handleDeleteComment(comment);
           }}
@@ -1968,11 +2120,17 @@ export function App() {
           onIssuePriorityChange={setEditIssuePriority}
           onIssueTitleChange={setEditIssueTitle}
           onIssueTypeChange={setEditIssueType}
+          onOpenIssue={(issueId) => {
+            void handleSelectIssue(issueId);
+          }}
           onSetIssueLabel={(issue, labelId, shouldAttach) => {
             void handleSetIssueLabel(issue, labelId, shouldAttach);
           }}
           onStartEditingComment={startEditingComment}
           onStartEditingIssue={startEditingIssue}
+          onSubtaskPriorityChange={setSubtaskPriority}
+          onSubtaskStatusChange={setSubtaskStatus}
+          onSubtaskTitleChange={setSubtaskTitle}
           onTransitionIssue={(issueId, status) => {
             void handleTransitionIssue(issueId, status);
           }}
@@ -1983,6 +2141,11 @@ export function App() {
           teamMembers={teamMembers}
           today={today}
           transitioningIssueIds={transitioningIssueIds}
+          parentIssue={selectedParentIssue}
+          subtaskFormError={subtaskFormError}
+          subtaskPriority={subtaskPriority}
+          subtaskStatus={subtaskStatus}
+          subtaskTitle={subtaskTitle}
           updatingCommentIds={updatingCommentIds}
         />
 
