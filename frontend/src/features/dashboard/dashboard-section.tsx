@@ -104,6 +104,21 @@ export function DashboardSection({
 
         <article className="dashboard-action-card">
           <div>
+            <p className="eyebrow">Iterations</p>
+            <h2>Sprints</h2>
+            <p>Create lightweight sprint cycles, set goals, and run start/complete flow.</p>
+          </div>
+          <button
+            className="small-button"
+            onClick={() => onNavigate("sprints")}
+            type="button"
+          >
+            Open sprints
+          </button>
+        </article>
+
+        <article className="dashboard-action-card">
+          <div>
             <p className="eyebrow">People</p>
             <h2>Team</h2>
             <p>{DASHBOARD_ACTION_COPY.team[role]}</p>

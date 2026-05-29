@@ -4,6 +4,7 @@ import {
   type CreateIssueLinkInput,
   type CreateLabelInput,
   type CreateProjectInput,
+  type CreateSprintInput,
   type CreateSubtaskInput,
   type CreateTeamMemberInput,
   type Issue,
@@ -18,11 +19,16 @@ import {
   type ListIssuesResponse,
   type ListLabelsResponse,
   type ListProjectsResponse,
+  type ListSprintsResponse,
   type ListTeamMembersResponse,
   type Project,
+  type Sprint,
+  type SprintFilters,
+  type SprintStatus,
   type TeamMember,
   type UpdateIssueInput,
   type UpdateProjectInput,
+  type UpdateSprintInput,
   type UpdateTeamMemberInput,
 } from "./api-types";
 export type {
@@ -40,10 +46,15 @@ export type {
   IssueType,
   Label,
   Project,
+  Sprint,
+  SprintFilters,
+  SprintStatus,
   TeamMember,
   CreateIssueLinkInput,
+  CreateSprintInput,
   CreateSubtaskInput,
   UpdateIssueInput,
+  UpdateSprintInput,
 } from "./api-types";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080";
@@ -306,6 +317,54 @@ export async function deleteIssueLink(issueId: string, linkId: string) {
     )}`,
     {
       method: "DELETE",
+    },
+  );
+}
+
+export async function listSprints(filters: SprintFilters = {}) {
+  const params = new URLSearchParams();
+  if (filters.projectId) {
+    params.set("project_id", filters.projectId);
+  }
+  if (filters.status) {
+    params.set("status", filters.status);
+  }
+
+  const query = params.toString();
+  return request<ListSprintsResponse>(
+    `/api/v1/sprints${query ? `?${query}` : ""}`,
+  );
+}
+
+export async function getSprint(sprintId: string) {
+  return request<Sprint>(`/api/v1/sprints/${encodeURIComponent(sprintId)}`);
+}
+
+export async function createSprint(input: CreateSprintInput) {
+  return request<Sprint>("/api/v1/sprints", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function updateSprint(sprintId: string, input: UpdateSprintInput) {
+  return request<Sprint>(`/api/v1/sprints/${encodeURIComponent(sprintId)}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function startSprint(sprintId: string) {
+  return request<Sprint>(`/api/v1/sprints/${encodeURIComponent(sprintId)}/start`, {
+    method: "POST",
+  });
+}
+
+export async function completeSprint(sprintId: string) {
+  return request<Sprint>(
+    `/api/v1/sprints/${encodeURIComponent(sprintId)}/complete`,
+    {
+      method: "POST",
     },
   );
 }

@@ -16,16 +16,20 @@ import {
   IssueType,
   Label,
   Project,
+  Sprint,
+  SprintStatus,
   TeamMember,
   archiveIssue,
   archiveProject,
   assignIssue,
   changePassword,
+  completeSprint,
   createLabel,
   createIssue,
   createIssueComment,
   createIssueLink,
   createProject,
+  createSprint,
   createSubtask,
   createTeamMember,
   deleteLabel,
@@ -34,6 +38,7 @@ import {
   getIssue,
   getCurrentUser,
   getProject,
+  getSprint,
   listIssueActivity,
   listIssueComments,
   listIssueChildren,
@@ -41,17 +46,20 @@ import {
   listIssues,
   listLabels,
   listProjects,
+  listSprints,
   listTeamMembers,
   login,
   logout,
   resetTeamMemberPassword,
   setIssueLabels,
+  startSprint,
   transitionIssue,
   updateProfile,
   updateProject,
   updateIssueComment,
   updateTeamMember,
   updateIssue,
+  updateSprint,
 } from "./lib/api";
 import {
   hasMinTrimmedLength,
@@ -70,10 +78,12 @@ import {
   issueMatchesFilters,
   startOfToday,
 } from "./lib/issue-model";
+import { sprintMatchesFilters } from "./lib/sprint-model";
 import {
   appSectionPath,
   appSections,
   currentAppSectionFromLocation,
+  sprintIdFromPath,
   type AppSection,
 } from "./lib/routing";
 import { AppSidebar, WorkspaceTopbar } from "./components/app-shell";
@@ -86,10 +96,30 @@ import { IssueDetailSection } from "./features/issues/issue-detail-section";
 import { IssueListPanel } from "./features/issues/issue-list-panel";
 import { LabelsSection } from "./features/labels/labels-section";
 import { ProjectsSection } from "./features/projects/projects-section";
+import { SprintsSection } from "./features/sprints/sprints-section";
 import { TeamSection } from "./features/team/team-section";
 
 function apiErrorMessage(error: unknown, fallback: string) {
   return error instanceof ApiError ? error.message : fallback;
+}
+
+function formString(formData: FormData, name: string, fallback: string) {
+  const value = formData.get(name);
+  return typeof value === "string" ? value : fallback;
+}
+
+function currentSprintIdFromLocation(
+  location: Pick<Location, "pathname"> | undefined = undefined,
+) {
+  if (location) {
+    return sprintIdFromPath(location.pathname);
+  }
+
+  if (typeof window === "undefined") {
+    return "";
+  }
+
+  return sprintIdFromPath(window.location.pathname);
 }
 
 export function App() {
@@ -103,6 +133,7 @@ export function App() {
   const [activeSection, setActiveSection] = useState<AppSection>(
     currentAppSectionFromLocation,
   );
+  const [routeSprintId, setRouteSprintId] = useState(currentSprintIdFromLocation);
   const [accountError, setAccountError] = useState("");
   const [accountSuccess, setAccountSuccess] = useState("");
   const [accountDisplayName, setAccountDisplayName] = useState("");
@@ -219,6 +250,31 @@ export function App() {
   const [deletingIssueLinkIds, setDeletingIssueLinkIds] = useState<string[]>([]);
   const [linkTargetIssueId, setLinkTargetIssueId] = useState("");
   const [linkType, setLinkType] = useState<IssueLinkType>("relates");
+  const [sprints, setSprints] = useState<Sprint[]>([]);
+  const [sprintsError, setSprintsError] = useState("");
+  const [sprintFormError, setSprintFormError] = useState("");
+  const [isLoadingSprints, setIsLoadingSprints] = useState(false);
+  const [isCreatingSprint, setIsCreatingSprint] = useState(false);
+  const [sprintProjectId, setSprintProjectId] = useState("");
+  const [sprintName, setSprintName] = useState("");
+  const [sprintGoal, setSprintGoal] = useState("");
+  const [sprintStartDate, setSprintStartDate] = useState("");
+  const [sprintEndDate, setSprintEndDate] = useState("");
+  const [sprintFilterProjectId, setSprintFilterProjectId] = useState("");
+  const [sprintFilterStatus, setSprintFilterStatus] = useState<
+    SprintStatus | ""
+  >("");
+  const [selectedSprint, setSelectedSprint] = useState<Sprint | null>(null);
+  const [selectedSprintError, setSelectedSprintError] = useState("");
+  const [isLoadingSelectedSprint, setIsLoadingSelectedSprint] = useState(false);
+  const [isEditingSprintDetails, setIsEditingSprintDetails] = useState(false);
+  const [isUpdatingSprint, setIsUpdatingSprint] = useState(false);
+  const [editSprintName, setEditSprintName] = useState("");
+  const [editSprintGoal, setEditSprintGoal] = useState("");
+  const [editSprintStartDate, setEditSprintStartDate] = useState("");
+  const [editSprintEndDate, setEditSprintEndDate] = useState("");
+  const [startingSprintIds, setStartingSprintIds] = useState<string[]>([]);
+  const [completingSprintIds, setCompletingSprintIds] = useState<string[]>([]);
   const selectedIssueId = selectedIssue?.id ?? "";
 
   function navigateToSection(
@@ -226,6 +282,9 @@ export function App() {
     mode: "push" | "replace" = "push",
   ) {
     setActiveSection(section);
+    if (section !== "sprints") {
+      setRouteSprintId("");
+    }
 
     if (typeof window === "undefined") {
       return;
@@ -246,6 +305,34 @@ export function App() {
     }
 
     window.history.pushState({ section }, "", nextPath);
+  }
+
+  function navigateToSprint(
+    sprintId: string,
+    mode: "push" | "replace" = "push",
+  ) {
+    setActiveSection("sprints");
+    setRouteSprintId(sprintId);
+
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const nextPath = `/sprints/${encodeURIComponent(sprintId)}`;
+    if (
+      window.location.pathname === nextPath &&
+      window.location.search === "" &&
+      window.location.hash === ""
+    ) {
+      return;
+    }
+
+    if (mode === "replace") {
+      window.history.replaceState({ section: "sprints", sprintId }, "", nextPath);
+      return;
+    }
+
+    window.history.pushState({ section: "sprints", sprintId }, "", nextPath);
   }
 
   useEffect(() => {
@@ -280,6 +367,7 @@ export function App() {
   useEffect(() => {
     function handleRouteChange() {
       setActiveSection(currentAppSectionFromLocation());
+      setRouteSprintId(currentSprintIdFromLocation());
     }
 
     window.addEventListener("popstate", handleRouteChange);
@@ -350,6 +438,21 @@ export function App() {
             return response.projects[0]?.id ?? "";
           });
           setIssueFilterProjectId((currentProjectId) =>
+            currentProjectId &&
+            !response.projects.some((project) => project.id === currentProjectId)
+              ? ""
+              : currentProjectId,
+          );
+          setSprintProjectId((currentProjectId) => {
+            if (
+              currentProjectId &&
+              response.projects.some((project) => project.id === currentProjectId)
+            ) {
+              return currentProjectId;
+            }
+            return response.projects[0]?.id ?? "";
+          });
+          setSprintFilterProjectId((currentProjectId) =>
             currentProjectId &&
             !response.projects.some((project) => project.id === currentProjectId)
               ? ""
@@ -489,6 +592,64 @@ export function App() {
     issueFilterLabelId,
     issueFilterDue,
   ]);
+
+  useEffect(() => {
+    if (!user) {
+      setSprints([]);
+      setSelectedSprint(null);
+      return;
+    }
+
+    let isMounted = true;
+    setSprintsError("");
+    setSprintFormError("");
+    setIsLoadingSprints(true);
+
+    listSprints({
+      projectId: sprintFilterProjectId || undefined,
+      status: sprintFilterStatus || undefined,
+    })
+      .then((response) => {
+        if (isMounted) {
+          setSprints(response.sprints);
+          setSelectedSprint((currentSprint) => {
+            if (!response.sprints.length) {
+              return null;
+            }
+
+            const matchingSprint = response.sprints.find(
+              (sprint) => sprint.id === currentSprint?.id,
+            );
+            return matchingSprint ?? response.sprints[0];
+          });
+        }
+      })
+      .catch((err) => {
+        if (isMounted) {
+          setSprintsError(apiErrorMessage(err, "Could not load sprints."));
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsLoadingSprints(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user, sprintFilterProjectId, sprintFilterStatus]);
+
+  useEffect(() => {
+    if (!user || activeSection !== "sprints" || !routeSprintId) {
+      return;
+    }
+    if (selectedSprint?.id === routeSprintId) {
+      return;
+    }
+
+    void loadSprintDetail(routeSprintId);
+  }, [user, activeSection, routeSprintId, selectedSprint?.id]);
 
   useEffect(() => {
     if (!selectedIssueId) {
@@ -782,6 +943,29 @@ export function App() {
     setDeletingIssueLinkIds([]);
     setLinkTargetIssueId("");
     setLinkType("relates");
+    setSprints([]);
+    setSprintsError("");
+    setSprintFormError("");
+    setIsLoadingSprints(false);
+    setIsCreatingSprint(false);
+    setSprintProjectId("");
+    setSprintName("");
+    setSprintGoal("");
+    setSprintStartDate("");
+    setSprintEndDate("");
+    setSprintFilterProjectId("");
+    setSprintFilterStatus("");
+    setSelectedSprint(null);
+    setSelectedSprintError("");
+    setIsLoadingSelectedSprint(false);
+    setIsEditingSprintDetails(false);
+    setIsUpdatingSprint(false);
+    setEditSprintName("");
+    setEditSprintGoal("");
+    setEditSprintStartDate("");
+    setEditSprintEndDate("");
+    setStartingSprintIds([]);
+    setCompletingSprintIds([]);
   }
 
   async function handleUpdateProfile(event: FormEvent<HTMLFormElement>) {
@@ -1006,6 +1190,18 @@ export function App() {
       );
       setIssueFilterProjectId((currentProjectId) =>
         currentProjectId === project.id ? "" : currentProjectId,
+      );
+      setSprintProjectId((currentProjectId) =>
+        currentProjectId === project.id ? nextProjects[0]?.id ?? "" : currentProjectId,
+      );
+      setSprintFilterProjectId((currentProjectId) =>
+        currentProjectId === project.id ? "" : currentProjectId,
+      );
+      setSprints((currentSprints) =>
+        currentSprints.filter((sprint) => sprint.project_id !== project.id),
+      );
+      setSelectedSprint((currentSprint) =>
+        currentSprint?.project_id === project.id ? null : currentSprint,
       );
       if (editingProjectId === project.id) {
         cancelEditingProject();
@@ -1263,6 +1459,250 @@ export function App() {
       setIssueLinks(response.links);
     } catch (err) {
       setLinksError(apiErrorMessage(err, "Could not load linked issues."));
+    }
+  }
+
+  function upsertSprintInList(sprint: Sprint) {
+    setSprints((currentSprints) => {
+      if (!sprintMatchesFilters(sprint, sprintFilterProjectId, sprintFilterStatus)) {
+        return currentSprints.filter((currentSprint) => currentSprint.id !== sprint.id);
+      }
+
+      if (currentSprints.some((currentSprint) => currentSprint.id === sprint.id)) {
+        return currentSprints.map((currentSprint) =>
+          currentSprint.id === sprint.id ? sprint : currentSprint,
+        );
+      }
+
+      return [sprint, ...currentSprints];
+    });
+  }
+
+  async function refreshSprints(selectedSprintOverride: Sprint | null = null) {
+    setSprintsError("");
+
+    try {
+      const response = await listSprints({
+        projectId: sprintFilterProjectId || undefined,
+        status: sprintFilterStatus || undefined,
+      });
+      setSprints(response.sprints);
+      setSelectedSprint((currentSprint) => {
+        if (selectedSprintOverride) {
+          return (
+            response.sprints.find(
+              (sprint) => sprint.id === selectedSprintOverride.id,
+            ) ?? selectedSprintOverride
+          );
+        }
+
+        if (currentSprint) {
+          const matchingSprint = response.sprints.find(
+            (sprint) => sprint.id === currentSprint.id,
+          );
+          if (matchingSprint) {
+            return matchingSprint;
+          }
+        }
+
+        return response.sprints[0] ?? null;
+      });
+    } catch (err) {
+      setSprintsError(apiErrorMessage(err, "Could not load sprints."));
+    }
+  }
+
+  function startEditingSprint(sprint: Sprint) {
+    setSelectedSprintError("");
+    setEditSprintName(sprint.name);
+    setEditSprintGoal(sprint.goal);
+    setEditSprintStartDate(sprint.start_date ?? "");
+    setEditSprintEndDate(sprint.end_date ?? "");
+    setIsEditingSprintDetails(true);
+  }
+
+  function cancelEditingSprint() {
+    setSelectedSprintError("");
+    setIsEditingSprintDetails(false);
+    setEditSprintName("");
+    setEditSprintGoal("");
+    setEditSprintStartDate("");
+    setEditSprintEndDate("");
+  }
+
+  async function loadSprintDetail(sprintId: string) {
+    const sprintPreview = sprints.find((sprint) => sprint.id === sprintId);
+    if (sprintPreview) {
+      setSelectedSprint(sprintPreview);
+    }
+
+    setSelectedSprintError("");
+    setIsEditingSprintDetails(false);
+    setIsLoadingSelectedSprint(true);
+
+    try {
+      const sprint = await getSprint(sprintId);
+      setSelectedSprint(sprint);
+      upsertSprintInList(sprint);
+    } catch (err) {
+      setSelectedSprintError(apiErrorMessage(err, "Could not load sprint details."));
+    } finally {
+      setIsLoadingSelectedSprint(false);
+    }
+  }
+
+  async function handleSelectSprint(sprintId: string) {
+    navigateToSprint(sprintId);
+    await loadSprintDetail(sprintId);
+  }
+
+  async function handleCreateSprint(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSprintFormError("");
+
+    const formData = new FormData(event.currentTarget);
+    const projectId = formString(formData, "sprint-project-id", sprintProjectId);
+    const name = normalizeText(formString(formData, "sprint-name", sprintName));
+    const goal = normalizeText(formString(formData, "sprint-goal", sprintGoal));
+    const startDate = formString(
+      formData,
+      "sprint-start-date",
+      sprintStartDate,
+    ).trim();
+    const endDate = formString(formData, "sprint-end-date", sprintEndDate).trim();
+
+    if (!projectId) {
+      setSprintFormError("Choose a project.");
+      return;
+    }
+    if (!hasText(name)) {
+      setSprintFormError("Sprint name is required.");
+      return;
+    }
+    if (startDate && endDate && startDate > endDate) {
+      setSprintFormError("Start date must be before or equal to end date.");
+      return;
+    }
+
+    setIsCreatingSprint(true);
+
+    try {
+      const sprint = await createSprint({
+        project_id: projectId,
+        name,
+        goal,
+        start_date: startDate,
+        end_date: endDate,
+      });
+
+      setSelectedSprint(sprint);
+      navigateToSprint(sprint.id);
+      setSprintName("");
+      setSprintGoal("");
+      setSprintStartDate("");
+      setSprintEndDate("");
+      setSprintFilterProjectId(sprint.project_id);
+      setSprintFilterStatus("");
+      upsertSprintInList(sprint);
+    } catch (err) {
+      setSprintFormError(apiErrorMessage(err, "Could not create sprint."));
+    } finally {
+      setIsCreatingSprint(false);
+    }
+  }
+
+  async function handleUpdateSprint(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selectedSprint) {
+      return;
+    }
+
+    setSelectedSprintError("");
+
+    const formData = new FormData(event.currentTarget);
+    const name = normalizeText(
+      formString(formData, "edit-sprint-name", editSprintName),
+    );
+    const goal = normalizeText(
+      formString(formData, "edit-sprint-goal", editSprintGoal),
+    );
+    const startDate = formString(
+      formData,
+      "edit-sprint-start-date",
+      editSprintStartDate,
+    ).trim();
+    const endDate = formString(
+      formData,
+      "edit-sprint-end-date",
+      editSprintEndDate,
+    ).trim();
+
+    if (!hasText(name)) {
+      setSelectedSprintError("Sprint name is required.");
+      return;
+    }
+    if (startDate && endDate && startDate > endDate) {
+      setSelectedSprintError("Start date must be before or equal to end date.");
+      return;
+    }
+
+    setIsUpdatingSprint(true);
+
+    try {
+      const sprint = await updateSprint(selectedSprint.id, {
+        name,
+        goal,
+        start_date: startDate,
+        end_date: endDate,
+      });
+      setSelectedSprint(sprint);
+      setIsEditingSprintDetails(false);
+      upsertSprintInList(sprint);
+    } catch (err) {
+      setSelectedSprintError(apiErrorMessage(err, "Could not update sprint."));
+    } finally {
+      setIsUpdatingSprint(false);
+    }
+  }
+
+  async function handleStartSprint(sprint: Sprint) {
+    setSelectedSprintError("");
+    setSprintsError("");
+    setStartingSprintIds((currentIds) =>
+      currentIds.includes(sprint.id) ? currentIds : [...currentIds, sprint.id],
+    );
+
+    try {
+      const startedSprint = await startSprint(sprint.id);
+      setSelectedSprint(startedSprint);
+      await refreshSprints(startedSprint);
+    } catch (err) {
+      setSelectedSprintError(apiErrorMessage(err, "Could not start sprint."));
+    } finally {
+      setStartingSprintIds((currentIds) =>
+        currentIds.filter((currentSprintId) => currentSprintId !== sprint.id),
+      );
+    }
+  }
+
+  async function handleCompleteSprint(sprint: Sprint) {
+    setSelectedSprintError("");
+    setSprintsError("");
+    setCompletingSprintIds((currentIds) =>
+      currentIds.includes(sprint.id) ? currentIds : [...currentIds, sprint.id],
+    );
+
+    try {
+      const completedSprint = await completeSprint(sprint.id);
+      setSelectedSprint(completedSprint);
+      setIsEditingSprintDetails(false);
+      await refreshSprints(completedSprint);
+    } catch (err) {
+      setSelectedSprintError(apiErrorMessage(err, "Could not complete sprint."));
+    } finally {
+      setCompletingSprintIds((currentIds) =>
+        currentIds.filter((currentSprintId) => currentSprintId !== sprint.id),
+      );
     }
   }
 
@@ -1933,6 +2373,13 @@ export function App() {
     !isCreatingLabel;
   const canCreateIssue =
     selectedProjectId !== "" && hasText(issueTitle) && !isCreatingIssue;
+  const canCreateSprint =
+    sprintProjectId !== "" && hasText(sprintName) && !isCreatingSprint;
+  const canUpdateSprint =
+    selectedSprint !== null &&
+    selectedSprint.status !== "completed" &&
+    hasText(editSprintName) &&
+    !isUpdatingSprint;
   const canCreateComment =
     selectedIssue !== null && hasText(commentBody) && !isCreatingComment;
   const canCreateSubtask =
@@ -2126,6 +2573,64 @@ export function App() {
           selectedProjectIssues={selectedProjectIssues}
           selectedProjectOpenIssues={selectedProjectOpenIssues}
           updatingProjectIds={updatingProjectIds}
+        />
+
+        <SprintsSection
+          canCreateSprint={canCreateSprint}
+          canUpdateSprint={canUpdateSprint}
+          completingSprintIds={completingSprintIds}
+          editSprintEndDate={editSprintEndDate}
+          editSprintGoal={editSprintGoal}
+          editSprintName={editSprintName}
+          editSprintStartDate={editSprintStartDate}
+          isActive={activeSection === "sprints"}
+          isCreatingSprint={isCreatingSprint}
+          isEditingSprint={isEditingSprintDetails}
+          isLoadingSelectedSprint={isLoadingSelectedSprint}
+          isLoadingSprints={isLoadingSprints}
+          isUpdatingSprint={isUpdatingSprint}
+          onCancelSprintEdit={cancelEditingSprint}
+          onCompleteSprint={(sprint) => {
+            void handleCompleteSprint(sprint);
+          }}
+          onCreateSprint={handleCreateSprint}
+          onEditSprintEndDateChange={setEditSprintEndDate}
+          onEditSprintGoalChange={setEditSprintGoal}
+          onEditSprintNameChange={setEditSprintName}
+          onEditSprintStartDateChange={setEditSprintStartDate}
+          onProjectFilterChange={setSprintFilterProjectId}
+          onSelectSprint={(sprintId) => {
+            void handleSelectSprint(sprintId);
+          }}
+          onSprintEndDateChange={setSprintEndDate}
+          onSprintGoalChange={setSprintGoal}
+          onSprintNameChange={setSprintName}
+          onSprintProjectChange={setSprintProjectId}
+          onSprintStartDateChange={setSprintStartDate}
+          onStartEditingSprint={startEditingSprint}
+          onStartSprint={(sprint) => {
+            void handleStartSprint(sprint);
+          }}
+          onStatusFilterChange={setSprintFilterStatus}
+          onUpdateSprint={handleUpdateSprint}
+          onViewSprintProjectIssues={(projectId) => {
+            setIssueFilterProjectId(projectId);
+            navigateToSection("issues");
+          }}
+          projectFilterId={sprintFilterProjectId}
+          projects={projects}
+          selectedSprint={selectedSprint}
+          selectedSprintError={selectedSprintError}
+          sprintEndDate={sprintEndDate}
+          sprintFormError={sprintFormError}
+          sprintGoal={sprintGoal}
+          sprintName={sprintName}
+          sprintProjectId={sprintProjectId}
+          sprintStartDate={sprintStartDate}
+          sprintStatusFilter={sprintFilterStatus}
+          sprints={sprints}
+          sprintsError={sprintsError}
+          startingSprintIds={startingSprintIds}
         />
 
         <section

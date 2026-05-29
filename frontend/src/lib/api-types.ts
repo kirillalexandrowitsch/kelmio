@@ -45,6 +45,7 @@ export type IssueType = "task" | "bug" | "story" | "epic" | "subtask";
 export type IssueLinkType = "blocks" | "relates";
 export type IssueSort = "created_desc" | "created_asc" | "priority_desc" | "due_date_asc";
 export type IssueDueFilter = "overdue" | "today" | "due_soon" | "no_due";
+export type SprintStatus = "planned" | "active" | "completed";
 
 export type Issue = {
   id: string;
@@ -119,6 +120,23 @@ export type IssueLink = {
   target_issue: IssueLinkIssue;
 };
 
+export type Sprint = {
+  id: string;
+  workspace_id: string;
+  project_id: string;
+  project_key: string;
+  project_name: string;
+  name: string;
+  goal: string;
+  status: SprintStatus;
+  start_date: string | null;
+  end_date: string | null;
+  created_by: string;
+  created_at: string;
+  completed_at: string | null;
+  issue_count: number;
+};
+
 export type ListProjectsResponse = {
   projects: Project[];
 };
@@ -160,6 +178,10 @@ export type ListIssueLinksResponse = {
   links: IssueLink[];
 };
 
+export type ListSprintsResponse = {
+  sprints: Sprint[];
+};
+
 export type IssueFilters = {
   query?: string;
   sort?: IssueSort;
@@ -169,6 +191,11 @@ export type IssueFilters = {
   assigneeId?: string;
   labelId?: string;
   due?: IssueDueFilter;
+};
+
+export type SprintFilters = {
+  projectId?: string;
+  status?: SprintStatus;
 };
 
 export type CreateProjectInput = {
@@ -210,6 +237,14 @@ export type CreateIssueLinkInput = {
   link_type: IssueLinkType;
 };
 
+export type CreateSprintInput = {
+  project_id: string;
+  name: string;
+  goal: string;
+  start_date: string;
+  end_date: string;
+};
+
 export type CreateLabelInput = {
   name: string;
   color: string;
@@ -221,4 +256,11 @@ export type UpdateIssueInput = {
   issue_type: IssueType;
   priority: IssuePriority;
   due_date: string;
+};
+
+export type UpdateSprintInput = {
+  name: string;
+  goal: string;
+  start_date: string;
+  end_date: string;
 };

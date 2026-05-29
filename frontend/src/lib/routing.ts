@@ -3,6 +3,7 @@ export type AppSection =
   | "projects"
   | "issues"
   | "board"
+  | "sprints"
   | "team"
   | "labels"
   | "account";
@@ -12,6 +13,7 @@ export const appSections = [
   { id: "projects", title: "Projects" },
   { id: "issues", title: "Issues" },
   { id: "board", title: "Board" },
+  { id: "sprints", title: "Sprints" },
   { id: "team", title: "Team" },
   { id: "labels", title: "Labels" },
   { id: "account", title: "Account" },
@@ -22,6 +24,7 @@ const appSectionPaths: Record<AppSection, string> = {
   projects: "/projects",
   issues: "/issues",
   board: "/board",
+  sprints: "/sprints",
   team: "/team",
   labels: "/labels",
   account: "/account",
@@ -36,7 +39,16 @@ export function appSectionFromPath(pathname: string): AppSection {
     (section) => appSectionPath(section.id) === pathname,
   );
 
+  if (!matchingSection && pathname.startsWith("/sprints/")) {
+    return "sprints";
+  }
+
   return matchingSection?.id ?? "dashboard";
+}
+
+export function sprintIdFromPath(pathname: string) {
+  const match = pathname.match(/^\/sprints\/([^/]+)$/);
+  return match ? decodeURIComponent(match[1]) : "";
 }
 
 export function currentAppSectionFromLocation(

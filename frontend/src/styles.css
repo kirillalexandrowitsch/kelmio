@@ -114,6 +114,11 @@ a {
 .project-form textarea:focus,
 .project-inline-form input:focus,
 .project-inline-form textarea:focus,
+.sprint-form input:focus,
+.sprint-form select:focus,
+.sprint-form textarea:focus,
+.sprint-inline-form input:focus,
+.sprint-inline-form textarea:focus,
 .team-member-form input:focus,
 .team-member-form select:focus,
 .member-password-reset input:focus,
@@ -126,6 +131,7 @@ a {
 .issue-edit-form textarea:focus,
 .issue-filters input:focus,
 .issue-filters select:focus,
+.sprint-filters select:focus,
 .issue-card select:focus,
 .issue-detail-status select:focus,
 .subtask-form input:focus,
@@ -140,6 +146,7 @@ a {
 .auth-form button,
 .account-form button,
 .project-form button,
+.sprint-form button,
 .team-member-form button,
 .label-form button,
 .issue-form button,
@@ -183,6 +190,16 @@ a {
 }
 
 .project-form button:hover:not(:disabled) {
+  background: #27362d;
+}
+
+.sprint-form button {
+  border: 1px solid #18231d;
+  color: #ffffff;
+  background: #18231d;
+}
+
+.sprint-form button:hover:not(:disabled) {
   background: #27362d;
 }
 
@@ -421,7 +438,7 @@ h1 {
 
 .summary-grid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 12px;
 }
 
@@ -459,7 +476,7 @@ h1 {
 
 .dashboard-actions {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   gap: 12px;
 }
 
@@ -502,9 +519,18 @@ h1 {
   gap: 12px;
 }
 
+.sprints-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  gap: 12px;
+}
+
 .projects-panel,
 .project-form,
 .project-detail-panel,
+.sprints-panel,
+.sprint-form,
+.sprint-detail-panel,
 .account-panel,
 .issues-panel,
 .issue-form,
@@ -531,7 +557,22 @@ h1 {
   padding: 18px;
 }
 
+.sprints-panel,
+.sprint-form,
+.sprint-detail-panel {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  padding: 18px;
+}
+
 .project-sidebar {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+}
+
+.sprints-sidebar {
   display: grid;
   align-content: start;
   gap: 12px;
@@ -613,6 +654,182 @@ h1 {
 
 .project-detail-issues strong {
   font-size: 13px;
+}
+
+.sprint-filters {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(160px, 1fr));
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #edf0ed;
+  border-radius: 8px;
+  background: #fbfcfb;
+}
+
+.sprint-filters label,
+.sprint-form label,
+.sprint-inline-form label {
+  display: grid;
+  gap: 8px;
+}
+
+.sprint-filters label span,
+.sprint-form label span,
+.sprint-inline-form label span {
+  color: #4e5c54;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.sprint-filters select,
+.sprint-form input,
+.sprint-form select,
+.sprint-form textarea,
+.sprint-inline-form input,
+.sprint-inline-form textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #c8d1cb;
+  border-radius: 8px;
+  color: #17211b;
+  background: #fbfcfb;
+  outline: none;
+}
+
+.sprint-filters select,
+.sprint-form input,
+.sprint-form select,
+.sprint-inline-form input {
+  min-height: 40px;
+}
+
+.sprint-form textarea,
+.sprint-inline-form textarea {
+  min-height: 92px;
+  resize: vertical;
+}
+
+.sprint-list {
+  display: grid;
+  gap: 8px;
+}
+
+.sprint-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 72px auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid #edf0ed;
+  border-radius: 8px;
+  background: #fbfcfb;
+}
+
+.sprint-row-selected {
+  border-color: #9db7a6;
+  background: #f3f7f4;
+}
+
+.sprint-row h3,
+.sprint-row p,
+.sprint-detail-description {
+  margin: 0;
+}
+
+.sprint-row h3 {
+  margin-top: 8px;
+  font-size: 15px;
+  line-height: 1.25;
+}
+
+.sprint-row p,
+.sprint-detail-description {
+  color: #657268;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.sprint-row-meta {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  color: #657268;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.sprint-row-meta strong {
+  color: #17211b;
+  font-size: 22px;
+}
+
+.sprint-status-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 5px 9px;
+  border: 1px solid #c8d1cb;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.sprint-status-planned {
+  color: #53635a;
+  background: #eef2ea;
+}
+
+.sprint-status-active {
+  border-color: #a8cbb6;
+  color: #285b3a;
+  background: #eaf6ed;
+}
+
+.sprint-status-completed {
+  border-color: #c8d1cb;
+  color: #657268;
+  background: #f6f8f6;
+}
+
+.sprint-detail-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.sprint-detail-stats article {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid #edf0ed;
+  border-radius: 8px;
+  background: #fbfcfb;
+}
+
+.sprint-detail-stats span {
+  color: #657268;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.sprint-detail-stats strong {
+  color: #17211b;
+  font-size: 16px;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.sprint-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sprint-inline-form {
+  display: grid;
+  gap: 12px;
 }
 
 .permission-note {
@@ -1924,7 +2141,7 @@ h1 {
   }
 
   .nav-list {
-    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
   }
 
   .nav-list button {
@@ -1938,9 +2155,11 @@ h1 {
   .dashboard-actions,
   .account-card,
   .projects-layout,
+  .sprints-layout,
   .issues-layout,
   .team-member-row,
   .team-member-form,
+  .sprint-filters,
   .subtask-form,
   .issue-link-form,
   .linked-issue-card,
@@ -1965,6 +2184,7 @@ h1 {
   .summary-grid,
   .dashboard-actions,
   .projects-layout,
+  .sprints-layout,
   .issues-layout,
   .board,
   .nav-list {
@@ -1990,6 +2210,7 @@ h1 {
 
   .field-grid,
   .issue-row,
+  .sprint-row,
   .team-member-row {
     grid-template-columns: 1fr;
   }
