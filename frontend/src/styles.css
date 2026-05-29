@@ -130,6 +130,7 @@ a {
 .issue-detail-status select:focus,
 .subtask-form input:focus,
 .subtask-form select:focus,
+.issue-link-form select:focus,
 .comment-form textarea:focus,
 .comment-edit-form textarea:focus {
   border-color: #4e795d;
@@ -144,6 +145,7 @@ a {
 .issue-form button,
 .issue-edit-form button,
 .subtask-form button,
+.issue-link-form button,
 .comment-form button,
 .comment-edit-form button,
 .ghost-button,
@@ -213,6 +215,7 @@ a {
 .issue-form button:hover:not(:disabled),
 .issue-edit-form button:hover:not(:disabled),
 .subtask-form button:hover:not(:disabled),
+.issue-link-form button:hover:not(:disabled),
 .comment-form button:hover:not(:disabled),
 .comment-edit-form button:hover:not(:disabled) {
   background: #27362d;
@@ -220,6 +223,7 @@ a {
 
 .issue-edit-form button,
 .subtask-form button,
+.issue-link-form button,
 .comment-form button,
 .comment-edit-form button {
   border: 1px solid #18231d;
@@ -1387,6 +1391,13 @@ h1 {
   border-top: 1px solid #edf0ed;
 }
 
+.linked-issues-section {
+  display: grid;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid #edf0ed;
+}
+
 .activity-section {
   display: grid;
   gap: 12px;
@@ -1414,7 +1425,8 @@ h1 {
 
 .hierarchy-parent-card > span,
 .hierarchy-child-list > span,
-.subtask-form label span {
+.subtask-form label span,
+.issue-link-form label span {
   color: #657268;
   font-size: 12px;
   font-weight: 800;
@@ -1461,6 +1473,61 @@ h1 {
   text-transform: capitalize;
 }
 
+.linked-issue-list {
+  display: grid;
+  gap: 8px;
+}
+
+.linked-issue-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 8px;
+  border: 1px solid #edf0ed;
+  border-radius: 10px;
+  background: #fbfcfb;
+}
+
+.linked-issue-card .hierarchy-issue-button {
+  border-color: transparent;
+  background: #ffffff;
+}
+
+.linked-issue-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.link-type-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid #c8d1cb;
+  border-radius: 999px;
+  color: #4d5b51;
+  background: #edf3ee;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.linked-issues-empty {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border: 1px dashed #c8d1cb;
+  border-radius: 10px;
+  background: #fbfcfb;
+}
+
+.linked-issues-empty strong {
+  color: #17211b;
+  font-size: 13px;
+}
+
 .subtask-form {
   display: grid;
   grid-template-columns:
@@ -1492,6 +1559,35 @@ h1 {
 }
 
 .subtask-form .form-error {
+  grid-column: 1 / -1;
+}
+
+.issue-link-form {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.35fr) minmax(220px, 1fr) auto;
+  align-items: end;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid #edf0ed;
+}
+
+.issue-link-form label {
+  display: grid;
+  gap: 8px;
+}
+
+.issue-link-form select {
+  width: 100%;
+  min-height: 40px;
+  padding: 10px 12px;
+  border: 1px solid #c8d1cb;
+  border-radius: 8px;
+  color: #17211b;
+  background: #ffffff;
+  outline: none;
+}
+
+.issue-link-form .form-error {
   grid-column: 1 / -1;
 }
 
@@ -1846,6 +1942,8 @@ h1 {
   .team-member-row,
   .team-member-form,
   .subtask-form,
+  .issue-link-form,
+  .linked-issue-card,
   .issue-filters,
   .issue-detail-body {
     grid-template-columns: 1fr;

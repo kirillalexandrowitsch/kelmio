@@ -21,6 +21,12 @@ export function activityTitle(activity: IssueActivity) {
   if (activity.action === "issue_parent_changed") {
     return "Changed parent";
   }
+  if (activity.action === "issue_link_created") {
+    return "Linked issue";
+  }
+  if (activity.action === "issue_link_deleted") {
+    return "Removed issue link";
+  }
   if (activity.action === "issue_archived") {
     return "Archived issue";
   }
@@ -76,6 +82,16 @@ export function activityDescription(
     return `${activity.payload.from_parent_issue_id || "No parent"} -> ${
       activity.payload.to_parent_issue_id || "No parent"
     }`;
+  }
+  if (
+    activity.action === "issue_link_created" ||
+    activity.action === "issue_link_deleted"
+  ) {
+    const sourceIssue = activity.payload.source_issue_key || "source issue";
+    const targetIssue = activity.payload.target_issue_key || "target issue";
+    const linkType = activity.payload.link_type || "linked";
+
+    return `${sourceIssue} ${linkType} ${targetIssue}`;
   }
 
   return "";

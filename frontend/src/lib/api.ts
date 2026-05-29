@@ -1,6 +1,7 @@
 import {
   type AuthResponse,
   type CreateIssueInput,
+  type CreateIssueLinkInput,
   type CreateLabelInput,
   type CreateProjectInput,
   type CreateSubtaskInput,
@@ -8,10 +9,12 @@ import {
   type Issue,
   type IssueComment,
   type IssueFilters,
+  type IssueLink,
   type IssueStatus,
   type Label,
   type ListIssueActivityResponse,
   type ListIssueCommentsResponse,
+  type ListIssueLinksResponse,
   type ListIssuesResponse,
   type ListLabelsResponse,
   type ListProjectsResponse,
@@ -29,6 +32,8 @@ export type {
   IssueComment,
   IssueDueFilter,
   IssueFilters,
+  IssueLink,
+  IssueLinkType,
   IssuePriority,
   IssueSort,
   IssueStatus,
@@ -36,6 +41,7 @@ export type {
   Label,
   Project,
   TeamMember,
+  CreateIssueLinkInput,
   CreateSubtaskInput,
   UpdateIssueInput,
 } from "./api-types";
@@ -222,6 +228,12 @@ export async function listIssueChildren(issueId: string) {
   );
 }
 
+export async function listIssueLinks(issueId: string) {
+  return request<ListIssueLinksResponse>(
+    `/api/v1/issues/${encodeURIComponent(issueId)}/links`,
+  );
+}
+
 export async function createIssue(input: CreateIssueInput) {
   return request<Issue>("/api/v1/issues", {
     method: "POST",
@@ -231,6 +243,16 @@ export async function createIssue(input: CreateIssueInput) {
 
 export async function createSubtask(issueId: string, input: CreateSubtaskInput) {
   return request<Issue>(`/api/v1/issues/${encodeURIComponent(issueId)}/subtasks`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function createIssueLink(
+  issueId: string,
+  input: CreateIssueLinkInput,
+) {
+  return request<IssueLink>(`/api/v1/issues/${encodeURIComponent(issueId)}/links`, {
     method: "POST",
     body: JSON.stringify(input),
   });
@@ -275,6 +297,17 @@ export async function archiveIssue(issueId: string) {
   await request<void>(`/api/v1/issues/${encodeURIComponent(issueId)}/archive`, {
     method: "POST",
   });
+}
+
+export async function deleteIssueLink(issueId: string, linkId: string) {
+  await request<void>(
+    `/api/v1/issues/${encodeURIComponent(issueId)}/links/${encodeURIComponent(
+      linkId,
+    )}`,
+    {
+      method: "DELETE",
+    },
+  );
 }
 
 export async function createIssueComment(issueId: string, body: string) {

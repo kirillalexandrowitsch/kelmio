@@ -8,6 +8,8 @@ import {
   IssueActivity,
   IssueComment,
   IssueDueFilter,
+  IssueLink,
+  IssueLinkType,
   IssuePriority,
   IssueSort,
   IssueStatus,
@@ -22,17 +24,20 @@ import {
   createLabel,
   createIssue,
   createIssueComment,
+  createIssueLink,
   createProject,
   createSubtask,
   createTeamMember,
   deleteLabel,
   deleteIssueComment,
+  deleteIssueLink,
   getIssue,
   getCurrentUser,
   getProject,
   listIssueActivity,
   listIssueComments,
   listIssueChildren,
+  listIssueLinks,
   listIssues,
   listLabels,
   listProjects,
@@ -206,6 +211,14 @@ export function App() {
   const [subtaskPriority, setSubtaskPriority] =
     useState<IssuePriority>("medium");
   const [subtaskStatus, setSubtaskStatus] = useState<IssueStatus>("todo");
+  const [issueLinks, setIssueLinks] = useState<IssueLink[]>([]);
+  const [linksError, setLinksError] = useState("");
+  const [linkFormError, setLinkFormError] = useState("");
+  const [isLoadingIssueLinks, setIsLoadingIssueLinks] = useState(false);
+  const [isCreatingIssueLink, setIsCreatingIssueLink] = useState(false);
+  const [deletingIssueLinkIds, setDeletingIssueLinkIds] = useState<string[]>([]);
+  const [linkTargetIssueId, setLinkTargetIssueId] = useState("");
+  const [linkType, setLinkType] = useState<IssueLinkType>("relates");
   const selectedIssueId = selectedIssue?.id ?? "";
 
   function navigateToSection(
@@ -591,6 +604,49 @@ export function App() {
     };
   }, [selectedIssueId]);
 
+  useEffect(() => {
+    if (!selectedIssueId) {
+      setIssueLinks([]);
+      setLinksError("");
+      setLinkFormError("");
+      setIsLoadingIssueLinks(false);
+      setIsCreatingIssueLink(false);
+      setDeletingIssueLinkIds([]);
+      setLinkTargetIssueId("");
+      setLinkType("relates");
+      return;
+    }
+
+    let isMounted = true;
+    setLinksError("");
+    setLinkFormError("");
+    setDeletingIssueLinkIds([]);
+    setLinkTargetIssueId("");
+    setLinkType("relates");
+    setIsLoadingIssueLinks(true);
+
+    listIssueLinks(selectedIssueId)
+      .then((response) => {
+        if (isMounted) {
+          setIssueLinks(response.links);
+        }
+      })
+      .catch((err) => {
+        if (isMounted) {
+          setLinksError(apiErrorMessage(err, "Could not load linked issues."));
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsLoadingIssueLinks(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedIssueId]);
+
   async function handleLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
@@ -718,6 +774,14 @@ export function App() {
     setSubtaskTitle("");
     setSubtaskPriority("medium");
     setSubtaskStatus("todo");
+    setIssueLinks([]);
+    setLinksError("");
+    setLinkFormError("");
+    setIsLoadingIssueLinks(false);
+    setIsCreatingIssueLink(false);
+    setDeletingIssueLinkIds([]);
+    setLinkTargetIssueId("");
+    setLinkType("relates");
   }
 
   async function handleUpdateProfile(event: FormEvent<HTMLFormElement>) {
@@ -1191,6 +1255,17 @@ export function App() {
     }
   }
 
+  async function refreshIssueLinks(issueId: string) {
+    setLinksError("");
+
+    try {
+      const response = await listIssueLinks(issueId);
+      setIssueLinks(response.links);
+    } catch (err) {
+      setLinksError(apiErrorMessage(err, "Could not load linked issues."));
+    }
+  }
+
   function startEditingIssue(issue: Issue) {
     setSelectedIssueError("");
     setEditIssueTitle(issue.title);
@@ -1425,6 +1500,14 @@ export function App() {
         setSubtaskTitle("");
         setSubtaskPriority("medium");
         setSubtaskStatus("todo");
+        setIssueLinks([]);
+        setLinksError("");
+        setLinkFormError("");
+        setIsLoadingIssueLinks(false);
+        setIsCreatingIssueLink(false);
+        setDeletingIssueLinkIds([]);
+        setLinkTargetIssueId("");
+        setLinkType("relates");
         setCommentBody("");
         setEditingCommentId("");
         setEditCommentBody("");
@@ -1599,6 +1682,68 @@ export function App() {
       setSubtaskFormError(apiErrorMessage(err, "Could not create subtask."));
     } finally {
       setIsCreatingSubtask(false);
+    }
+  }
+
+  async function handleCreateIssueLink(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selectedIssue) {
+      return;
+    }
+
+    setLinkFormError("");
+    setLinksError("");
+
+    if (!linkTargetIssueId) {
+      setLinkFormError("Choose a target issue.");
+      return;
+    }
+
+    setIsCreatingIssueLink(true);
+
+    try {
+      const link = await createIssueLink(selectedIssue.id, {
+        target_issue_id: linkTargetIssueId,
+        link_type: linkType,
+      });
+
+      setIssueLinks((currentLinks) => [link, ...currentLinks]);
+      setLinkTargetIssueId("");
+      setLinkType("relates");
+      await refreshIssueLinks(selectedIssue.id);
+      await refreshIssueActivity(selectedIssue.id);
+    } catch (err) {
+      setLinkFormError(apiErrorMessage(err, "Could not add issue link."));
+    } finally {
+      setIsCreatingIssueLink(false);
+    }
+  }
+
+  async function handleDeleteIssueLink(link: IssueLink) {
+    if (!selectedIssue) {
+      return;
+    }
+    if (!window.confirm("Remove this issue link?")) {
+      return;
+    }
+
+    setLinksError("");
+    setDeletingIssueLinkIds((currentIds) =>
+      currentIds.includes(link.id) ? currentIds : [...currentIds, link.id],
+    );
+
+    try {
+      await deleteIssueLink(selectedIssue.id, link.id);
+      setIssueLinks((currentLinks) =>
+        currentLinks.filter((currentLink) => currentLink.id !== link.id),
+      );
+      await refreshIssueActivity(selectedIssue.id);
+    } catch (err) {
+      setLinksError(apiErrorMessage(err, "Could not remove issue link."));
+    } finally {
+      setDeletingIssueLinkIds((currentIds) =>
+        currentIds.filter((currentLinkId) => currentLinkId !== link.id),
+      );
     }
   }
 
@@ -1792,6 +1937,14 @@ export function App() {
     selectedIssue !== null && hasText(commentBody) && !isCreatingComment;
   const canCreateSubtask =
     selectedIssue !== null && hasText(subtaskTitle) && !isCreatingSubtask;
+  const availableLinkIssues = selectedIssue
+    ? issues.filter((issue) => issue.id !== selectedIssue.id)
+    : [];
+  const canCreateIssueLink =
+    selectedIssue !== null &&
+    linkTargetIssueId !== "" &&
+    linkTargetIssueId !== selectedIssue.id &&
+    !isCreatingIssueLink;
   const selectedParentIssue =
     selectedIssue?.parent_issue_id
       ? issues.find((issue) => issue.id === selectedIssue.parent_issue_id) ?? null
@@ -2056,7 +2209,9 @@ export function App() {
           activityError={activityError}
           archivingIssueIds={archivingIssueIds}
           assigningIssueIds={assigningIssueIds}
+          availableLinkIssues={availableLinkIssues}
           canCreateComment={canCreateComment}
+          canCreateIssueLink={canCreateIssueLink}
           canCreateSubtask={canCreateSubtask}
           childIssues={issueChildren}
           commentBody={commentBody}
@@ -2064,6 +2219,7 @@ export function App() {
           commentsError={commentsError}
           currentUser={user}
           deletingCommentIds={deletingCommentIds}
+          deletingIssueLinkIds={deletingIssueLinkIds}
           editCommentBody={editCommentBody}
           editIssueDescription={editIssueDescription}
           editIssueDueDate={editIssueDueDate}
@@ -2073,18 +2229,25 @@ export function App() {
           editingCommentId={editingCommentId}
           isActive={activeSection === "issues"}
           isCreatingComment={isCreatingComment}
+          isCreatingIssueLink={isCreatingIssueLink}
           isCreatingSubtask={isCreatingSubtask}
           isEditingIssueDetails={isEditingIssueDetails}
           isLoadingActivity={isLoadingActivity}
           isLoadingChildIssues={isLoadingIssueChildren}
           isLoadingComments={isLoadingComments}
+          isLoadingIssueLinks={isLoadingIssueLinks}
           isLoadingIssue={isLoadingSelectedIssue}
           isUpdatingIssue={isUpdatingIssue}
           issue={selectedIssue}
           issueError={selectedIssueError}
           hierarchyError={hierarchyError}
+          issueLinks={issueLinks}
           labelingIssueIds={labelingIssueIds}
           labels={labels}
+          linkFormError={linkFormError}
+          linksError={linksError}
+          linkTargetIssueId={linkTargetIssueId}
+          linkType={linkType}
           onArchiveIssue={(issue) => {
             void handleArchiveIssue(issue);
           }}
@@ -2103,6 +2266,14 @@ export function App() {
             setSubtaskTitle("");
             setSubtaskPriority("medium");
             setSubtaskStatus("todo");
+            setIssueLinks([]);
+            setLinksError("");
+            setLinkFormError("");
+            setIsLoadingIssueLinks(false);
+            setIsCreatingIssueLink(false);
+            setDeletingIssueLinkIds([]);
+            setLinkTargetIssueId("");
+            setLinkType("relates");
             setEditingCommentId("");
             setEditCommentBody("");
             setUpdatingCommentIds([]);
@@ -2110,9 +2281,13 @@ export function App() {
           }}
           onCommentBodyChange={setCommentBody}
           onCreateComment={handleCreateComment}
+          onCreateIssueLink={handleCreateIssueLink}
           onCreateSubtask={handleCreateSubtask}
           onDeleteComment={(comment) => {
             void handleDeleteComment(comment);
+          }}
+          onDeleteIssueLink={(link) => {
+            void handleDeleteIssueLink(link);
           }}
           onEditCommentBodyChange={setEditCommentBody}
           onIssueDescriptionChange={setEditIssueDescription}
@@ -2120,6 +2295,8 @@ export function App() {
           onIssuePriorityChange={setEditIssuePriority}
           onIssueTitleChange={setEditIssueTitle}
           onIssueTypeChange={setEditIssueType}
+          onIssueLinkTargetChange={setLinkTargetIssueId}
+          onIssueLinkTypeChange={setLinkType}
           onOpenIssue={(issueId) => {
             void handleSelectIssue(issueId);
           }}

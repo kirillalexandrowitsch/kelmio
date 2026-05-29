@@ -6,6 +6,8 @@ import {
   type Issue,
   type IssueActivity,
   type IssueComment,
+  type IssueLink,
+  type IssueLinkType,
   type IssuePriority,
   type IssueStatus,
   type IssueType,
@@ -17,13 +19,16 @@ import { IssueCommentsSection } from "./issue-comments-section";
 import { IssueDetailMainContent } from "./issue-detail-main-content";
 import { IssueDetailSidebar } from "./issue-detail-sidebar";
 import { IssueHierarchySection } from "./issue-hierarchy-section";
+import { IssueLinksSection } from "./issue-links-section";
 
 type IssueDetailSectionProps = {
   activity: IssueActivity[];
   activityError: string;
   archivingIssueIds: string[];
   assigningIssueIds: string[];
+  availableLinkIssues: Issue[];
   canCreateComment: boolean;
+  canCreateIssueLink: boolean;
   canCreateSubtask: boolean;
   childIssues: Issue[];
   commentBody: string;
@@ -31,6 +36,7 @@ type IssueDetailSectionProps = {
   commentsError: string;
   currentUser: CurrentUser;
   deletingCommentIds: string[];
+  deletingIssueLinkIds: string[];
   editCommentBody: string;
   editIssueDescription: string;
   editIssueDueDate: string;
@@ -40,18 +46,25 @@ type IssueDetailSectionProps = {
   editingCommentId: string;
   isActive: boolean;
   isCreatingComment: boolean;
+  isCreatingIssueLink: boolean;
   isCreatingSubtask: boolean;
   isEditingIssueDetails: boolean;
   isLoadingActivity: boolean;
   isLoadingChildIssues: boolean;
   isLoadingComments: boolean;
+  isLoadingIssueLinks: boolean;
   isLoadingIssue: boolean;
   isUpdatingIssue: boolean;
   issue: Issue | null;
   issueError: string;
   hierarchyError: string;
+  issueLinks: IssueLink[];
   labelingIssueIds: string[];
   labels: Label[];
+  linkFormError: string;
+  linksError: string;
+  linkTargetIssueId: string;
+  linkType: IssueLinkType;
   onArchiveIssue: (issue: Issue) => void;
   onAssignIssue: (issueId: string, assigneeId: string) => void;
   onCancelEditingComment: () => void;
@@ -59,14 +72,18 @@ type IssueDetailSectionProps = {
   onCloseIssue: () => void;
   onCommentBodyChange: (value: string) => void;
   onCreateComment: (event: FormEvent<HTMLFormElement>) => void;
+  onCreateIssueLink: (event: FormEvent<HTMLFormElement>) => void;
   onCreateSubtask: (event: FormEvent<HTMLFormElement>) => void;
   onDeleteComment: (comment: IssueComment) => void;
+  onDeleteIssueLink: (link: IssueLink) => void;
   onEditCommentBodyChange: (value: string) => void;
   onIssueDescriptionChange: (value: string) => void;
   onIssueDueDateChange: (value: string) => void;
   onIssuePriorityChange: (value: IssuePriority) => void;
   onIssueTitleChange: (value: string) => void;
   onIssueTypeChange: (value: IssueType) => void;
+  onIssueLinkTargetChange: (issueId: string) => void;
+  onIssueLinkTypeChange: (linkType: IssueLinkType) => void;
   onOpenIssue: (issueId: string) => void;
   onSubtaskPriorityChange: (value: IssuePriority) => void;
   onSubtaskStatusChange: (value: IssueStatus) => void;
@@ -100,7 +117,9 @@ export function IssueDetailSection({
   activityError,
   archivingIssueIds,
   assigningIssueIds,
+  availableLinkIssues,
   canCreateComment,
+  canCreateIssueLink,
   canCreateSubtask,
   childIssues,
   commentBody,
@@ -108,6 +127,7 @@ export function IssueDetailSection({
   commentsError,
   currentUser,
   deletingCommentIds,
+  deletingIssueLinkIds,
   editCommentBody,
   editIssueDescription,
   editIssueDueDate,
@@ -117,18 +137,25 @@ export function IssueDetailSection({
   editingCommentId,
   isActive,
   isCreatingComment,
+  isCreatingIssueLink,
   isCreatingSubtask,
   isEditingIssueDetails,
   isLoadingActivity,
   isLoadingChildIssues,
   isLoadingComments,
+  isLoadingIssueLinks,
   isLoadingIssue,
   isUpdatingIssue,
   issue,
   issueError,
   hierarchyError,
+  issueLinks,
   labelingIssueIds,
   labels,
+  linkFormError,
+  linksError,
+  linkTargetIssueId,
+  linkType,
   onArchiveIssue,
   onAssignIssue,
   onCancelEditingComment,
@@ -136,14 +163,18 @@ export function IssueDetailSection({
   onCloseIssue,
   onCommentBodyChange,
   onCreateComment,
+  onCreateIssueLink,
   onCreateSubtask,
   onDeleteComment,
+  onDeleteIssueLink,
   onEditCommentBodyChange,
   onIssueDescriptionChange,
   onIssueDueDateChange,
   onIssuePriorityChange,
   onIssueTitleChange,
   onIssueTypeChange,
+  onIssueLinkTargetChange,
+  onIssueLinkTypeChange,
   onOpenIssue,
   onSetIssueLabel,
   onStartEditingComment,
@@ -253,6 +284,25 @@ export function IssueDetailSection({
               subtaskPriority={subtaskPriority}
               subtaskStatus={subtaskStatus}
               subtaskTitle={subtaskTitle}
+            />
+
+            <IssueLinksSection
+              availableIssues={availableLinkIssues}
+              canCreateLink={canCreateIssueLink}
+              deletingLinkIds={deletingIssueLinkIds}
+              formError={linkFormError}
+              isCreatingLink={isCreatingIssueLink}
+              isLoadingLinks={isLoadingIssueLinks}
+              issue={issue}
+              linkTargetIssueId={linkTargetIssueId}
+              linkType={linkType}
+              links={issueLinks}
+              linksError={linksError}
+              onCreateLink={onCreateIssueLink}
+              onDeleteLink={onDeleteIssueLink}
+              onOpenIssue={onOpenIssue}
+              onTargetIssueChange={onIssueLinkTargetChange}
+              onTypeChange={onIssueLinkTypeChange}
             />
 
             <IssueCommentsSection

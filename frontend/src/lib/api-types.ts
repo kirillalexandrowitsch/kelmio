@@ -42,6 +42,7 @@ export type Label = {
 export type IssueStatus = "backlog" | "todo" | "in_progress" | "blocked" | "done";
 export type IssuePriority = "low" | "medium" | "high" | "critical";
 export type IssueType = "task" | "bug" | "story" | "epic" | "subtask";
+export type IssueLinkType = "blocks" | "relates";
 export type IssueSort = "created_desc" | "created_asc" | "priority_desc" | "due_date_asc";
 export type IssueDueFilter = "overdue" | "today" | "due_soon" | "no_due";
 
@@ -85,6 +86,8 @@ export type IssueActivity = {
     | "assignee_changed"
     | "labels_changed"
     | "issue_parent_changed"
+    | "issue_link_created"
+    | "issue_link_deleted"
     | "issue_archived"
     | "comment_added"
     | "comment_updated"
@@ -94,6 +97,26 @@ export type IssueActivity = {
   actor_display_name: string | null;
   payload: Record<string, string>;
   created_at: string;
+};
+
+export type IssueLinkIssue = {
+  id: string;
+  issue_key: string;
+  title: string;
+  issue_type: IssueType;
+  status: IssueStatus;
+  priority: IssuePriority;
+};
+
+export type IssueLink = {
+  id: string;
+  source_issue_id: string;
+  target_issue_id: string;
+  link_type: IssueLinkType;
+  created_by: string;
+  created_at: string;
+  source_issue: IssueLinkIssue;
+  target_issue: IssueLinkIssue;
 };
 
 export type ListProjectsResponse = {
@@ -131,6 +154,10 @@ export type ListIssueCommentsResponse = {
 
 export type ListIssueActivityResponse = {
   activity: IssueActivity[];
+};
+
+export type ListIssueLinksResponse = {
+  links: IssueLink[];
 };
 
 export type IssueFilters = {
@@ -176,6 +203,11 @@ export type CreateSubtaskInput = {
   assignee_id: string;
   due_date: string;
   label_ids: string[];
+};
+
+export type CreateIssueLinkInput = {
+  target_issue_id: string;
+  link_type: IssueLinkType;
 };
 
 export type CreateLabelInput = {

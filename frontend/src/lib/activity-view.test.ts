@@ -45,6 +45,10 @@ test("formats known and unknown activity titles", () => {
     "Changed parent",
   );
   assert.equal(
+    activityTitle(makeActivity({ action: "issue_link_created" })),
+    "Linked issue",
+  );
+  assert.equal(
     activityTitle(makeActivity({ action: "custom_action" })),
     "custom action",
   );
@@ -93,5 +97,19 @@ test("formats activity descriptions with issue and member context", () => {
       members,
     ),
     "parent-1 -> parent-2",
+  );
+  assert.equal(
+    activityDescription(
+      makeActivity({
+        action: "issue_link_created",
+        payload: {
+          link_type: "blocks",
+          source_issue_key: "WEB-1",
+          target_issue_key: "WEB-2",
+        },
+      }),
+      members,
+    ),
+    "WEB-1 blocks WEB-2",
   );
 });
