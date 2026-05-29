@@ -79,6 +79,7 @@ func TestPostgresMigrationsCreateCoreSchema(t *testing.T) {
 		"labels",
 		"issue_labels",
 		"comments",
+		"issue_links",
 		"sessions",
 		"activity_log",
 		"schema_migrations",
@@ -217,5 +218,45 @@ func TestPostgresMigrationsCreateCoreSchema(t *testing.T) {
 		VALUES ($1, 4, 'INT-4', 'Invalid epic', 'epic', 'todo', 'medium', $2, $3)
 	`, projectID, userID, epicID); err == nil {
 		t.Fatal("expected epic with parent to fail")
+	}
+
+	var linkID string
+	if err := db.QueryRow(ctx, `
+		INSERT INTO issue_links (source_issue_id, target_issue_id, link_type, created_by)
+		VALUES ($1, $2, $3, $4)
+		RETURNING id::text
+	`, epicID, subtaskID, "relates", userID).Scan(&linkID); err != nil {
+		t.Fatalf("insert issue link: %v", err)
+	}
+	if linkID == "" {
+		t.Fatal("expected generated issue link id")
+	}
+
+	if _, err := db.Exec(ctx, `
+		INSERT INTO issue_links (source_issue_id, target_issue_id, link_type, created_by)
+		VALUES ($1, $2, $3, $4)
+	`, epicID, subtaskID, "relates", userID); err == nil {
+		t.Fatal("expected duplicate issue link to fail")
+	}
+
+	if _, err := db.Exec(ctx, `
+		INSERT INTO issue_links (source_issue_id, target_issue_id, link_type, created_by)
+		VALUES ($1, $2, $3, $4)
+	`, subtaskID, epicID, "relates", userID); err == nil {
+		t.Fatal("expected inverse relates issue link to fail")
+	}
+
+	if _, err := db.Exec(ctx, `
+		INSERT INTO issue_links (source_issue_id, target_issue_id, link_type, created_by)
+		VALUES ($1, $2, $3, $4)
+	`, epicID, epicID, "blocks", userID); err == nil {
+		t.Fatal("expected self issue link to fail")
+	}
+
+	if _, err := db.Exec(ctx, `
+		INSERT INTO issue_links (source_issue_id, target_issue_id, link_type, created_by)
+		VALUES ($1, $2, $3, $4)
+	`, subtaskID, epicID, "duplicates", userID); err == nil {
+		t.Fatal("expected invalid issue link type to fail")
 	}
 }
