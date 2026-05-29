@@ -8,6 +8,7 @@ import (
 )
 
 const testIssueID = "6d5257d4-002e-44da-8925-d9108699c504"
+const testTargetIssueID = "f2d59348-61a3-491a-9eb1-5aec91fbdf1e"
 
 func TestNormalizeCreateIssueDefaults(t *testing.T) {
 	t.Parallel()
@@ -414,6 +415,100 @@ func TestNormalizeSetIssueParentValidation(t *testing.T) {
 
 	parentID := "not-a-uuid"
 	if _, err := normalizeSetIssueParent(setIssueParentRequest{ParentIssueID: &parentID}); err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestNormalizeCreateIssueLink(t *testing.T) {
+	t.Parallel()
+
+	got, err := normalizeCreateIssueLink(testIssueID, createIssueLinkRequest{
+		TargetIssueID: " F2D59348-61A3-491A-9EB1-5AEC91FBDF1E ",
+		LinkType:      " relates ",
+	})
+	if err != nil {
+		t.Fatalf("normalize create issue link: %v", err)
+	}
+
+	if got.TargetIssueID != testTargetIssueID {
+		t.Fatalf("TargetIssueID = %q, want %q", got.TargetIssueID, testTargetIssueID)
+	}
+	if got.LinkType != "relates" {
+		t.Fatalf("LinkType = %q, want %q", got.LinkType, "relates")
+	}
+}
+
+func TestNormalizeCreateIssueLinkValidation(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		req  createIssueLinkRequest
+	}{
+		{
+			name: "missing target",
+			req: createIssueLinkRequest{
+				LinkType: "relates",
+			},
+		},
+		{
+			name: "bad target",
+			req: createIssueLinkRequest{
+				TargetIssueID: "not-a-uuid",
+				LinkType:      "relates",
+			},
+		},
+		{
+			name: "self link",
+			req: createIssueLinkRequest{
+				TargetIssueID: testIssueID,
+				LinkType:      "relates",
+			},
+		},
+		{
+			name: "missing type",
+			req: createIssueLinkRequest{
+				TargetIssueID: testTargetIssueID,
+			},
+		},
+		{
+			name: "bad type",
+			req: createIssueLinkRequest{
+				TargetIssueID: testTargetIssueID,
+				LinkType:      "duplicates",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			if _, err := normalizeCreateIssueLink(testIssueID, tt.req); err == nil {
+				t.Fatal("expected error")
+			}
+		})
+	}
+}
+
+func TestNormalizeIssueLinkID(t *testing.T) {
+	t.Parallel()
+
+	got, err := normalizeIssueLinkID(" F2D59348-61A3-491A-9EB1-5AEC91FBDF1E ")
+	if err != nil {
+		t.Fatalf("normalize issue link id: %v", err)
+	}
+
+	if got != testTargetIssueID {
+		t.Fatalf("issue link id = %q, want %q", got, testTargetIssueID)
+	}
+}
+
+func TestNormalizeIssueLinkIDValidation(t *testing.T) {
+	t.Parallel()
+
+	if _, err := normalizeIssueLinkID("not-a-uuid"); err == nil {
 		t.Fatal("expected error")
 	}
 }

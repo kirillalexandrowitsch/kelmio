@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -40,6 +41,11 @@ var validIssuePriorities = map[string]bool{
 	"medium":   true,
 	"high":     true,
 	"critical": true,
+}
+
+var validIssueLinkTypes = map[string]bool{
+	"blocks":  true,
+	"relates": true,
 }
 
 var uuidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
@@ -96,6 +102,11 @@ type setIssueLabelsRequest struct {
 
 type setIssueParentRequest struct {
 	ParentIssueID *string `json:"parent_issue_id"`
+}
+
+type createIssueLinkRequest struct {
+	TargetIssueID string `json:"target_issue_id"`
+	LinkType      string `json:"link_type"`
 }
 
 type createCommentRequest struct {
@@ -164,6 +175,30 @@ type listActivityResponse struct {
 	Activity []issueActivityResponse `json:"activity"`
 }
 
+type issueLinkIssueResponse struct {
+	ID        string `json:"id"`
+	IssueKey  string `json:"issue_key"`
+	Title     string `json:"title"`
+	IssueType string `json:"issue_type"`
+	Status    string `json:"status"`
+	Priority  string `json:"priority"`
+}
+
+type issueLinkResponse struct {
+	ID            string                 `json:"id"`
+	SourceIssueID string                 `json:"source_issue_id"`
+	TargetIssueID string                 `json:"target_issue_id"`
+	LinkType      string                 `json:"link_type"`
+	CreatedBy     string                 `json:"created_by"`
+	CreatedAt     time.Time              `json:"created_at"`
+	SourceIssue   issueLinkIssueResponse `json:"source_issue"`
+	TargetIssue   issueLinkIssueResponse `json:"target_issue"`
+}
+
+type listIssueLinksResponse struct {
+	Links []issueLinkResponse `json:"links"`
+}
+
 type normalizedCreateIssue struct {
 	ProjectID     string
 	ParentIssueID string
@@ -185,6 +220,11 @@ type normalizedUpdateIssue struct {
 	DueDate     string
 }
 
+type normalizedCreateIssueLink struct {
+	TargetIssueID string
+	LinkType      string
+}
+
 func NewHandler(db *pgxpool.Pool, authHandler *auth.Handler) *Handler {
 	return &Handler{
 		db:   db,
@@ -200,6 +240,9 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/issues/{id}/children", h.listChildren)
 	mux.HandleFunc("POST /api/v1/issues/{id}/subtasks", h.createSubtask)
 	mux.HandleFunc("PATCH /api/v1/issues/{id}/parent", h.setParent)
+	mux.HandleFunc("GET /api/v1/issues/{id}/links", h.listLinks)
+	mux.HandleFunc("POST /api/v1/issues/{id}/links", h.createLink)
+	mux.HandleFunc("DELETE /api/v1/issues/{id}/links/{linkID}", h.deleteLink)
 	mux.HandleFunc("POST /api/v1/issues/{id}/transition", h.transition)
 	mux.HandleFunc("POST /api/v1/issues/{id}/assign", h.assign)
 	mux.HandleFunc("PUT /api/v1/issues/{id}/labels", h.setLabels)
@@ -509,6 +552,137 @@ func (h *Handler) setParent(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, issue)
+}
+
+func (h *Handler) listLinks(w http.ResponseWriter, r *http.Request) {
+	user, ok := h.requireUser(w, r)
+	if !ok {
+		return
+	}
+
+	issueID, err := normalizeIssueID(r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	if _, err := h.getIssue(ctx, user.WorkspaceID, issueID); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "issue_not_found", "issue was not found")
+			return
+		}
+
+		writeError(w, http.StatusInternalServerError, "internal_error", "could not load issue")
+		return
+	}
+
+	links, err := h.listIssueLinks(ctx, user.WorkspaceID, issueID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "internal_error", "could not list issue links")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, listIssueLinksResponse{Links: links})
+}
+
+func (h *Handler) createLink(w http.ResponseWriter, r *http.Request) {
+	user, ok := h.requireUser(w, r)
+	if !ok {
+		return
+	}
+
+	issueID, err := normalizeIssueID(r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	var req createIssueLinkRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	input, err := normalizeCreateIssueLink(issueID, req)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	link, err := h.createIssueLink(ctx, user, issueID, input)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "issue_not_found", "issue was not found")
+			return
+		}
+		if errors.Is(err, errInvalidIssueLinkTarget) {
+			writeError(w, http.StatusBadRequest, "invalid_target", "target issue must be accessible in this workspace")
+			return
+		}
+		if errors.Is(err, errIssueLinkSelf) {
+			writeError(w, http.StatusBadRequest, "invalid_link", "issue cannot be linked to itself")
+			return
+		}
+		if errors.Is(err, errIssueLinkDuplicate) {
+			writeError(w, http.StatusConflict, "duplicate_link", "issue link already exists")
+			return
+		}
+
+		writeError(w, http.StatusInternalServerError, "internal_error", "could not create issue link")
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, link)
+}
+
+func (h *Handler) deleteLink(w http.ResponseWriter, r *http.Request) {
+	user, ok := h.requireUser(w, r)
+	if !ok {
+		return
+	}
+
+	issueID, err := normalizeIssueID(r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	linkID, err := normalizeIssueLinkID(r.PathValue("linkID"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	if _, err := h.getIssue(ctx, user.WorkspaceID, issueID); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "issue_not_found", "issue was not found")
+			return
+		}
+
+		writeError(w, http.StatusInternalServerError, "internal_error", "could not load issue")
+		return
+	}
+
+	if err := h.deleteIssueLink(ctx, user, issueID, linkID); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "link_not_found", "issue link was not found")
+			return
+		}
+
+		writeError(w, http.StatusInternalServerError, "internal_error", "could not delete issue link")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *Handler) transition(w http.ResponseWriter, r *http.Request) {
@@ -1083,6 +1257,9 @@ var errInvalidIssueParent = errors.New("invalid issue parent")
 var errIssueParentCycle = errors.New("issue parent cycle")
 var errIssueParentRequired = errors.New("issue parent required")
 var errIssueParentForbidden = errors.New("issue parent forbidden")
+var errInvalidIssueLinkTarget = errors.New("invalid issue link target")
+var errIssueLinkSelf = errors.New("issue link self")
+var errIssueLinkDuplicate = errors.New("issue link duplicate")
 
 func (h *Handler) getIssue(ctx context.Context, workspaceID string, issueID string) (issueResponse, error) {
 	return scanIssue(h.db.QueryRow(ctx, `
@@ -1600,6 +1777,151 @@ func (h *Handler) setIssueParent(ctx context.Context, user auth.CurrentUser, iss
 	}
 
 	return issue, nil
+}
+
+func (h *Handler) listIssueLinks(ctx context.Context, workspaceID string, issueID string) ([]issueLinkResponse, error) {
+	rows, err := h.db.Query(ctx, `
+		SELECT
+			il.id::text,
+			il.source_issue_id::text,
+			il.target_issue_id::text,
+			il.link_type,
+			il.created_by::text,
+			il.created_at,
+			source_issue.id::text,
+			source_issue.issue_key,
+			source_issue.title,
+			source_issue.issue_type,
+			source_issue.status,
+			source_issue.priority,
+			target_issue.id::text,
+			target_issue.issue_key,
+			target_issue.title,
+			target_issue.issue_type,
+			target_issue.status,
+			target_issue.priority
+		FROM issue_links il
+		JOIN issues source_issue ON source_issue.id = il.source_issue_id
+		JOIN projects source_project ON source_project.id = source_issue.project_id
+		JOIN issues target_issue ON target_issue.id = il.target_issue_id
+		JOIN projects target_project ON target_project.id = target_issue.project_id
+		WHERE (il.source_issue_id = $1 OR il.target_issue_id = $1)
+			AND source_project.workspace_id = $2
+			AND target_project.workspace_id = $2
+			AND source_project.archived_at IS NULL
+			AND target_project.archived_at IS NULL
+			AND source_issue.archived_at IS NULL
+			AND target_issue.archived_at IS NULL
+		ORDER BY il.created_at DESC, il.id DESC
+		LIMIT 100
+	`, issueID, workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	links := make([]issueLinkResponse, 0)
+	for rows.Next() {
+		link, err := scanIssueLink(rows)
+		if err != nil {
+			return nil, err
+		}
+
+		links = append(links, link)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return links, nil
+}
+
+func (h *Handler) createIssueLink(ctx context.Context, user auth.CurrentUser, sourceIssueID string, input normalizedCreateIssueLink) (issueLinkResponse, error) {
+	if sourceIssueID == input.TargetIssueID {
+		return issueLinkResponse{}, errIssueLinkSelf
+	}
+
+	tx, err := h.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return issueLinkResponse{}, err
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	if _, err := getIssueInTx(ctx, tx, user.WorkspaceID, sourceIssueID); err != nil {
+		return issueLinkResponse{}, err
+	}
+	if _, err := getIssueInTx(ctx, tx, user.WorkspaceID, input.TargetIssueID); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return issueLinkResponse{}, errInvalidIssueLinkTarget
+		}
+		return issueLinkResponse{}, err
+	}
+
+	linkExists, err := issueLinkExists(ctx, tx, sourceIssueID, input.TargetIssueID, input.LinkType)
+	if err != nil {
+		return issueLinkResponse{}, err
+	}
+	if linkExists {
+		return issueLinkResponse{}, errIssueLinkDuplicate
+	}
+
+	var linkID string
+	if err := tx.QueryRow(ctx, `
+		INSERT INTO issue_links (source_issue_id, target_issue_id, link_type, created_by)
+		VALUES ($1, $2, $3, $4)
+		RETURNING id::text
+	`, sourceIssueID, input.TargetIssueID, input.LinkType, user.ID).Scan(&linkID); err != nil {
+		if isUniqueViolation(err) || isCheckViolation(err) {
+			return issueLinkResponse{}, errIssueLinkDuplicate
+		}
+		return issueLinkResponse{}, err
+	}
+
+	link, err := getIssueLinkInTx(ctx, tx, user.WorkspaceID, linkID)
+	if err != nil {
+		return issueLinkResponse{}, err
+	}
+
+	if err := insertIssueLinkActivity(ctx, tx, link, user.ID, "issue_link_created"); err != nil {
+		return issueLinkResponse{}, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return issueLinkResponse{}, err
+	}
+
+	return link, nil
+}
+
+func (h *Handler) deleteIssueLink(ctx context.Context, user auth.CurrentUser, issueID string, linkID string) error {
+	tx, err := h.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	link, err := getIssueLinkForIssueInTx(ctx, tx, user.WorkspaceID, issueID, linkID)
+	if err != nil {
+		return err
+	}
+
+	if _, err := tx.Exec(ctx, `
+		DELETE FROM issue_links
+		WHERE id = $1
+	`, linkID); err != nil {
+		return err
+	}
+
+	if err := insertIssueLinkActivity(ctx, tx, link, user.ID, "issue_link_deleted"); err != nil {
+		return err
+	}
+
+	return tx.Commit(ctx)
 }
 
 func (h *Handler) transitionIssueStatus(ctx context.Context, user auth.CurrentUser, issueID string, status string) (issueResponse, error) {
@@ -2363,6 +2685,34 @@ func normalizeSetIssueParent(req setIssueParentRequest) (string, error) {
 	return normalizeOptionalIssueID(*req.ParentIssueID)
 }
 
+func normalizeCreateIssueLink(sourceIssueID string, req createIssueLinkRequest) (normalizedCreateIssueLink, error) {
+	targetIssueID := strings.ToLower(strings.TrimSpace(req.TargetIssueID))
+	linkType := strings.TrimSpace(req.LinkType)
+
+	input := normalizedCreateIssueLink{
+		TargetIssueID: targetIssueID,
+		LinkType:      linkType,
+	}
+
+	if input.TargetIssueID == "" {
+		return input, errors.New("target_issue_id is required")
+	}
+	if !uuidPattern.MatchString(input.TargetIssueID) {
+		return input, errors.New("target_issue_id must be a valid issue id")
+	}
+	if input.TargetIssueID == sourceIssueID {
+		return input, errors.New("target_issue_id must be different from source issue id")
+	}
+	if input.LinkType == "" {
+		return input, errors.New("link_type is required")
+	}
+	if !validIssueLinkTypes[input.LinkType] {
+		return input, errors.New("link_type is invalid")
+	}
+
+	return input, nil
+}
+
 func normalizeIssueID(id string) (string, error) {
 	id = strings.ToLower(strings.TrimSpace(id))
 	if id == "" {
@@ -2370,6 +2720,18 @@ func normalizeIssueID(id string) (string, error) {
 	}
 	if !uuidPattern.MatchString(id) {
 		return "", errors.New("issue id is invalid")
+	}
+
+	return id, nil
+}
+
+func normalizeIssueLinkID(id string) (string, error) {
+	id = strings.ToLower(strings.TrimSpace(id))
+	if id == "" {
+		return "", errors.New("issue link id is required")
+	}
+	if !uuidPattern.MatchString(id) {
+		return "", errors.New("issue link id is invalid")
 	}
 
 	return id, nil
@@ -2748,6 +3110,143 @@ func getIssueInTx(ctx context.Context, tx pgx.Tx, workspaceID string, issueID st
 	`, issueID, workspaceID))
 }
 
+func issueLinkExists(ctx context.Context, tx pgx.Tx, sourceIssueID string, targetIssueID string, linkType string) (bool, error) {
+	var exists bool
+	if linkType == "relates" {
+		err := tx.QueryRow(ctx, `
+			SELECT EXISTS (
+				SELECT 1
+				FROM issue_links
+				WHERE link_type = 'relates'
+					AND (
+						(source_issue_id = $1 AND target_issue_id = $2)
+						OR (source_issue_id = $2 AND target_issue_id = $1)
+					)
+			)
+		`, sourceIssueID, targetIssueID).Scan(&exists)
+
+		return exists, err
+	}
+
+	err := tx.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1
+			FROM issue_links
+			WHERE source_issue_id = $1
+				AND target_issue_id = $2
+				AND link_type = $3
+		)
+	`, sourceIssueID, targetIssueID, linkType).Scan(&exists)
+
+	return exists, err
+}
+
+func getIssueLinkInTx(ctx context.Context, tx pgx.Tx, workspaceID string, linkID string) (issueLinkResponse, error) {
+	return scanIssueLink(tx.QueryRow(ctx, `
+		SELECT
+			il.id::text,
+			il.source_issue_id::text,
+			il.target_issue_id::text,
+			il.link_type,
+			il.created_by::text,
+			il.created_at,
+			source_issue.id::text,
+			source_issue.issue_key,
+			source_issue.title,
+			source_issue.issue_type,
+			source_issue.status,
+			source_issue.priority,
+			target_issue.id::text,
+			target_issue.issue_key,
+			target_issue.title,
+			target_issue.issue_type,
+			target_issue.status,
+			target_issue.priority
+		FROM issue_links il
+		JOIN issues source_issue ON source_issue.id = il.source_issue_id
+		JOIN projects source_project ON source_project.id = source_issue.project_id
+		JOIN issues target_issue ON target_issue.id = il.target_issue_id
+		JOIN projects target_project ON target_project.id = target_issue.project_id
+		WHERE il.id = $1
+			AND source_project.workspace_id = $2
+			AND target_project.workspace_id = $2
+			AND source_project.archived_at IS NULL
+			AND target_project.archived_at IS NULL
+			AND source_issue.archived_at IS NULL
+			AND target_issue.archived_at IS NULL
+	`, linkID, workspaceID))
+}
+
+func getIssueLinkForIssueInTx(ctx context.Context, tx pgx.Tx, workspaceID string, issueID string, linkID string) (issueLinkResponse, error) {
+	return scanIssueLink(tx.QueryRow(ctx, `
+		SELECT
+			il.id::text,
+			il.source_issue_id::text,
+			il.target_issue_id::text,
+			il.link_type,
+			il.created_by::text,
+			il.created_at,
+			source_issue.id::text,
+			source_issue.issue_key,
+			source_issue.title,
+			source_issue.issue_type,
+			source_issue.status,
+			source_issue.priority,
+			target_issue.id::text,
+			target_issue.issue_key,
+			target_issue.title,
+			target_issue.issue_type,
+			target_issue.status,
+			target_issue.priority
+		FROM issue_links il
+		JOIN issues source_issue ON source_issue.id = il.source_issue_id
+		JOIN projects source_project ON source_project.id = source_issue.project_id
+		JOIN issues target_issue ON target_issue.id = il.target_issue_id
+		JOIN projects target_project ON target_project.id = target_issue.project_id
+		WHERE il.id = $1
+			AND (il.source_issue_id = $2 OR il.target_issue_id = $2)
+			AND source_project.workspace_id = $3
+			AND target_project.workspace_id = $3
+			AND source_project.archived_at IS NULL
+			AND target_project.archived_at IS NULL
+			AND source_issue.archived_at IS NULL
+			AND target_issue.archived_at IS NULL
+		FOR UPDATE OF il
+	`, linkID, issueID, workspaceID))
+}
+
+func insertIssueLinkActivity(ctx context.Context, tx pgx.Tx, link issueLinkResponse, actorID string, action string) error {
+	payload := map[string]string{
+		"link_id":          link.ID,
+		"link_type":        link.LinkType,
+		"source_issue_id":  link.SourceIssueID,
+		"source_issue_key": link.SourceIssue.IssueKey,
+		"target_issue_id":  link.TargetIssueID,
+		"target_issue_key": link.TargetIssue.IssueKey,
+	}
+
+	if err := insertIssueActivity(ctx, tx, link.SourceIssueID, actorID, action, payload); err != nil {
+		return err
+	}
+	if link.TargetIssueID != link.SourceIssueID {
+		if err := insertIssueActivity(ctx, tx, link.TargetIssueID, actorID, action, payload); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func isUniqueViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23505"
+}
+
+func isCheckViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23514"
+}
+
 func changedIssueFields(previous issueResponse, current issueResponse) []string {
 	fields := make([]string, 0, 5)
 
@@ -2829,6 +3328,34 @@ func decodeIssueLabels(labelsJSON []byte) ([]issueLabelResponse, error) {
 	}
 
 	return labels, nil
+}
+
+func scanIssueLink(row rowScanner) (issueLinkResponse, error) {
+	var link issueLinkResponse
+	if err := row.Scan(
+		&link.ID,
+		&link.SourceIssueID,
+		&link.TargetIssueID,
+		&link.LinkType,
+		&link.CreatedBy,
+		&link.CreatedAt,
+		&link.SourceIssue.ID,
+		&link.SourceIssue.IssueKey,
+		&link.SourceIssue.Title,
+		&link.SourceIssue.IssueType,
+		&link.SourceIssue.Status,
+		&link.SourceIssue.Priority,
+		&link.TargetIssue.ID,
+		&link.TargetIssue.IssueKey,
+		&link.TargetIssue.Title,
+		&link.TargetIssue.IssueType,
+		&link.TargetIssue.Status,
+		&link.TargetIssue.Priority,
+	); err != nil {
+		return issueLinkResponse{}, err
+	}
+
+	return link, nil
 }
 
 func scanIssueComment(row rowScanner) (issueCommentResponse, error) {

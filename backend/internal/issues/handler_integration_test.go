@@ -110,6 +110,127 @@ func TestIssueHierarchyIntegration(t *testing.T) {
 	}
 }
 
+func TestIssueLinksIntegration(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	db := newIssueIntegrationDB(t, ctx)
+	handler := NewHandler(db, nil)
+
+	user, projectID := seedIssueIntegrationWorkspace(t, ctx, db)
+
+	source, err := handler.createIssue(ctx, user, normalizedCreateIssue{
+		ProjectID: projectID,
+		Title:     "Source issue",
+		IssueType: "task",
+		Status:    "todo",
+		Priority:  "medium",
+	})
+	if err != nil {
+		t.Fatalf("create source issue: %v", err)
+	}
+
+	target, err := handler.createIssue(ctx, user, normalizedCreateIssue{
+		ProjectID: projectID,
+		Title:     "Target issue",
+		IssueType: "bug",
+		Status:    "todo",
+		Priority:  "high",
+	})
+	if err != nil {
+		t.Fatalf("create target issue: %v", err)
+	}
+
+	link, err := handler.createIssueLink(ctx, user, source.ID, normalizedCreateIssueLink{
+		TargetIssueID: target.ID,
+		LinkType:      "relates",
+	})
+	if err != nil {
+		t.Fatalf("create issue link: %v", err)
+	}
+	if link.SourceIssueID != source.ID || link.TargetIssueID != target.ID {
+		t.Fatalf("unexpected link endpoints: %#v", link)
+	}
+
+	sourceLinks, err := handler.listIssueLinks(ctx, user.WorkspaceID, source.ID)
+	if err != nil {
+		t.Fatalf("list source issue links: %v", err)
+	}
+	if !hasIssueLinkID(sourceLinks, link.ID) {
+		t.Fatalf("expected source links to contain link %s", link.ID)
+	}
+
+	targetLinks, err := handler.listIssueLinks(ctx, user.WorkspaceID, target.ID)
+	if err != nil {
+		t.Fatalf("list target issue links: %v", err)
+	}
+	if !hasIssueLinkID(targetLinks, link.ID) {
+		t.Fatalf("expected target links to contain link %s", link.ID)
+	}
+
+	if _, err := handler.createIssueLink(ctx, user, source.ID, normalizedCreateIssueLink{
+		TargetIssueID: target.ID,
+		LinkType:      "relates",
+	}); !errors.Is(err, errIssueLinkDuplicate) {
+		t.Fatalf("duplicate link error = %v, want %v", err, errIssueLinkDuplicate)
+	}
+
+	if _, err := handler.createIssueLink(ctx, user, target.ID, normalizedCreateIssueLink{
+		TargetIssueID: source.ID,
+		LinkType:      "relates",
+	}); !errors.Is(err, errIssueLinkDuplicate) {
+		t.Fatalf("inverse relates link error = %v, want %v", err, errIssueLinkDuplicate)
+	}
+
+	if _, err := handler.createIssueLink(ctx, user, source.ID, normalizedCreateIssueLink{
+		TargetIssueID: source.ID,
+		LinkType:      "blocks",
+	}); !errors.Is(err, errIssueLinkSelf) {
+		t.Fatalf("self link error = %v, want %v", err, errIssueLinkSelf)
+	}
+
+	if _, err := handler.createIssueLink(ctx, user, source.ID, normalizedCreateIssueLink{
+		TargetIssueID: "6d5257d4-002e-44da-8925-d9108699c504",
+		LinkType:      "blocks",
+	}); !errors.Is(err, errInvalidIssueLinkTarget) {
+		t.Fatalf("invalid target link error = %v, want %v", err, errInvalidIssueLinkTarget)
+	}
+
+	if err := handler.deleteIssueLink(ctx, user, target.ID, link.ID); err != nil {
+		t.Fatalf("delete issue link from target side: %v", err)
+	}
+
+	sourceLinks, err = handler.listIssueLinks(ctx, user.WorkspaceID, source.ID)
+	if err != nil {
+		t.Fatalf("list source issue links after delete: %v", err)
+	}
+	if hasIssueLinkID(sourceLinks, link.ID) {
+		t.Fatalf("expected source links to not contain deleted link %s", link.ID)
+	}
+
+	sourceActivity, err := handler.listIssueActivity(ctx, user.WorkspaceID, source.ID)
+	if err != nil {
+		t.Fatalf("list source activity: %v", err)
+	}
+	if !hasActivityAction(sourceActivity, "issue_link_created") {
+		t.Fatal("expected source activity to contain issue_link_created")
+	}
+	if !hasActivityAction(sourceActivity, "issue_link_deleted") {
+		t.Fatal("expected source activity to contain issue_link_deleted")
+	}
+
+	targetActivity, err := handler.listIssueActivity(ctx, user.WorkspaceID, target.ID)
+	if err != nil {
+		t.Fatalf("list target activity: %v", err)
+	}
+	if !hasActivityAction(targetActivity, "issue_link_created") {
+		t.Fatal("expected target activity to contain issue_link_created")
+	}
+	if !hasActivityAction(targetActivity, "issue_link_deleted") {
+		t.Fatal("expected target activity to contain issue_link_deleted")
+	}
+}
+
 func newIssueIntegrationDB(t *testing.T, ctx context.Context) *pgxpool.Pool {
 	t.Helper()
 
@@ -221,6 +342,16 @@ func expectIssueParent(t *testing.T, issue issueResponse, want string) {
 func hasIssueID(issues []issueResponse, issueID string) bool {
 	for _, issue := range issues {
 		if issue.ID == issueID {
+			return true
+		}
+	}
+
+	return false
+}
+
+func hasIssueLinkID(links []issueLinkResponse, linkID string) bool {
+	for _, link := range links {
+		if link.ID == linkID {
 			return true
 		}
 	}
