@@ -80,6 +80,7 @@ func TestPostgresMigrationsCreateCoreSchema(t *testing.T) {
 		"issue_labels",
 		"comments",
 		"issue_links",
+		"sprints",
 		"sessions",
 		"activity_log",
 		"schema_migrations",
@@ -127,6 +128,22 @@ func TestPostgresMigrationsCreateCoreSchema(t *testing.T) {
 	}
 	if !hasParentIssueID {
 		t.Fatal("expected issues.parent_issue_id to exist")
+	}
+
+	var hasSprintID bool
+	if err := db.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1
+			FROM information_schema.columns
+			WHERE table_schema = $1
+				AND table_name = 'issues'
+				AND column_name = 'sprint_id'
+		)
+	`, schemaName).Scan(&hasSprintID); err != nil {
+		t.Fatalf("check sprint_id column: %v", err)
+	}
+	if !hasSprintID {
+		t.Fatal("expected issues.sprint_id to exist")
 	}
 
 	var userID string
@@ -258,5 +275,134 @@ func TestPostgresMigrationsCreateCoreSchema(t *testing.T) {
 		VALUES ($1, $2, $3, $4)
 	`, subtaskID, epicID, "duplicates", userID); err == nil {
 		t.Fatal("expected invalid issue link type to fail")
+	}
+
+	var activeSprintID string
+	if err := db.QueryRow(ctx, `
+		INSERT INTO sprints (
+			workspace_id,
+			project_id,
+			name,
+			goal,
+			status,
+			start_date,
+			end_date,
+			created_by
+		)
+		VALUES ($1, $2, 'Integration Sprint', 'Ship sprint schema', 'active', '2026-06-01', '2026-06-14', $3)
+		RETURNING id::text
+	`, workspaceID, projectID, userID).Scan(&activeSprintID); err != nil {
+		t.Fatalf("insert active sprint: %v", err)
+	}
+	if activeSprintID == "" {
+		t.Fatal("expected generated active sprint id")
+	}
+
+	var issueSprintID string
+	if err := db.QueryRow(ctx, `
+		UPDATE issues
+		SET sprint_id = $1
+		WHERE id = $2
+		RETURNING sprint_id::text
+	`, activeSprintID, epicID).Scan(&issueSprintID); err != nil {
+		t.Fatalf("assign issue to sprint: %v", err)
+	}
+	if issueSprintID != activeSprintID {
+		t.Fatalf("issue sprint id = %q, want %q", issueSprintID, activeSprintID)
+	}
+
+	if _, err := db.Exec(ctx, `
+		INSERT INTO sprints (
+			workspace_id,
+			project_id,
+			name,
+			status,
+			start_date,
+			end_date,
+			created_by
+		)
+		VALUES ($1, $2, 'Second active sprint', 'active', '2026-06-15', '2026-06-28', $3)
+	`, workspaceID, projectID, userID); err == nil {
+		t.Fatal("expected second active sprint in one project to fail")
+	}
+
+	if _, err := db.Exec(ctx, `
+		INSERT INTO sprints (workspace_id, project_id, name, status, created_by)
+		VALUES ($1, $2, 'Invalid status sprint', 'paused', $3)
+	`, workspaceID, projectID, userID); err == nil {
+		t.Fatal("expected invalid sprint status to fail")
+	}
+
+	if _, err := db.Exec(ctx, `
+		INSERT INTO sprints (workspace_id, project_id, name, status, created_by)
+		VALUES ($1, $2, '   ', 'planned', $3)
+	`, workspaceID, projectID, userID); err == nil {
+		t.Fatal("expected blank sprint name to fail")
+	}
+
+	if _, err := db.Exec(ctx, `
+		INSERT INTO sprints (
+			workspace_id,
+			project_id,
+			name,
+			status,
+			start_date,
+			end_date,
+			created_by
+		)
+		VALUES ($1, $2, 'Invalid dates sprint', 'planned', '2026-06-14', '2026-06-01', $3)
+	`, workspaceID, projectID, userID); err == nil {
+		t.Fatal("expected sprint with end_date before start_date to fail")
+	}
+
+	if _, err := db.Exec(ctx, `
+		INSERT INTO sprints (workspace_id, project_id, name, status, created_by)
+		VALUES ($1, $2, 'Incomplete completed sprint', 'completed', $3)
+	`, workspaceID, projectID, userID); err == nil {
+		t.Fatal("expected completed sprint without completed_at to fail")
+	}
+
+	var completedSprintID string
+	if err := db.QueryRow(ctx, `
+		INSERT INTO sprints (
+			workspace_id,
+			project_id,
+			name,
+			status,
+			created_by,
+			completed_at
+		)
+		VALUES ($1, $2, 'Completed Sprint', 'completed', $3, now())
+		RETURNING id::text
+	`, workspaceID, projectID, userID).Scan(&completedSprintID); err != nil {
+		t.Fatalf("insert completed sprint: %v", err)
+	}
+	if completedSprintID == "" {
+		t.Fatal("expected generated completed sprint id")
+	}
+
+	var otherWorkspaceID string
+	if err := db.QueryRow(ctx, `
+		INSERT INTO workspaces (name)
+		VALUES ('Other Integration Workspace')
+		RETURNING id::text
+	`).Scan(&otherWorkspaceID); err != nil {
+		t.Fatalf("insert other workspace: %v", err)
+	}
+
+	var otherProjectID string
+	if err := db.QueryRow(ctx, `
+		INSERT INTO projects (workspace_id, key, name, created_by)
+		VALUES ($1, 'OTH', 'Other Project', $2)
+		RETURNING id::text
+	`, otherWorkspaceID, userID).Scan(&otherProjectID); err != nil {
+		t.Fatalf("insert other project: %v", err)
+	}
+
+	if _, err := db.Exec(ctx, `
+		INSERT INTO sprints (workspace_id, project_id, name, status, created_by)
+		VALUES ($1, $2, 'Cross workspace sprint', 'planned', $3)
+	`, workspaceID, otherProjectID, userID); err == nil {
+		t.Fatal("expected sprint project/workspace mismatch to fail")
 	}
 }
