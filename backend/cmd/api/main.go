@@ -16,6 +16,7 @@ import (
 	"team-task-tracker/backend/internal/issues"
 	"team-task-tracker/backend/internal/labels"
 	"team-task-tracker/backend/internal/projects"
+	"team-task-tracker/backend/internal/sprints"
 	"team-task-tracker/backend/internal/team"
 )
 
@@ -55,6 +56,9 @@ func main() {
 
 	teamHandler := team.NewHandler(db, authHandler)
 	teamHandler.RegisterRoutes(mux)
+
+	sprintsHandler := sprints.NewHandler(db, authHandler)
+	sprintsHandler.RegisterRoutes(mux)
 
 	server := &http.Server{
 		Addr:         ":" + cfg.Port,
