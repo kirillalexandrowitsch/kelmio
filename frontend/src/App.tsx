@@ -1921,6 +1921,11 @@ export function App() {
       setSelectedIssue((currentIssue) =>
         currentIssue?.id === updatedIssue.id ? updatedIssue : currentIssue,
       );
+      setSprintPlanningIssues((currentIssues) =>
+        currentIssues.map((issue) =>
+          issue.id === updatedIssue.id ? updatedIssue : issue,
+        ),
+      );
       if (selectedIssue?.id === updatedIssue.id) {
         await refreshIssueActivity(updatedIssue.id);
       }
@@ -2452,6 +2457,23 @@ export function App() {
     void handleTransitionIssue(issue.id, nextStatus);
   }
 
+  function handleSprintIssueDrop(
+    event: DragEvent<HTMLElement>,
+    nextStatus: IssueStatus,
+  ) {
+    event.preventDefault();
+
+    const issueId = event.dataTransfer.getData("text/plain");
+    const issue = sprintPlanningIssues.find(
+      (currentIssue) => currentIssue.id === issueId,
+    );
+    if (!issue || issue.status === nextStatus) {
+      return;
+    }
+
+    void handleTransitionIssue(issue.id, nextStatus);
+  }
+
   const today = startOfToday();
   const openIssues = issues.filter((issue) => issue.status !== "done");
   const selectedProjectIssues = selectedProjectDetail
@@ -2745,6 +2767,9 @@ export function App() {
           onSelectSprint={(sprintId) => {
             void handleSelectSprint(sprintId);
           }}
+          onSprintIssueDragOver={handleIssueDragOver}
+          onSprintIssueDragStart={handleIssueDragStart}
+          onSprintIssueDrop={handleSprintIssueDrop}
           onSprintEndDateChange={setSprintEndDate}
           onSprintGoalChange={setSprintGoal}
           onSprintNameChange={setSprintName}
@@ -2755,6 +2780,9 @@ export function App() {
             void handleStartSprint(sprint);
           }}
           onStatusFilterChange={setSprintFilterStatus}
+          onTransitionIssue={(issueId, status) => {
+            void handleTransitionIssue(issueId, status);
+          }}
           onUpdateSprint={handleUpdateSprint}
           onViewSprintProjectIssues={(projectId) => {
             setIssueFilterProjectId(projectId);
@@ -2778,6 +2806,9 @@ export function App() {
           sprints={sprints}
           sprintsError={sprintsError}
           startingSprintIds={startingSprintIds}
+          teamMembers={teamMembers}
+          today={today}
+          transitioningIssueIds={transitioningIssueIds}
         />
 
         <section

@@ -133,6 +133,7 @@ a {
 .issue-filters select:focus,
 .sprint-filters select:focus,
 .issue-card select:focus,
+.active-sprint-card select:focus,
 .issue-detail-status select:focus,
 .subtask-form input:focus,
 .subtask-form select:focus,
@@ -521,7 +522,7 @@ h1 {
 
 .sprints-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 380px;
+  grid-template-columns: minmax(320px, 0.75fr) minmax(560px, 1.25fr);
   gap: 12px;
 }
 
@@ -825,6 +826,144 @@ h1 {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.active-sprint-board-panel {
+  display: grid;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid #edf0ed;
+}
+
+.active-sprint-board-panel h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.active-sprint-note {
+  margin: 0;
+  padding: 12px;
+  border: 1px dashed #c8d1cb;
+  border-radius: 8px;
+  color: #657268;
+  background: #fbfcfb;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.active-sprint-board {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(170px, 1fr));
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.active-sprint-column {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-width: 170px;
+  padding: 10px;
+  border: 1px solid #dce4de;
+  border-radius: 10px;
+  background:
+    linear-gradient(180deg, #fbfcfb 0%, #f5f8f5 100%);
+}
+
+.active-sprint-column header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.active-sprint-column header span {
+  color: #53635a;
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.active-sprint-column header strong {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border-radius: 999px;
+  color: #356145;
+  background: #e6f3e9;
+  font-size: 12px;
+}
+
+.active-sprint-card-list {
+  display: grid;
+  gap: 8px;
+}
+
+.active-sprint-card {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid #dfe7e1;
+  border-radius: 9px;
+  background: #ffffff;
+  box-shadow: 0 4px 14px rgb(20 36 27 / 6%);
+  cursor: grab;
+}
+
+.active-sprint-card:active {
+  cursor: grabbing;
+}
+
+.active-sprint-card h4,
+.active-sprint-card p {
+  margin: 0;
+}
+
+.active-sprint-card h4 {
+  font-size: 13px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.active-sprint-card p {
+  color: #657268;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.active-sprint-card-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: #53635a;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.active-sprint-card-actions {
+  display: grid;
+  gap: 4px;
+}
+
+.active-sprint-card-actions span {
+  color: #657268;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.active-sprint-empty {
+  display: grid;
+  min-height: 84px;
+  place-items: center;
+  border: 1px dashed #c8d1cb;
+  border-radius: 8px;
+  color: #8a968d;
+  font-size: 13px;
+  text-align: center;
 }
 
 .sprint-inline-form {
@@ -2263,6 +2402,11 @@ h1 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .active-sprint-board {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    overflow-x: visible;
+  }
+
   .dashboard-actions,
   .account-card,
   .projects-layout,
@@ -2299,6 +2443,7 @@ h1 {
   .sprints-layout,
   .issues-layout,
   .board,
+  .active-sprint-board,
   .nav-list {
     grid-template-columns: 1fr;
   }

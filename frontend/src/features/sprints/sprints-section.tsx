@@ -1,13 +1,17 @@
-import { type FormEvent } from "react";
+import { type DragEvent, type FormEvent } from "react";
 
 import { FormError } from "../../components/form-feedback";
 import {
   type Issue,
+  type IssueStatus,
   type Project,
   type Sprint,
   type SprintStatus,
+  type TeamMember,
 } from "../../lib/api-types";
 import {
+  columns,
+  issueDueInfo,
   issueTypeLabels,
   priorityLabels,
   statusLabel,
@@ -17,6 +21,7 @@ import {
   sprintStatusLabels,
   sprintStatusOptions,
 } from "../../lib/sprint-model";
+import { memberDisplayName } from "../../lib/team-view";
 import { hasText } from "../../lib/validation";
 
 type SprintsSectionProps = {
@@ -46,6 +51,12 @@ type SprintsSectionProps = {
   onProjectFilterChange: (value: string) => void;
   onRemoveIssueFromSprint: (issue: Issue) => void;
   onSelectSprint: (sprintId: string) => void;
+  onSprintIssueDragOver: (event: DragEvent<HTMLElement>) => void;
+  onSprintIssueDragStart: (event: DragEvent<HTMLElement>, issueId: string) => void;
+  onSprintIssueDrop: (
+    event: DragEvent<HTMLElement>,
+    nextStatus: IssueStatus,
+  ) => void;
   onSprintEndDateChange: (value: string) => void;
   onSprintGoalChange: (value: string) => void;
   onSprintNameChange: (value: string) => void;
@@ -54,6 +65,7 @@ type SprintsSectionProps = {
   onStartEditingSprint: (sprint: Sprint) => void;
   onStartSprint: (sprint: Sprint) => void;
   onStatusFilterChange: (value: SprintStatus | "") => void;
+  onTransitionIssue: (issueId: string, status: IssueStatus) => void;
   onUpdateSprint: (event: FormEvent<HTMLFormElement>) => void;
   onViewSprintProjectIssues: (projectId: string) => void;
   projectFilterId: string;
@@ -74,6 +86,9 @@ type SprintsSectionProps = {
   sprints: Sprint[];
   sprintsError: string;
   startingSprintIds: string[];
+  teamMembers: TeamMember[];
+  today: Date;
+  transitioningIssueIds: string[];
 };
 
 export function SprintsSection({
@@ -103,6 +118,9 @@ export function SprintsSection({
   onProjectFilterChange,
   onRemoveIssueFromSprint,
   onSelectSprint,
+  onSprintIssueDragOver,
+  onSprintIssueDragStart,
+  onSprintIssueDrop,
   onSprintEndDateChange,
   onSprintGoalChange,
   onSprintNameChange,
@@ -111,6 +129,7 @@ export function SprintsSection({
   onStartEditingSprint,
   onStartSprint,
   onStatusFilterChange,
+  onTransitionIssue,
   onUpdateSprint,
   onViewSprintProjectIssues,
   projectFilterId,
@@ -131,6 +150,9 @@ export function SprintsSection({
   sprints,
   sprintsError,
   startingSprintIds,
+  teamMembers,
+  today,
+  transitioningIssueIds,
 }: SprintsSectionProps) {
   const hasFilters = projectFilterId !== "" || sprintStatusFilter !== "";
   const summary = hasFilters
@@ -456,6 +478,18 @@ export function SprintsSection({
                   </button>
                 </div>
 
+                <ActiveSprintBoardPanel
+                  issues={selectedSprintIssues}
+                  onIssueDragOver={onSprintIssueDragOver}
+                  onIssueDragStart={onSprintIssueDragStart}
+                  onIssueDrop={onSprintIssueDrop}
+                  onTransitionIssue={onTransitionIssue}
+                  sprint={selectedSprint}
+                  teamMembers={teamMembers}
+                  today={today}
+                  transitioningIssueIds={transitioningIssueIds}
+                />
+
                 <SprintPlanningPanel
                   addingIssueToSprintIds={addingIssueToSprintIds}
                   backlogIssues={selectedSprintBacklogIssues}
@@ -476,6 +510,144 @@ export function SprintsSection({
             <div className="comments-empty">No sprint selected</div>
           )}
         </aside>
+      </div>
+    </section>
+  );
+}
+
+type ActiveSprintBoardPanelProps = {
+  issues: Issue[];
+  onIssueDragOver: (event: DragEvent<HTMLElement>) => void;
+  onIssueDragStart: (event: DragEvent<HTMLElement>, issueId: string) => void;
+  onIssueDrop: (event: DragEvent<HTMLElement>, nextStatus: IssueStatus) => void;
+  onTransitionIssue: (issueId: string, status: IssueStatus) => void;
+  sprint: Sprint;
+  teamMembers: TeamMember[];
+  today: Date;
+  transitioningIssueIds: string[];
+};
+
+function ActiveSprintBoardPanel({
+  issues,
+  onIssueDragOver,
+  onIssueDragStart,
+  onIssueDrop,
+  onTransitionIssue,
+  sprint,
+  teamMembers,
+  today,
+  transitioningIssueIds,
+}: ActiveSprintBoardPanelProps) {
+  if (sprint.status !== "active") {
+    return (
+      <section className="active-sprint-board-panel" aria-label="Active sprint board">
+        <header className="section-header">
+          <div>
+            <p className="eyebrow">Active board</p>
+            <h3>Sprint workflow</h3>
+          </div>
+        </header>
+        <p className="active-sprint-note">
+          {sprint.status === "completed"
+            ? "Completed sprint board is locked for history."
+            : "Start this sprint to use the active board."}
+        </p>
+      </section>
+    );
+  }
+
+  return (
+    <section className="active-sprint-board-panel" aria-label="Active sprint board">
+      <header className="section-header">
+        <div>
+          <p className="eyebrow">Active board</p>
+          <h3>Sprint workflow</h3>
+        </div>
+        <span className="muted">{issues.length} issues</span>
+      </header>
+
+      <div className="active-sprint-board">
+        {columns.map((column) => {
+          const columnIssues = issues.filter(
+            (issue) => issue.status === column.status,
+          );
+
+          return (
+            <article
+              className="active-sprint-column"
+              key={column.status}
+              onDragOver={onIssueDragOver}
+              onDrop={(event) => onIssueDrop(event, column.status)}
+            >
+              <header>
+                <span>{column.title}</span>
+                <strong>{columnIssues.length}</strong>
+              </header>
+
+              <div className="active-sprint-card-list">
+                {columnIssues.map((issue) => {
+                  const dueInfo = issueDueInfo(issue, today);
+                  const isTransitioning = transitioningIssueIds.includes(issue.id);
+
+                  return (
+                    <article
+                      className="active-sprint-card"
+                      draggable
+                      key={issue.id}
+                      onDragStart={(event) => onIssueDragStart(event, issue.id)}
+                    >
+                      <div className="active-sprint-card-meta">
+                        <span>{issue.issue_key}</span>
+                        <span>{priorityLabels[issue.priority]}</span>
+                      </div>
+
+                      <h4>{issue.title}</h4>
+
+                      {dueInfo ? (
+                        <span className={`due-badge due-badge-${dueInfo.tone}`}>
+                          {dueInfo.label}
+                        </span>
+                      ) : null}
+
+                      <p>
+                        {issueTypeLabels[issue.issue_type]} ·{" "}
+                        {memberDisplayName(teamMembers, issue.assignee_id)}
+                      </p>
+
+                      <label className="active-sprint-card-actions">
+                        <span>Status</span>
+                        <select
+                          aria-label={`Status for ${issue.issue_key}`}
+                          disabled={isTransitioning}
+                          onChange={(event) => {
+                            const nextStatus = event.target.value as IssueStatus;
+                            if (nextStatus !== issue.status) {
+                              onTransitionIssue(issue.id, nextStatus);
+                            }
+                          }}
+                          value={issue.status}
+                        >
+                          {columns.map((nextColumn) => (
+                            <option
+                              key={nextColumn.status}
+                              value={nextColumn.status}
+                            >
+                              {nextColumn.title}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    </article>
+                  );
+                })}
+
+                {columnIssues.length === 0 ? (
+                  <div className="active-sprint-empty">No sprint issues</div>
+                ) : null}
+              </div>
+            </article>
+          );
+        })}
       </div>
     </section>
   );
