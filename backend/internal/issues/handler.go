@@ -137,6 +137,7 @@ type issueResponse struct {
 	ReporterID    string               `json:"reporter_id"`
 	AssigneeID    *string              `json:"assignee_id"`
 	ParentIssueID *string              `json:"parent_issue_id"`
+	SprintID      *string              `json:"sprint_id"`
 	DueDate       *string              `json:"due_date"`
 	Labels        []issueLabelResponse `json:"labels"`
 	CreatedAt     time.Time            `json:"created_at"`
@@ -1202,6 +1203,7 @@ func (h *Handler) listIssues(ctx context.Context, workspaceID string, query map[
 			i.reporter_id::text,
 			i.assignee_id::text,
 			i.parent_issue_id::text,
+			i.sprint_id::text,
 			i.due_date::text,
 			i.created_at,
 			i.updated_at,
@@ -1277,6 +1279,7 @@ func (h *Handler) getIssue(ctx context.Context, workspaceID string, issueID stri
 			i.reporter_id::text,
 			i.assignee_id::text,
 			i.parent_issue_id::text,
+			i.sprint_id::text,
 			i.due_date::text,
 			i.created_at,
 			i.updated_at,
@@ -1392,6 +1395,7 @@ func (h *Handler) createIssue(ctx context.Context, user auth.CurrentUser, input 
 			reporter_id::text,
 			assignee_id::text,
 			parent_issue_id::text,
+			sprint_id::text,
 			due_date::text,
 			created_at,
 			updated_at,
@@ -1461,6 +1465,7 @@ func (h *Handler) updateIssue(ctx context.Context, user auth.CurrentUser, issueI
 			i.reporter_id::text,
 			i.assignee_id::text,
 			i.parent_issue_id::text,
+			i.sprint_id::text,
 			i.due_date::text,
 			i.created_at,
 			i.updated_at,
@@ -1532,6 +1537,7 @@ func (h *Handler) updateIssue(ctx context.Context, user auth.CurrentUser, issueI
 			i.reporter_id::text,
 			i.assignee_id::text,
 			i.parent_issue_id::text,
+			i.sprint_id::text,
 			i.due_date::text,
 			i.created_at,
 			i.updated_at,
@@ -1588,6 +1594,7 @@ func (h *Handler) listIssueChildren(ctx context.Context, workspaceID string, iss
 			i.reporter_id::text,
 			i.assignee_id::text,
 			i.parent_issue_id::text,
+			i.sprint_id::text,
 			i.due_date::text,
 			i.created_at,
 			i.updated_at,
@@ -1662,6 +1669,7 @@ func (h *Handler) setIssueParent(ctx context.Context, user auth.CurrentUser, iss
 			i.reporter_id::text,
 			i.assignee_id::text,
 			i.parent_issue_id::text,
+			i.sprint_id::text,
 			i.due_date::text,
 			i.created_at,
 			i.updated_at,
@@ -1741,6 +1749,7 @@ func (h *Handler) setIssueParent(ctx context.Context, user auth.CurrentUser, iss
 			i.reporter_id::text,
 			i.assignee_id::text,
 			i.parent_issue_id::text,
+			i.sprint_id::text,
 			i.due_date::text,
 			i.created_at,
 			i.updated_at,
@@ -1971,6 +1980,7 @@ func (h *Handler) transitionIssueStatus(ctx context.Context, user auth.CurrentUs
 			i.reporter_id::text,
 			i.assignee_id::text,
 			i.parent_issue_id::text,
+			i.sprint_id::text,
 			i.due_date::text,
 			i.created_at,
 			i.updated_at,
@@ -2067,6 +2077,7 @@ func (h *Handler) assignIssue(ctx context.Context, user auth.CurrentUser, issueI
 			i.reporter_id::text,
 			i.assignee_id::text,
 			i.parent_issue_id::text,
+			i.sprint_id::text,
 			i.due_date::text,
 			i.created_at,
 			i.updated_at,
@@ -2185,6 +2196,7 @@ func (h *Handler) setIssueLabels(ctx context.Context, user auth.CurrentUser, iss
 			i.reporter_id::text,
 			i.assignee_id::text,
 			i.parent_issue_id::text,
+			i.sprint_id::text,
 			i.due_date::text,
 			i.created_at,
 			i.updated_at,
@@ -3082,6 +3094,7 @@ func getIssueInTx(ctx context.Context, tx pgx.Tx, workspaceID string, issueID st
 			i.reporter_id::text,
 			i.assignee_id::text,
 			i.parent_issue_id::text,
+			i.sprint_id::text,
 			i.due_date::text,
 			i.created_at,
 			i.updated_at,
@@ -3277,6 +3290,7 @@ func scanIssue(row rowScanner) (issueResponse, error) {
 	var issue issueResponse
 	var assigneeID pgtype.Text
 	var parentIssueID pgtype.Text
+	var sprintID pgtype.Text
 	var dueDate pgtype.Text
 	var labelsJSON []byte
 
@@ -3294,6 +3308,7 @@ func scanIssue(row rowScanner) (issueResponse, error) {
 		&issue.ReporterID,
 		&assigneeID,
 		&parentIssueID,
+		&sprintID,
 		&dueDate,
 		&issue.CreatedAt,
 		&issue.UpdatedAt,
@@ -3304,6 +3319,7 @@ func scanIssue(row rowScanner) (issueResponse, error) {
 
 	issue.AssigneeID = nullableText(assigneeID)
 	issue.ParentIssueID = nullableText(parentIssueID)
+	issue.SprintID = nullableText(sprintID)
 	issue.DueDate = nullableText(dueDate)
 	labels, err := decodeIssueLabels(labelsJSON)
 	if err != nil {

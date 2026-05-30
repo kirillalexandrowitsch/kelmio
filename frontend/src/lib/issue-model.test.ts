@@ -26,6 +26,7 @@ function makeIssue(overrides: Partial<Issue> = {}): Issue {
     reporter_id: "user-1",
     assignee_id: "user-2",
     parent_issue_id: null,
+    sprint_id: null,
     due_date: "2026-05-28",
     labels: [{ id: "label-1", name: "frontend", color: "#4e795d" }],
     created_at: "2026-05-26T10:00:00Z",

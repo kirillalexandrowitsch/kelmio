@@ -832,6 +832,117 @@ h1 {
   gap: 12px;
 }
 
+.sprint-planning-panel {
+  display: grid;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid #edf0ed;
+}
+
+.sprint-planning-panel h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.planning-note {
+  margin: 0;
+  color: #657268;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.sprint-planning-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.planning-column {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid #edf0ed;
+  border-radius: 10px;
+  background: #fbfcfb;
+}
+
+.planning-column header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.planning-column header span {
+  color: #657268;
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.planning-column header strong {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 999px;
+  color: #53635a;
+  background: #eef2ea;
+  font-size: 12px;
+}
+
+.planning-issue-list {
+  display: grid;
+  gap: 8px;
+}
+
+.planning-issue-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid #edf0ed;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.planning-issue-card > div {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.planning-issue-card h4,
+.planning-issue-card p {
+  margin: 0;
+}
+
+.planning-issue-card h4 {
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.planning-issue-card p {
+  color: #657268;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.planning-empty {
+  display: grid;
+  min-height: 88px;
+  place-items: center;
+  gap: 8px;
+  padding: 12px;
+  border: 1px dashed #c8d1cb;
+  border-radius: 8px;
+  color: #8a968d;
+  font-size: 13px;
+  text-align: center;
+}
+
 .permission-note {
   color: #4e5c54;
   font-size: 14px;
@@ -2160,6 +2271,7 @@ h1 {
   .team-member-row,
   .team-member-form,
   .sprint-filters,
+  .sprint-planning-grid,
   .subtask-form,
   .issue-link-form,
   .linked-issue-card,
@@ -2211,6 +2323,7 @@ h1 {
   .field-grid,
   .issue-row,
   .sprint-row,
+  .planning-issue-card,
   .team-member-row {
     grid-template-columns: 1fr;
   }

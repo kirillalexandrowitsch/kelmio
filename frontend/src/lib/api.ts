@@ -360,6 +360,27 @@ export async function startSprint(sprintId: string) {
   });
 }
 
+export async function addIssueToSprint(sprintId: string, issueId: string) {
+  return request<Sprint>(
+    `/api/v1/sprints/${encodeURIComponent(sprintId)}/issues`,
+    {
+      method: "POST",
+      body: JSON.stringify({ issue_id: issueId }),
+    },
+  );
+}
+
+export async function removeIssueFromSprint(sprintId: string, issueId: string) {
+  await request<void>(
+    `/api/v1/sprints/${encodeURIComponent(sprintId)}/issues/${encodeURIComponent(
+      issueId,
+    )}`,
+    {
+      method: "DELETE",
+    },
+  );
+}
+
 export async function completeSprint(sprintId: string) {
   return request<Sprint>(
     `/api/v1/sprints/${encodeURIComponent(sprintId)}/complete`,

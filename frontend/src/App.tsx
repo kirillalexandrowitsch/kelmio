@@ -19,6 +19,7 @@ import {
   Sprint,
   SprintStatus,
   TeamMember,
+  addIssueToSprint,
   archiveIssue,
   archiveProject,
   assignIssue,
@@ -51,6 +52,7 @@ import {
   login,
   logout,
   resetTeamMemberPassword,
+  removeIssueFromSprint,
   setIssueLabels,
   startSprint,
   transitionIssue,
@@ -275,6 +277,15 @@ export function App() {
   const [editSprintEndDate, setEditSprintEndDate] = useState("");
   const [startingSprintIds, setStartingSprintIds] = useState<string[]>([]);
   const [completingSprintIds, setCompletingSprintIds] = useState<string[]>([]);
+  const [sprintPlanningIssues, setSprintPlanningIssues] = useState<Issue[]>([]);
+  const [sprintPlanningError, setSprintPlanningError] = useState("");
+  const [isLoadingSprintPlanning, setIsLoadingSprintPlanning] = useState(false);
+  const [addingIssueToSprintIds, setAddingIssueToSprintIds] = useState<string[]>(
+    [],
+  );
+  const [removingIssueFromSprintIds, setRemovingIssueFromSprintIds] = useState<
+    string[]
+  >([]);
   const selectedIssueId = selectedIssue?.id ?? "";
 
   function navigateToSection(
@@ -652,6 +663,47 @@ export function App() {
   }, [user, activeSection, routeSprintId, selectedSprint?.id]);
 
   useEffect(() => {
+    if (!user || !selectedSprint) {
+      setSprintPlanningIssues([]);
+      setSprintPlanningError("");
+      setIsLoadingSprintPlanning(false);
+      setAddingIssueToSprintIds([]);
+      setRemovingIssueFromSprintIds([]);
+      return;
+    }
+
+    let isMounted = true;
+    setSprintPlanningError("");
+    setIsLoadingSprintPlanning(true);
+
+    listIssues({
+      projectId: selectedSprint.project_id,
+      sort: "created_desc",
+    })
+      .then((response) => {
+        if (isMounted) {
+          setSprintPlanningIssues(response.issues);
+        }
+      })
+      .catch((err) => {
+        if (isMounted) {
+          setSprintPlanningError(
+            apiErrorMessage(err, "Could not load sprint planning issues."),
+          );
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsLoadingSprintPlanning(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user, selectedSprint?.id, selectedSprint?.project_id]);
+
+  useEffect(() => {
     if (!selectedIssueId) {
       setIssueComments([]);
       setCommentsError("");
@@ -966,6 +1018,11 @@ export function App() {
     setEditSprintEndDate("");
     setStartingSprintIds([]);
     setCompletingSprintIds([]);
+    setSprintPlanningIssues([]);
+    setSprintPlanningError("");
+    setIsLoadingSprintPlanning(false);
+    setAddingIssueToSprintIds([]);
+    setRemovingIssueFromSprintIds([]);
   }
 
   async function handleUpdateProfile(event: FormEvent<HTMLFormElement>) {
@@ -1512,6 +1569,20 @@ export function App() {
     }
   }
 
+  function setIssueSprint(issueId: string, sprintId: string | null) {
+    const updateIssueSprint = (issue: Issue) =>
+      issue.id === issueId ? { ...issue, sprint_id: sprintId } : issue;
+
+    setIssues((currentIssues) => currentIssues.map(updateIssueSprint));
+    setSprintPlanningIssues((currentIssues) =>
+      currentIssues.map(updateIssueSprint),
+    );
+    setIssueChildren((currentIssues) => currentIssues.map(updateIssueSprint));
+    setSelectedIssue((currentIssue) =>
+      currentIssue?.id === issueId ? updateIssueSprint(currentIssue) : currentIssue,
+    );
+  }
+
   function startEditingSprint(sprint: Sprint) {
     setSelectedSprintError("");
     setEditSprintName(sprint.name);
@@ -1702,6 +1773,59 @@ export function App() {
     } finally {
       setCompletingSprintIds((currentIds) =>
         currentIds.filter((currentSprintId) => currentSprintId !== sprint.id),
+      );
+    }
+  }
+
+  async function handleAddIssueToSprint(issue: Issue) {
+    if (!selectedSprint) {
+      return;
+    }
+
+    setSprintPlanningError("");
+    setSelectedSprintError("");
+    setAddingIssueToSprintIds((currentIds) =>
+      currentIds.includes(issue.id) ? currentIds : [...currentIds, issue.id],
+    );
+
+    try {
+      const sprint = await addIssueToSprint(selectedSprint.id, issue.id);
+      setSelectedSprint(sprint);
+      upsertSprintInList(sprint);
+      setIssueSprint(issue.id, sprint.id);
+    } catch (err) {
+      setSprintPlanningError(apiErrorMessage(err, "Could not add issue to sprint."));
+    } finally {
+      setAddingIssueToSprintIds((currentIds) =>
+        currentIds.filter((currentIssueId) => currentIssueId !== issue.id),
+      );
+    }
+  }
+
+  async function handleRemoveIssueFromSprint(issue: Issue) {
+    if (!selectedSprint) {
+      return;
+    }
+
+    setSprintPlanningError("");
+    setSelectedSprintError("");
+    setRemovingIssueFromSprintIds((currentIds) =>
+      currentIds.includes(issue.id) ? currentIds : [...currentIds, issue.id],
+    );
+
+    try {
+      await removeIssueFromSprint(selectedSprint.id, issue.id);
+      const sprint = await getSprint(selectedSprint.id);
+      setSelectedSprint(sprint);
+      upsertSprintInList(sprint);
+      setIssueSprint(issue.id, null);
+    } catch (err) {
+      setSprintPlanningError(
+        apiErrorMessage(err, "Could not remove issue from sprint."),
+      );
+    } finally {
+      setRemovingIssueFromSprintIds((currentIds) =>
+        currentIds.filter((currentIssueId) => currentIssueId !== issue.id),
       );
     }
   }
@@ -2336,6 +2460,17 @@ export function App() {
   const selectedProjectOpenIssues = selectedProjectIssues.filter(
     (issue) => issue.status !== "done",
   );
+  const selectedSprintIssues = selectedSprint
+    ? sprintPlanningIssues.filter((issue) => issue.sprint_id === selectedSprint.id)
+    : [];
+  const selectedSprintBacklogIssues = selectedSprint
+    ? sprintPlanningIssues.filter(
+        (issue) =>
+          issue.project_id === selectedSprint.project_id &&
+          issue.sprint_id === null &&
+          issue.status !== "done",
+      )
+    : [];
   const overdueIssuesCount = openIssues.filter(
     (issue) => issueDueInfo(issue, today)?.tone === "overdue",
   ).length;
@@ -2576,6 +2711,7 @@ export function App() {
         />
 
         <SprintsSection
+          addingIssueToSprintIds={addingIssueToSprintIds}
           canCreateSprint={canCreateSprint}
           canUpdateSprint={canUpdateSprint}
           completingSprintIds={completingSprintIds}
@@ -2587,8 +2723,12 @@ export function App() {
           isCreatingSprint={isCreatingSprint}
           isEditingSprint={isEditingSprintDetails}
           isLoadingSelectedSprint={isLoadingSelectedSprint}
+          isLoadingSprintPlanning={isLoadingSprintPlanning}
           isLoadingSprints={isLoadingSprints}
           isUpdatingSprint={isUpdatingSprint}
+          onAddIssueToSprint={(issue) => {
+            void handleAddIssueToSprint(issue);
+          }}
           onCancelSprintEdit={cancelEditingSprint}
           onCompleteSprint={(sprint) => {
             void handleCompleteSprint(sprint);
@@ -2599,6 +2739,9 @@ export function App() {
           onEditSprintNameChange={setEditSprintName}
           onEditSprintStartDateChange={setEditSprintStartDate}
           onProjectFilterChange={setSprintFilterProjectId}
+          onRemoveIssueFromSprint={(issue) => {
+            void handleRemoveIssueFromSprint(issue);
+          }}
           onSelectSprint={(sprintId) => {
             void handleSelectSprint(sprintId);
           }}
@@ -2619,11 +2762,15 @@ export function App() {
           }}
           projectFilterId={sprintFilterProjectId}
           projects={projects}
+          removingIssueFromSprintIds={removingIssueFromSprintIds}
           selectedSprint={selectedSprint}
+          selectedSprintBacklogIssues={selectedSprintBacklogIssues}
           selectedSprintError={selectedSprintError}
+          selectedSprintIssues={selectedSprintIssues}
           sprintEndDate={sprintEndDate}
           sprintFormError={sprintFormError}
           sprintGoal={sprintGoal}
+          sprintPlanningError={sprintPlanningError}
           sprintName={sprintName}
           sprintProjectId={sprintProjectId}
           sprintStartDate={sprintStartDate}

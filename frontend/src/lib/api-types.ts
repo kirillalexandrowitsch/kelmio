@@ -61,6 +61,7 @@ export type Issue = {
   reporter_id: string;
   assignee_id: string | null;
   parent_issue_id: string | null;
+  sprint_id: string | null;
   due_date: string | null;
   labels: Label[];
   created_at: string;

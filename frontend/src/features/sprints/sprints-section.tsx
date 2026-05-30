@@ -1,7 +1,17 @@
 import { type FormEvent } from "react";
 
 import { FormError } from "../../components/form-feedback";
-import { type Project, type Sprint, type SprintStatus } from "../../lib/api-types";
+import {
+  type Issue,
+  type Project,
+  type Sprint,
+  type SprintStatus,
+} from "../../lib/api-types";
+import {
+  issueTypeLabels,
+  priorityLabels,
+  statusLabel,
+} from "../../lib/issue-model";
 import {
   sprintDateRange,
   sprintStatusLabels,
@@ -10,6 +20,7 @@ import {
 import { hasText } from "../../lib/validation";
 
 type SprintsSectionProps = {
+  addingIssueToSprintIds: string[];
   canCreateSprint: boolean;
   canUpdateSprint: boolean;
   completingSprintIds: string[];
@@ -21,8 +32,10 @@ type SprintsSectionProps = {
   isCreatingSprint: boolean;
   isEditingSprint: boolean;
   isLoadingSelectedSprint: boolean;
+  isLoadingSprintPlanning: boolean;
   isLoadingSprints: boolean;
   isUpdatingSprint: boolean;
+  onAddIssueToSprint: (issue: Issue) => void;
   onCancelSprintEdit: () => void;
   onCompleteSprint: (sprint: Sprint) => void;
   onCreateSprint: (event: FormEvent<HTMLFormElement>) => void;
@@ -31,6 +44,7 @@ type SprintsSectionProps = {
   onEditSprintNameChange: (value: string) => void;
   onEditSprintStartDateChange: (value: string) => void;
   onProjectFilterChange: (value: string) => void;
+  onRemoveIssueFromSprint: (issue: Issue) => void;
   onSelectSprint: (sprintId: string) => void;
   onSprintEndDateChange: (value: string) => void;
   onSprintGoalChange: (value: string) => void;
@@ -44,12 +58,16 @@ type SprintsSectionProps = {
   onViewSprintProjectIssues: (projectId: string) => void;
   projectFilterId: string;
   projects: Project[];
+  removingIssueFromSprintIds: string[];
   selectedSprint: Sprint | null;
+  selectedSprintBacklogIssues: Issue[];
   selectedSprintError: string;
+  selectedSprintIssues: Issue[];
   sprintEndDate: string;
   sprintFormError: string;
   sprintGoal: string;
   sprintName: string;
+  sprintPlanningError: string;
   sprintProjectId: string;
   sprintStartDate: string;
   sprintStatusFilter: SprintStatus | "";
@@ -59,6 +77,7 @@ type SprintsSectionProps = {
 };
 
 export function SprintsSection({
+  addingIssueToSprintIds,
   canCreateSprint,
   canUpdateSprint,
   completingSprintIds,
@@ -70,8 +89,10 @@ export function SprintsSection({
   isCreatingSprint,
   isEditingSprint,
   isLoadingSelectedSprint,
+  isLoadingSprintPlanning,
   isLoadingSprints,
   isUpdatingSprint,
+  onAddIssueToSprint,
   onCancelSprintEdit,
   onCompleteSprint,
   onCreateSprint,
@@ -80,6 +101,7 @@ export function SprintsSection({
   onEditSprintNameChange,
   onEditSprintStartDateChange,
   onProjectFilterChange,
+  onRemoveIssueFromSprint,
   onSelectSprint,
   onSprintEndDateChange,
   onSprintGoalChange,
@@ -93,12 +115,16 @@ export function SprintsSection({
   onViewSprintProjectIssues,
   projectFilterId,
   projects,
+  removingIssueFromSprintIds,
   selectedSprint,
+  selectedSprintBacklogIssues,
   selectedSprintError,
+  selectedSprintIssues,
   sprintEndDate,
   sprintFormError,
   sprintGoal,
   sprintName,
+  sprintPlanningError,
   sprintProjectId,
   sprintStartDate,
   sprintStatusFilter,
@@ -429,6 +455,21 @@ export function SprintsSection({
                     View project issues
                   </button>
                 </div>
+
+                <SprintPlanningPanel
+                  addingIssueToSprintIds={addingIssueToSprintIds}
+                  backlogIssues={selectedSprintBacklogIssues}
+                  isLoading={isLoadingSprintPlanning}
+                  onAddIssue={onAddIssueToSprint}
+                  onOpenProjectIssues={() =>
+                    onViewSprintProjectIssues(selectedSprint.project_id)
+                  }
+                  onRemoveIssue={onRemoveIssueFromSprint}
+                  planningError={sprintPlanningError}
+                  removingIssueFromSprintIds={removingIssueFromSprintIds}
+                  sprint={selectedSprint}
+                  sprintIssues={selectedSprintIssues}
+                />
               </>
             )
           ) : (
@@ -437,5 +478,151 @@ export function SprintsSection({
         </aside>
       </div>
     </section>
+  );
+}
+
+type SprintPlanningPanelProps = {
+  addingIssueToSprintIds: string[];
+  backlogIssues: Issue[];
+  isLoading: boolean;
+  onAddIssue: (issue: Issue) => void;
+  onOpenProjectIssues: () => void;
+  onRemoveIssue: (issue: Issue) => void;
+  planningError: string;
+  removingIssueFromSprintIds: string[];
+  sprint: Sprint;
+  sprintIssues: Issue[];
+};
+
+function SprintPlanningPanel({
+  addingIssueToSprintIds,
+  backlogIssues,
+  isLoading,
+  onAddIssue,
+  onOpenProjectIssues,
+  onRemoveIssue,
+  planningError,
+  removingIssueFromSprintIds,
+  sprint,
+  sprintIssues,
+}: SprintPlanningPanelProps) {
+  const canPlan = sprint.status !== "completed";
+
+  return (
+    <section className="sprint-planning-panel" aria-label="Sprint planning">
+      <header className="section-header">
+        <div>
+          <p className="eyebrow">Backlog planning</p>
+          <h3>Plan sprint issues</h3>
+        </div>
+        {isLoading ? <span className="muted">Loading</span> : null}
+      </header>
+
+      <FormError message={planningError} />
+
+      {!canPlan ? (
+        <p className="planning-note">
+          Completed sprints are read-only. Issues stay visible for history.
+        </p>
+      ) : null}
+
+      <div className="sprint-planning-grid">
+        <section className="planning-column" aria-label="Sprint issues">
+          <header>
+            <span>In sprint</span>
+            <strong>{sprintIssues.length}</strong>
+          </header>
+
+          {sprintIssues.length > 0 ? (
+            <div className="planning-issue-list">
+              {sprintIssues.map((issue) => (
+                <PlanningIssueCard
+                  actionLabel="Remove"
+                  disabled={
+                    !canPlan || removingIssueFromSprintIds.includes(issue.id)
+                  }
+                  isBusy={removingIssueFromSprintIds.includes(issue.id)}
+                  issue={issue}
+                  key={issue.id}
+                  onAction={() => onRemoveIssue(issue)}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="planning-empty">No issues in this sprint yet</div>
+          )}
+        </section>
+
+        <section className="planning-column" aria-label="Project backlog">
+          <header>
+            <span>Project backlog</span>
+            <strong>{backlogIssues.length}</strong>
+          </header>
+
+          {backlogIssues.length > 0 ? (
+            <div className="planning-issue-list">
+              {backlogIssues.map((issue) => (
+                <PlanningIssueCard
+                  actionLabel="Add"
+                  disabled={!canPlan || addingIssueToSprintIds.includes(issue.id)}
+                  isBusy={addingIssueToSprintIds.includes(issue.id)}
+                  issue={issue}
+                  key={issue.id}
+                  onAction={() => onAddIssue(issue)}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="planning-empty">
+              <span>No unplanned open issues for this project</span>
+              <button
+                className="small-button"
+                onClick={onOpenProjectIssues}
+                type="button"
+              >
+                View project issues
+              </button>
+            </div>
+          )}
+        </section>
+      </div>
+    </section>
+  );
+}
+
+type PlanningIssueCardProps = {
+  actionLabel: string;
+  disabled: boolean;
+  isBusy: boolean;
+  issue: Issue;
+  onAction: () => void;
+};
+
+function PlanningIssueCard({
+  actionLabel,
+  disabled,
+  isBusy,
+  issue,
+  onAction,
+}: PlanningIssueCardProps) {
+  return (
+    <article className="planning-issue-card">
+      <div>
+        <span className="issue-key">{issue.issue_key}</span>
+        <h4>{issue.title}</h4>
+        <p>
+          {issueTypeLabels[issue.issue_type]} · {priorityLabels[issue.priority]} ·{" "}
+          {statusLabel(issue.status)}
+        </p>
+      </div>
+      <button
+        className="small-button"
+        disabled={disabled}
+        onClick={onAction}
+        type="button"
+      >
+        {isBusy ? (actionLabel === "Add" ? "Adding" : "Removing") : actionLabel}
+      </button>
+    </article>
   );
 }
