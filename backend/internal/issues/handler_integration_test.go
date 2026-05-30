@@ -231,6 +231,81 @@ func TestIssueLinksIntegration(t *testing.T) {
 	}
 }
 
+func TestIssueListSprintFiltersIntegration(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	db := newIssueIntegrationDB(t, ctx)
+	handler := NewHandler(db, nil)
+
+	user, projectID := seedIssueIntegrationWorkspace(t, ctx, db)
+
+	var sprintID string
+	if err := db.QueryRow(ctx, `
+		INSERT INTO sprints (workspace_id, project_id, name, created_by)
+		VALUES ($1, $2, 'Sprint filter test', $3)
+		RETURNING id::text
+	`, user.WorkspaceID, projectID, user.ID).Scan(&sprintID); err != nil {
+		t.Fatalf("insert sprint: %v", err)
+	}
+
+	inSprint, err := handler.createIssue(ctx, user, normalizedCreateIssue{
+		ProjectID: projectID,
+		Title:     "Issue in sprint",
+		IssueType: "task",
+		Status:    "todo",
+		Priority:  "medium",
+	})
+	if err != nil {
+		t.Fatalf("create sprint issue: %v", err)
+	}
+	if _, err := db.Exec(ctx, `
+		UPDATE issues
+		SET sprint_id = $1
+		WHERE id = $2
+	`, sprintID, inSprint.ID); err != nil {
+		t.Fatalf("assign issue to sprint: %v", err)
+	}
+
+	withoutSprint, err := handler.createIssue(ctx, user, normalizedCreateIssue{
+		ProjectID: projectID,
+		Title:     "Issue without sprint",
+		IssueType: "task",
+		Status:    "todo",
+		Priority:  "medium",
+	})
+	if err != nil {
+		t.Fatalf("create no sprint issue: %v", err)
+	}
+
+	sprintIssues, err := handler.listIssues(ctx, user.WorkspaceID, map[string][]string{
+		"sprint_id": {sprintID},
+	})
+	if err != nil {
+		t.Fatalf("list sprint issues: %v", err)
+	}
+	if !hasIssueID(sprintIssues, inSprint.ID) {
+		t.Fatalf("expected sprint filter to contain issue %s", inSprint.ID)
+	}
+	if hasIssueID(sprintIssues, withoutSprint.ID) {
+		t.Fatalf("expected sprint filter to exclude issue %s", withoutSprint.ID)
+	}
+
+	noSprintIssues, err := handler.listIssues(ctx, user.WorkspaceID, map[string][]string{
+		"project_id": {projectID},
+		"sprint_id":  {"none"},
+	})
+	if err != nil {
+		t.Fatalf("list no sprint issues: %v", err)
+	}
+	if !hasIssueID(noSprintIssues, withoutSprint.ID) {
+		t.Fatalf("expected no sprint filter to contain issue %s", withoutSprint.ID)
+	}
+	if hasIssueID(noSprintIssues, inSprint.ID) {
+		t.Fatalf("expected no sprint filter to exclude issue %s", inSprint.ID)
+	}
+}
+
 func newIssueIntegrationDB(t *testing.T, ctx context.Context) *pgxpool.Pool {
 	t.Helper()
 

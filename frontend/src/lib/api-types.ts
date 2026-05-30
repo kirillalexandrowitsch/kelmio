@@ -187,6 +187,7 @@ export type IssueFilters = {
   query?: string;
   sort?: IssueSort;
   projectId?: string;
+  sprintId?: string;
   status?: IssueStatus;
   priority?: IssuePriority;
   assigneeId?: string;

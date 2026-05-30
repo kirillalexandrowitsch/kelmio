@@ -2,8 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  sprintDisplayName,
   sprintDateRange,
   sprintMatchesFilters,
+  sprintOptionLabel,
   sprintStatusCounts,
 } from "./sprint-model.ts";
 import { type Sprint } from "./api-types.ts";
@@ -47,6 +49,13 @@ test("formats sprint date ranges", () => {
     sprintDateRange({ start_date: null, end_date: null }),
     "No dates planned",
   );
+});
+
+test("formats sprint labels for filters and issue rows", () => {
+  assert.equal(sprintOptionLabel(baseSprint), "Sprint 1 (CORE)");
+  assert.equal(sprintDisplayName([baseSprint], baseSprint.id), "Sprint 1");
+  assert.equal(sprintDisplayName([baseSprint], "missing"), "missing");
+  assert.equal(sprintDisplayName([baseSprint], null), "No sprint");
 });
 
 test("counts sprints by status", () => {

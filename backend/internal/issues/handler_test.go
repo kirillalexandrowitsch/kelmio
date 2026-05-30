@@ -630,6 +630,47 @@ func TestIssueDueFilterCondition(t *testing.T) {
 	}
 }
 
+func TestIssueSprintFilterCondition(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		sprintValue string
+		placeholder int
+		want        string
+	}{
+		{
+			name:        "empty ignored",
+			sprintValue: "",
+			placeholder: 2,
+			want:        "",
+		},
+		{
+			name:        "none",
+			sprintValue: "none",
+			placeholder: 2,
+			want:        "i.sprint_id IS NULL",
+		},
+		{
+			name:        "specific sprint",
+			sprintValue: "6d5257d4-002e-44da-8925-d9108699c504",
+			placeholder: 3,
+			want:        "i.sprint_id = $3",
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := issueSprintFilterCondition(tt.sprintValue, tt.placeholder); got != tt.want {
+				t.Fatalf("condition = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestIssueListOrderClause(t *testing.T) {
 	t.Parallel()
 

@@ -87,12 +87,13 @@ test("describes due state relative to today", () => {
 
 test("matches combined issue filters", () => {
   const today = new Date(2026, 4, 26);
-  const issue = makeIssue();
+  const issue = makeIssue({ sprint_id: "sprint-1" });
 
   assert.equal(
     issueMatchesFilters(
       issue,
       "project-1",
+      "sprint-1",
       "todo",
       "medium",
       "user-2",
@@ -104,11 +105,19 @@ test("matches combined issue filters", () => {
     true,
   );
   assert.equal(
-    issueMatchesFilters(issue, "other-project", "", "", "", "", "", "", today),
+    issueMatchesFilters(issue, "other-project", "", "", "", "", "", "", "", today),
     false,
   );
   assert.equal(
-    issueMatchesFilters(issue, "", "", "", "unassigned", "", "", "", today),
+    issueMatchesFilters(issue, "", "other-sprint", "", "", "", "", "", "", today),
+    false,
+  );
+  assert.equal(
+    issueMatchesFilters(issue, "", "none", "", "", "", "", "", "", today),
+    false,
+  );
+  assert.equal(
+    issueMatchesFilters(issue, "", "", "", "", "unassigned", "", "", "", today),
     false,
   );
 });

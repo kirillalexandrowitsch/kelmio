@@ -124,6 +124,40 @@ function currentSprintIdFromLocation(
   return sprintIdFromPath(window.location.pathname);
 }
 
+const issueFilterSprintStatusRank: Record<SprintStatus, number> = {
+  active: 0,
+  planned: 1,
+  completed: 2,
+};
+
+function sortIssueFilterSprints(sprints: Sprint[]) {
+  return [...sprints].sort((left, right) => {
+    const statusRank =
+      issueFilterSprintStatusRank[left.status] -
+      issueFilterSprintStatusRank[right.status];
+    if (statusRank !== 0) {
+      return statusRank;
+    }
+
+    const projectRank = left.project_key.localeCompare(right.project_key);
+    if (projectRank !== 0) {
+      return projectRank;
+    }
+
+    return left.name.localeCompare(right.name);
+  });
+}
+
+function upsertIssueFilterSprint(sprints: Sprint[], sprint: Sprint) {
+  const nextSprints = sprints.some((currentSprint) => currentSprint.id === sprint.id)
+    ? sprints.map((currentSprint) =>
+        currentSprint.id === sprint.id ? sprint : currentSprint,
+      )
+    : [...sprints, sprint];
+
+  return sortIssueFilterSprints(nextSprints);
+}
+
 export function App() {
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [loginValue, setLoginValue] = useState("admin");
@@ -201,6 +235,7 @@ export function App() {
   const [issueFilterQuery, setIssueFilterQuery] = useState("");
   const [issueSort, setIssueSort] = useState<IssueSort>("created_desc");
   const [issueFilterProjectId, setIssueFilterProjectId] = useState("");
+  const [issueFilterSprintId, setIssueFilterSprintId] = useState("");
   const [issueFilterStatus, setIssueFilterStatus] = useState<IssueStatus | "">("");
   const [issueFilterPriority, setIssueFilterPriority] = useState<
     IssuePriority | ""
@@ -253,6 +288,7 @@ export function App() {
   const [linkTargetIssueId, setLinkTargetIssueId] = useState("");
   const [linkType, setLinkType] = useState<IssueLinkType>("relates");
   const [sprints, setSprints] = useState<Sprint[]>([]);
+  const [issueFilterSprints, setIssueFilterSprints] = useState<Sprint[]>([]);
   const [sprintsError, setSprintsError] = useState("");
   const [sprintFormError, setSprintFormError] = useState("");
   const [isLoadingSprints, setIsLoadingSprints] = useState(false);
@@ -567,6 +603,7 @@ export function App() {
       query: issueFilterQuery || undefined,
       sort: issueSort,
       projectId: issueFilterProjectId || undefined,
+      sprintId: issueFilterSprintId || undefined,
       status: issueFilterStatus || undefined,
       priority: issueFilterPriority || undefined,
       assigneeId: issueFilterAssigneeId || undefined,
@@ -597,12 +634,41 @@ export function App() {
     issueFilterQuery,
     issueSort,
     issueFilterProjectId,
+    issueFilterSprintId,
     issueFilterStatus,
     issueFilterPriority,
     issueFilterAssigneeId,
     issueFilterLabelId,
     issueFilterDue,
   ]);
+
+  useEffect(() => {
+    if (!user) {
+      setIssueFilterSprints([]);
+      setIssueFilterSprintId("");
+      return;
+    }
+
+    let isMounted = true;
+
+    listSprints()
+      .then((response) => {
+        if (isMounted) {
+          setIssueFilterSprints(sortIssueFilterSprints(response.sprints));
+        }
+      })
+      .catch((err) => {
+        if (isMounted) {
+          setIssuesError(
+            apiErrorMessage(err, "Could not load sprint filter options."),
+          );
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user]);
 
   useEffect(() => {
     if (!user) {
@@ -1520,6 +1586,9 @@ export function App() {
   }
 
   function upsertSprintInList(sprint: Sprint) {
+    setIssueFilterSprints((currentSprints) =>
+      upsertIssueFilterSprint(currentSprints, sprint),
+    );
     setSprints((currentSprints) => {
       if (!sprintMatchesFilters(sprint, sprintFilterProjectId, sprintFilterStatus)) {
         return currentSprints.filter((currentSprint) => currentSprint.id !== sprint.id);
@@ -1569,17 +1638,45 @@ export function App() {
     }
   }
 
-  function setIssueSprint(issueId: string, sprintId: string | null) {
-    const updateIssueSprint = (issue: Issue) =>
-      issue.id === issueId ? { ...issue, sprint_id: sprintId } : issue;
+  function syncIssueSprint(issue: Issue, sprintId: string | null) {
+    const updatedIssue = { ...issue, sprint_id: sprintId };
+    const updateIssueSprint = (currentIssue: Issue) =>
+      currentIssue.id === issue.id ? updatedIssue : currentIssue;
 
-    setIssues((currentIssues) => currentIssues.map(updateIssueSprint));
+    setIssues((currentIssues) => {
+      const matchesFilters = issueMatchesFilters(
+        updatedIssue,
+        issueFilterProjectId,
+        issueFilterSprintId,
+        issueFilterStatus,
+        issueFilterPriority,
+        issueFilterAssigneeId,
+        issueFilterLabelId,
+        issueFilterDue,
+        issueFilterQuery,
+        today,
+      );
+      const hasIssue = currentIssues.some(
+        (currentIssue) => currentIssue.id === updatedIssue.id,
+      );
+
+      if (!matchesFilters) {
+        return currentIssues.filter(
+          (currentIssue) => currentIssue.id !== updatedIssue.id,
+        );
+      }
+      if (!hasIssue) {
+        return [updatedIssue, ...currentIssues];
+      }
+
+      return currentIssues.map(updateIssueSprint);
+    });
     setSprintPlanningIssues((currentIssues) =>
       currentIssues.map(updateIssueSprint),
     );
     setIssueChildren((currentIssues) => currentIssues.map(updateIssueSprint));
     setSelectedIssue((currentIssue) =>
-      currentIssue?.id === issueId ? updateIssueSprint(currentIssue) : currentIssue,
+      currentIssue?.id === issue.id ? updateIssueSprint(currentIssue) : currentIssue,
     );
   }
 
@@ -1792,7 +1889,7 @@ export function App() {
       const sprint = await addIssueToSprint(selectedSprint.id, issue.id);
       setSelectedSprint(sprint);
       upsertSprintInList(sprint);
-      setIssueSprint(issue.id, sprint.id);
+      syncIssueSprint(issue, sprint.id);
     } catch (err) {
       setSprintPlanningError(apiErrorMessage(err, "Could not add issue to sprint."));
     } finally {
@@ -1818,7 +1915,7 @@ export function App() {
       const sprint = await getSprint(selectedSprint.id);
       setSelectedSprint(sprint);
       upsertSprintInList(sprint);
-      setIssueSprint(issue.id, null);
+      syncIssueSprint(issue, null);
     } catch (err) {
       setSprintPlanningError(
         apiErrorMessage(err, "Could not remove issue from sprint."),
@@ -1863,6 +1960,7 @@ export function App() {
           !issueMatchesFilters(
             updatedIssue,
             issueFilterProjectId,
+            issueFilterSprintId,
             issueFilterStatus,
             issueFilterPriority,
             issueFilterAssigneeId,
@@ -1902,6 +2000,7 @@ export function App() {
           !issueMatchesFilters(
             updatedIssue,
             issueFilterProjectId,
+            issueFilterSprintId,
             issueFilterStatus,
             issueFilterPriority,
             issueFilterAssigneeId,
@@ -1959,6 +2058,7 @@ export function App() {
           !issueMatchesFilters(
             updatedIssue,
             issueFilterProjectId,
+            issueFilterSprintId,
             issueFilterStatus,
             issueFilterPriority,
             issueFilterAssigneeId,
@@ -2012,6 +2112,7 @@ export function App() {
           !issueMatchesFilters(
             updatedIssue,
             issueFilterProjectId,
+            issueFilterSprintId,
             issueFilterStatus,
             issueFilterPriority,
             issueFilterAssigneeId,
@@ -2167,6 +2268,7 @@ export function App() {
         issueMatchesFilters(
           issue,
           issueFilterProjectId,
+          issueFilterSprintId,
           issueFilterStatus,
           issueFilterPriority,
           issueFilterAssigneeId,
@@ -2229,6 +2331,7 @@ export function App() {
           !issueMatchesFilters(
             subtask,
             issueFilterProjectId,
+            issueFilterSprintId,
             issueFilterStatus,
             issueFilterPriority,
             issueFilterAssigneeId,
@@ -2474,6 +2577,34 @@ export function App() {
     void handleTransitionIssue(issue.id, nextStatus);
   }
 
+  function handleIssueProjectFilterChange(projectId: string) {
+    setIssueFilterProjectId(projectId);
+    setIssueFilterSprintId((currentSprintId) => {
+      if (!currentSprintId || currentSprintId === "none" || !projectId) {
+        return currentSprintId;
+      }
+
+      const sprint = issueFilterSprints.find(
+        (currentSprint) => currentSprint.id === currentSprintId,
+      );
+      return sprint?.project_id === projectId ? currentSprintId : "";
+    });
+  }
+
+  function handleIssueSprintFilterChange(sprintId: string) {
+    setIssueFilterSprintId(sprintId);
+    if (!sprintId || sprintId === "none") {
+      return;
+    }
+
+    const sprint = issueFilterSprints.find(
+      (currentSprint) => currentSprint.id === sprintId,
+    );
+    if (sprint) {
+      setIssueFilterProjectId(sprint.project_id);
+    }
+  }
+
   const today = startOfToday();
   const openIssues = issues.filter((issue) => issue.status !== "done");
   const selectedProjectIssues = selectedProjectDetail
@@ -2493,6 +2624,9 @@ export function App() {
           issue.status !== "done",
       )
     : [];
+  const issueFilterVisibleSprints = issueFilterProjectId
+    ? issueFilterSprints.filter((sprint) => sprint.project_id === issueFilterProjectId)
+    : issueFilterSprints;
   const overdueIssuesCount = openIssues.filter(
     (issue) => issueDueInfo(issue, today)?.tone === "overdue",
   ).length;
@@ -2860,6 +2994,7 @@ export function App() {
             onClearFilters={() => {
               setIssueFilterQuery("");
               setIssueFilterProjectId("");
+              setIssueFilterSprintId("");
               setIssueFilterStatus("");
               setIssueFilterPriority("");
               setIssueFilterAssigneeId("");
@@ -2872,15 +3007,18 @@ export function App() {
               void handleSelectIssue(issueId);
             }}
             onPriorityFilterChange={setIssueFilterPriority}
-            onProjectFilterChange={setIssueFilterProjectId}
+            onProjectFilterChange={handleIssueProjectFilterChange}
             onQueryChange={setIssueFilterQuery}
             onSortChange={setIssueSort}
+            onSprintFilterChange={handleIssueSprintFilterChange}
             onStatusFilterChange={setIssueFilterStatus}
             priorityFilter={issueFilterPriority}
             projectFilterId={issueFilterProjectId}
             projects={projects}
             query={issueFilterQuery}
             sort={issueSort}
+            sprintFilterId={issueFilterSprintId}
+            sprints={issueFilterVisibleSprints}
             statusFilter={issueFilterStatus}
             teamMembers={teamMembers}
             today={today}

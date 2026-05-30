@@ -1151,6 +1151,13 @@ func (h *Handler) listIssues(ctx context.Context, workspaceID string, query map[
 	}
 
 	addFilter("i.project_id", firstQueryValue(query, "project_id"))
+	sprintID := strings.TrimSpace(firstQueryValue(query, "sprint_id"))
+	if sprintCondition := issueSprintFilterCondition(sprintID, len(args)+1); sprintCondition != "" {
+		if sprintID != "none" {
+			args = append(args, sprintID)
+		}
+		conditions = append(conditions, sprintCondition)
+	}
 	addFilter("i.status", firstQueryValue(query, "status"))
 	addFilter("i.priority", firstQueryValue(query, "priority"))
 	if dueCondition := issueDueFilterCondition(firstQueryValue(query, "due")); dueCondition != "" {
@@ -2899,6 +2906,17 @@ func issueDueFilterCondition(dueValue string) string {
 		return "i.due_date IS NULL"
 	default:
 		return ""
+	}
+}
+
+func issueSprintFilterCondition(sprintValue string, placeholder int) string {
+	switch strings.TrimSpace(sprintValue) {
+	case "":
+		return ""
+	case "none":
+		return "i.sprint_id IS NULL"
+	default:
+		return fmt.Sprintf("i.sprint_id = $%d", placeholder)
 	}
 }
 

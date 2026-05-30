@@ -64,6 +64,7 @@ export type DueTone = "overdue" | "due-soon" | "scheduled" | "done";
 export function issueMatchesFilters(
   issue: Issue,
   projectId: string,
+  sprintId: string,
   status: IssueStatus | "",
   priority: IssuePriority | "",
   assigneeId: string,
@@ -73,6 +74,12 @@ export function issueMatchesFilters(
   today: Date,
 ) {
   if (projectId && issue.project_id !== projectId) {
+    return false;
+  }
+  if (sprintId === "none" && issue.sprint_id !== null) {
+    return false;
+  }
+  if (sprintId && sprintId !== "none" && issue.sprint_id !== sprintId) {
     return false;
   }
   if (status && issue.status !== status) {

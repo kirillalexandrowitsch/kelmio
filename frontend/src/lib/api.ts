@@ -197,6 +197,9 @@ export async function listIssues(filters: IssueFilters = {}) {
   if (filters.projectId) {
     params.set("project_id", filters.projectId);
   }
+  if (filters.sprintId) {
+    params.set("sprint_id", filters.sprintId);
+  }
   if (filters.status) {
     params.set("status", filters.status);
   }

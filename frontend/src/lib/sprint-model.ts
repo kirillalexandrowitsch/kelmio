@@ -42,6 +42,18 @@ export function sprintDateRange(sprint: Pick<Sprint, "start_date" | "end_date">)
   return "No dates planned";
 }
 
+export function sprintOptionLabel(sprint: Sprint) {
+  return `${sprint.name} (${sprint.project_key})`;
+}
+
+export function sprintDisplayName(sprints: Sprint[], sprintId: string | null) {
+  if (!sprintId) {
+    return "No sprint";
+  }
+
+  return sprints.find((sprint) => sprint.id === sprintId)?.name ?? sprintId;
+}
+
 export function sprintStatusCounts(sprints: Sprint[]) {
   return sprints.reduce(
     (counts, sprint) => ({

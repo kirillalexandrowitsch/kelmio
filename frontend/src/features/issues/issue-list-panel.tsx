@@ -7,6 +7,7 @@ import {
   type IssueStatus,
   type Label,
   type Project,
+  type Sprint,
   type TeamMember,
 } from "../../lib/api-types";
 import {
@@ -17,6 +18,12 @@ import {
   issueTypeLabels,
   priorityLabels,
 } from "../../lib/issue-model";
+import {
+  sprintDisplayName,
+  sprintOptionLabel,
+  sprintStatusLabels,
+  sprintStatusOptions,
+} from "../../lib/sprint-model";
 import { memberDisplayName, memberOptionLabel } from "../../lib/team-view";
 import { hasText } from "../../lib/validation";
 
@@ -39,12 +46,15 @@ type IssueListPanelProps = {
   onProjectFilterChange: (value: string) => void;
   onQueryChange: (value: string) => void;
   onSortChange: (value: IssueSort) => void;
+  onSprintFilterChange: (value: string) => void;
   onStatusFilterChange: (value: IssueStatus | "") => void;
   priorityFilter: IssuePriority | "";
   projectFilterId: string;
   projects: Project[];
   query: string;
   sort: IssueSort;
+  sprintFilterId: string;
+  sprints: Sprint[];
   statusFilter: IssueStatus | "";
   teamMembers: TeamMember[];
   today: Date;
@@ -69,18 +79,22 @@ export function IssueListPanel({
   onProjectFilterChange,
   onQueryChange,
   onSortChange,
+  onSprintFilterChange,
   onStatusFilterChange,
   priorityFilter,
   projectFilterId,
   projects,
   query,
   sort,
+  sprintFilterId,
+  sprints,
   statusFilter,
   teamMembers,
   today,
 }: IssueListPanelProps) {
   const hasFilters =
     projectFilterId !== "" ||
+    sprintFilterId !== "" ||
     statusFilter !== "" ||
     priorityFilter !== "" ||
     assigneeFilterId !== "" ||
@@ -139,6 +153,35 @@ export function IssueListPanel({
                 {project.key}
               </option>
             ))}
+          </select>
+        </label>
+
+        <label>
+          <span>Sprint</span>
+          <select
+            onChange={(event) => onSprintFilterChange(event.target.value)}
+            value={sprintFilterId}
+          >
+            <option value="">All sprints</option>
+            <option value="none">No sprint</option>
+            {sprintStatusOptions.map((status) => {
+              const statusSprints = sprints.filter(
+                (sprint) => sprint.status === status,
+              );
+              if (statusSprints.length === 0) {
+                return null;
+              }
+
+              return (
+                <optgroup key={status} label={sprintStatusLabels[status]}>
+                  {statusSprints.map((sprint) => (
+                    <option key={sprint.id} value={sprint.id}>
+                      {sprintOptionLabel(sprint)}
+                    </option>
+                  ))}
+                </optgroup>
+              );
+            })}
           </select>
         </label>
 
@@ -242,6 +285,9 @@ export function IssueListPanel({
         <div className="issue-list">
           {issues.map((issue) => {
             const dueInfo = issueDueInfo(issue, today);
+            const sprintName = issue.sprint_id
+              ? sprintDisplayName(sprints, issue.sprint_id)
+              : null;
 
             return (
               <article className="issue-row" key={issue.id}>
@@ -254,6 +300,7 @@ export function IssueListPanel({
                     {columns.find((column) => column.status === issue.status)
                       ?.title ?? issue.status}{" "}
                     · {memberDisplayName(teamMembers, issue.assignee_id)}
+                    {sprintName ? ` · Sprint: ${sprintName}` : ""}
                   </p>
                   {dueInfo ? (
                     <span className={`due-badge due-badge-${dueInfo.tone}`}>
