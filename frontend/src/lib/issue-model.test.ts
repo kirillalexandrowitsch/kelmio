@@ -8,6 +8,7 @@ import {
   editableIssueTypeOptions,
   rootIssueTypeOptions,
   statusLabel,
+  storyPointsLabel,
 } from "./issue-model.ts";
 import { type Issue } from "./api-types.ts";
 
@@ -23,6 +24,7 @@ function makeIssue(overrides: Partial<Issue> = {}): Issue {
     issue_type: "task",
     status: "todo",
     priority: "medium",
+    story_points: 3,
     reporter_id: "user-1",
     assignee_id: "user-2",
     parent_issue_id: null,
@@ -52,6 +54,12 @@ test("extracts issue label ids in display order", () => {
     ),
     ["backend", "bug"],
   );
+});
+
+test("formats story point labels", () => {
+  assert.equal(storyPointsLabel(0), "0 points");
+  assert.equal(storyPointsLabel(1), "1 point");
+  assert.equal(storyPointsLabel(5), "5 points");
 });
 
 test("keeps safe issue type options for root and child issues", () => {

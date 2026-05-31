@@ -19,10 +19,12 @@ type IssueHierarchySectionProps = {
   onCreateSubtask: (event: FormEvent<HTMLFormElement>) => void;
   onOpenIssue: (issueId: string) => void;
   onPriorityChange: (value: IssuePriority) => void;
+  onStoryPointsChange: (value: string) => void;
   onStatusChange: (value: IssueStatus) => void;
   onTitleChange: (value: string) => void;
   parentIssue: Issue | null;
   subtaskPriority: IssuePriority;
+  subtaskStoryPoints: string;
   subtaskStatus: IssueStatus;
   subtaskTitle: string;
 };
@@ -38,10 +40,12 @@ export function IssueHierarchySection({
   onCreateSubtask,
   onOpenIssue,
   onPriorityChange,
+  onStoryPointsChange,
   onStatusChange,
   onTitleChange,
   parentIssue,
   subtaskPriority,
+  subtaskStoryPoints,
   subtaskStatus,
   subtaskTitle,
 }: IssueHierarchySectionProps) {
@@ -97,7 +101,7 @@ export function IssueHierarchySection({
                 </strong>
                 <small>
                   {issueTypeLabels[child.issue_type]} ·{" "}
-                  {child.status.replaceAll("_", " ")}
+                  {child.status.replaceAll("_", " ")} · {child.story_points} pts
                 </small>
               </button>
             ))}
@@ -147,6 +151,17 @@ export function IssueHierarchySection({
               </option>
             ))}
           </select>
+        </label>
+
+        <label>
+          <span>Points</span>
+          <input
+            min="0"
+            max="100"
+            onChange={(event) => onStoryPointsChange(event.target.value)}
+            type="number"
+            value={subtaskStoryPoints}
+          />
         </label>
 
         <button disabled={!canCreateSubtask} type="submit">

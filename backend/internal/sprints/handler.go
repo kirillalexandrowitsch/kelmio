@@ -72,6 +72,10 @@ type sprintResponse struct {
 	CreatedAt   time.Time  `json:"created_at"`
 	CompletedAt *time.Time `json:"completed_at"`
 	IssueCount  int        `json:"issue_count"`
+	DoneCount   int        `json:"done_count"`
+	PointsTotal int        `json:"points_total"`
+	PointsDone  int        `json:"points_done"`
+	PointsOpen  int        `json:"points_open"`
 }
 
 type listSprintsResponse struct {
@@ -443,6 +447,33 @@ func (h *Handler) listSprints(ctx context.Context, workspaceID string, projectID
 				FROM issues i
 				WHERE i.sprint_id = s.id
 					AND i.archived_at IS NULL
+			),
+			(
+				SELECT COUNT(*)::int
+				FROM issues i
+				WHERE i.sprint_id = s.id
+					AND i.archived_at IS NULL
+					AND i.status = 'done'
+			),
+			(
+				SELECT COALESCE(SUM(i.story_points), 0)::int
+				FROM issues i
+				WHERE i.sprint_id = s.id
+					AND i.archived_at IS NULL
+			),
+			(
+				SELECT COALESCE(SUM(i.story_points), 0)::int
+				FROM issues i
+				WHERE i.sprint_id = s.id
+					AND i.archived_at IS NULL
+					AND i.status = 'done'
+			),
+			(
+				SELECT COALESCE(SUM(i.story_points), 0)::int
+				FROM issues i
+				WHERE i.sprint_id = s.id
+					AND i.archived_at IS NULL
+					AND i.status <> 'done'
 			)
 		FROM sprints s
 		JOIN projects p ON p.id = s.project_id
@@ -516,6 +547,10 @@ func (h *Handler) createSprint(ctx context.Context, user auth.CurrentUser, input
 			inserted.created_by::text,
 			inserted.created_at,
 			inserted.completed_at,
+			0::int,
+			0::int,
+			0::int,
+			0::int,
 			0::int
 		FROM inserted
 		JOIN projects p ON p.id = inserted.project_id
@@ -578,6 +613,33 @@ func (h *Handler) updateSprint(ctx context.Context, workspaceID string, sprintID
 				FROM issues i
 				WHERE i.sprint_id = s.id
 					AND i.archived_at IS NULL
+			),
+			(
+				SELECT COUNT(*)::int
+				FROM issues i
+				WHERE i.sprint_id = s.id
+					AND i.archived_at IS NULL
+					AND i.status = 'done'
+			),
+			(
+				SELECT COALESCE(SUM(i.story_points), 0)::int
+				FROM issues i
+				WHERE i.sprint_id = s.id
+					AND i.archived_at IS NULL
+			),
+			(
+				SELECT COALESCE(SUM(i.story_points), 0)::int
+				FROM issues i
+				WHERE i.sprint_id = s.id
+					AND i.archived_at IS NULL
+					AND i.status = 'done'
+			),
+			(
+				SELECT COALESCE(SUM(i.story_points), 0)::int
+				FROM issues i
+				WHERE i.sprint_id = s.id
+					AND i.archived_at IS NULL
+					AND i.status <> 'done'
 			)
 	`, sprintID, workspaceID, input.Name, input.Goal, dateOrNil(input.StartDate), dateOrNil(input.EndDate)))
 	if err != nil {
@@ -636,6 +698,33 @@ func (h *Handler) startSprint(ctx context.Context, workspaceID string, sprintID 
 				FROM issues i
 				WHERE i.sprint_id = s.id
 					AND i.archived_at IS NULL
+			),
+			(
+				SELECT COUNT(*)::int
+				FROM issues i
+				WHERE i.sprint_id = s.id
+					AND i.archived_at IS NULL
+					AND i.status = 'done'
+			),
+			(
+				SELECT COALESCE(SUM(i.story_points), 0)::int
+				FROM issues i
+				WHERE i.sprint_id = s.id
+					AND i.archived_at IS NULL
+			),
+			(
+				SELECT COALESCE(SUM(i.story_points), 0)::int
+				FROM issues i
+				WHERE i.sprint_id = s.id
+					AND i.archived_at IS NULL
+					AND i.status = 'done'
+			),
+			(
+				SELECT COALESCE(SUM(i.story_points), 0)::int
+				FROM issues i
+				WHERE i.sprint_id = s.id
+					AND i.archived_at IS NULL
+					AND i.status <> 'done'
 			)
 	`, sprintID, workspaceID))
 	if err != nil {
@@ -697,6 +786,33 @@ func (h *Handler) completeSprint(ctx context.Context, workspaceID string, sprint
 				FROM issues i
 				WHERE i.sprint_id = s.id
 					AND i.archived_at IS NULL
+			),
+			(
+				SELECT COUNT(*)::int
+				FROM issues i
+				WHERE i.sprint_id = s.id
+					AND i.archived_at IS NULL
+					AND i.status = 'done'
+			),
+			(
+				SELECT COALESCE(SUM(i.story_points), 0)::int
+				FROM issues i
+				WHERE i.sprint_id = s.id
+					AND i.archived_at IS NULL
+			),
+			(
+				SELECT COALESCE(SUM(i.story_points), 0)::int
+				FROM issues i
+				WHERE i.sprint_id = s.id
+					AND i.archived_at IS NULL
+					AND i.status = 'done'
+			),
+			(
+				SELECT COALESCE(SUM(i.story_points), 0)::int
+				FROM issues i
+				WHERE i.sprint_id = s.id
+					AND i.archived_at IS NULL
+					AND i.status <> 'done'
 			)
 	`, sprintID, workspaceID))
 	if err != nil {
@@ -946,6 +1062,33 @@ func getSprintForUpdate(ctx context.Context, querier sprintQuerier, workspaceID 
 				FROM issues i
 				WHERE i.sprint_id = s.id
 					AND i.archived_at IS NULL
+			),
+			(
+				SELECT COUNT(*)::int
+				FROM issues i
+				WHERE i.sprint_id = s.id
+					AND i.archived_at IS NULL
+					AND i.status = 'done'
+			),
+			(
+				SELECT COALESCE(SUM(i.story_points), 0)::int
+				FROM issues i
+				WHERE i.sprint_id = s.id
+					AND i.archived_at IS NULL
+			),
+			(
+				SELECT COALESCE(SUM(i.story_points), 0)::int
+				FROM issues i
+				WHERE i.sprint_id = s.id
+					AND i.archived_at IS NULL
+					AND i.status = 'done'
+			),
+			(
+				SELECT COALESCE(SUM(i.story_points), 0)::int
+				FROM issues i
+				WHERE i.sprint_id = s.id
+					AND i.archived_at IS NULL
+					AND i.status <> 'done'
 			)
 		FROM sprints s
 		JOIN projects p ON p.id = s.project_id
@@ -1001,6 +1144,10 @@ func scanSprint(row rowScanner) (sprintResponse, error) {
 		&sprint.CreatedAt,
 		&sprint.CompletedAt,
 		&sprint.IssueCount,
+		&sprint.DoneCount,
+		&sprint.PointsTotal,
+		&sprint.PointsDone,
+		&sprint.PointsOpen,
 	); err != nil {
 		return sprintResponse{}, err
 	}

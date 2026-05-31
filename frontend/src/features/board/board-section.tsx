@@ -1,7 +1,12 @@
 import { type DragEvent } from "react";
 
 import { type Issue, type IssueStatus, type TeamMember } from "../../lib/api-types";
-import { columns, issueDueInfo, priorityLabels } from "../../lib/issue-model";
+import {
+  columns,
+  issueDueInfo,
+  priorityLabels,
+  storyPointsLabel,
+} from "../../lib/issue-model";
 import { memberDisplayName } from "../../lib/team-view";
 
 type BoardSectionProps = {
@@ -69,6 +74,9 @@ export function BoardSection({
                       <span>{priorityLabels[issue.priority]}</span>
                     </div>
                     <h3>{issue.title}</h3>
+                    <span className="detail-chip">
+                      {storyPointsLabel(issue.story_points)}
+                    </span>
                     {dueInfo ? (
                       <span className={`due-badge due-badge-${dueInfo.tone}`}>
                         {dueInfo.label}

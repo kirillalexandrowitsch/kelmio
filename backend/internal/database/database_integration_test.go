@@ -146,6 +146,22 @@ func TestPostgresMigrationsCreateCoreSchema(t *testing.T) {
 		t.Fatal("expected issues.sprint_id to exist")
 	}
 
+	var hasStoryPoints bool
+	if err := db.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1
+			FROM information_schema.columns
+			WHERE table_schema = $1
+				AND table_name = 'issues'
+				AND column_name = 'story_points'
+		)
+	`, schemaName).Scan(&hasStoryPoints); err != nil {
+		t.Fatalf("check story_points column: %v", err)
+	}
+	if !hasStoryPoints {
+		t.Fatal("expected issues.story_points to exist")
+	}
+
 	var userID string
 	if err := db.QueryRow(ctx, `
 		INSERT INTO users (email, username, password_hash, display_name)

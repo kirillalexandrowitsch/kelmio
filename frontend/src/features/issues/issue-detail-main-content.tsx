@@ -16,6 +16,7 @@ type IssueDetailMainContentProps = {
   editDescription: string;
   editDueDate: string;
   editPriority: IssuePriority;
+  editStoryPoints: string;
   editTitle: string;
   editType: IssueType;
   isEditing: boolean;
@@ -25,6 +26,7 @@ type IssueDetailMainContentProps = {
   onDescriptionChange: (value: string) => void;
   onDueDateChange: (value: string) => void;
   onPriorityChange: (value: IssuePriority) => void;
+  onStoryPointsChange: (value: string) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onTitleChange: (value: string) => void;
   onTypeChange: (value: IssueType) => void;
@@ -34,6 +36,7 @@ export function IssueDetailMainContent({
   editDescription,
   editDueDate,
   editPriority,
+  editStoryPoints,
   editTitle,
   editType,
   isEditing,
@@ -43,6 +46,7 @@ export function IssueDetailMainContent({
   onDescriptionChange,
   onDueDateChange,
   onPriorityChange,
+  onStoryPointsChange,
   onSubmit,
   onTitleChange,
   onTypeChange,
@@ -100,14 +104,27 @@ export function IssueDetailMainContent({
           </label>
         </div>
 
-        <label>
-          <span>Due date</span>
-          <input
-            onChange={(event) => onDueDateChange(event.target.value)}
-            type="date"
-            value={editDueDate}
-          />
-        </label>
+        <div className="field-grid">
+          <label>
+            <span>Due date</span>
+            <input
+              onChange={(event) => onDueDateChange(event.target.value)}
+              type="date"
+              value={editDueDate}
+            />
+          </label>
+
+          <label>
+            <span>Story points</span>
+            <input
+              min="0"
+              max="100"
+              onChange={(event) => onStoryPointsChange(event.target.value)}
+              type="number"
+              value={editStoryPoints}
+            />
+          </label>
+        </div>
 
         <div className="form-actions">
           <button disabled={isUpdating || !hasText(editTitle)} type="submit">
@@ -132,6 +149,7 @@ export function IssueDetailMainContent({
         <span className="issue-key">{issue.issue_key}</span>
         <span className="detail-chip">{issueTypeLabels[issue.issue_type]}</span>
         <span className="detail-chip">{priorityLabels[issue.priority]}</span>
+        <span className="detail-chip">{issue.story_points} pts</span>
       </div>
 
       <div>

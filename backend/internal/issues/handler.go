@@ -65,6 +65,7 @@ type createIssueRequest struct {
 	IssueType     string   `json:"issue_type"`
 	Status        string   `json:"status"`
 	Priority      string   `json:"priority"`
+	StoryPoints   int      `json:"story_points"`
 	AssigneeID    string   `json:"assignee_id"`
 	DueDate       string   `json:"due_date"`
 	LabelIDs      []string `json:"label_ids"`
@@ -75,6 +76,7 @@ type createSubtaskRequest struct {
 	Description string   `json:"description"`
 	Status      string   `json:"status"`
 	Priority    string   `json:"priority"`
+	StoryPoints int      `json:"story_points"`
 	AssigneeID  string   `json:"assignee_id"`
 	DueDate     string   `json:"due_date"`
 	LabelIDs    []string `json:"label_ids"`
@@ -85,6 +87,7 @@ type updateIssueRequest struct {
 	Description string `json:"description"`
 	IssueType   string `json:"issue_type"`
 	Priority    string `json:"priority"`
+	StoryPoints int    `json:"story_points"`
 	DueDate     string `json:"due_date"`
 }
 
@@ -134,6 +137,7 @@ type issueResponse struct {
 	IssueType     string               `json:"issue_type"`
 	Status        string               `json:"status"`
 	Priority      string               `json:"priority"`
+	StoryPoints   int                  `json:"story_points"`
 	ReporterID    string               `json:"reporter_id"`
 	AssigneeID    *string              `json:"assignee_id"`
 	ParentIssueID *string              `json:"parent_issue_id"`
@@ -208,6 +212,7 @@ type normalizedCreateIssue struct {
 	IssueType     string
 	Status        string
 	Priority      string
+	StoryPoints   int
 	AssigneeID    string
 	DueDate       string
 	LabelIDs      []string
@@ -218,6 +223,7 @@ type normalizedUpdateIssue struct {
 	Description string
 	IssueType   string
 	Priority    string
+	StoryPoints int
 	DueDate     string
 }
 
@@ -1207,6 +1213,7 @@ func (h *Handler) listIssues(ctx context.Context, workspaceID string, query map[
 			i.issue_type,
 			i.status,
 			i.priority,
+			i.story_points,
 			i.reporter_id::text,
 			i.assignee_id::text,
 			i.parent_issue_id::text,
@@ -1283,6 +1290,7 @@ func (h *Handler) getIssue(ctx context.Context, workspaceID string, issueID stri
 			i.issue_type,
 			i.status,
 			i.priority,
+			i.story_points,
 			i.reporter_id::text,
 			i.assignee_id::text,
 			i.parent_issue_id::text,
@@ -1382,16 +1390,17 @@ func (h *Handler) createIssue(ctx context.Context, user auth.CurrentUser, input 
 			issue_type,
 			status,
 			priority,
+			story_points,
 			reporter_id,
 			assignee_id,
 			parent_issue_id,
 			due_date
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 		RETURNING
 			id::text,
 			project_id::text,
-			$13::text,
+			$14::text,
 			number,
 			issue_key,
 			title,
@@ -1399,6 +1408,7 @@ func (h *Handler) createIssue(ctx context.Context, user auth.CurrentUser, input 
 			issue_type,
 			status,
 			priority,
+			story_points,
 			reporter_id::text,
 			assignee_id::text,
 			parent_issue_id::text,
@@ -1407,7 +1417,7 @@ func (h *Handler) createIssue(ctx context.Context, user auth.CurrentUser, input 
 			created_at,
 			updated_at,
 			'[]'::jsonb
-	`, input.ProjectID, nextNumber, issueKey, input.Title, input.Description, input.IssueType, input.Status, input.Priority, user.ID, assigneeID, parentIssueID, dueDate, projectKey))
+	`, input.ProjectID, nextNumber, issueKey, input.Title, input.Description, input.IssueType, input.Status, input.Priority, input.StoryPoints, user.ID, assigneeID, parentIssueID, dueDate, projectKey))
 	if err != nil {
 		return issueResponse{}, err
 	}
@@ -1433,6 +1443,7 @@ func (h *Handler) createIssue(ctx context.Context, user auth.CurrentUser, input 
 		"title":     issue.Title,
 		"status":    issue.Status,
 		"priority":  issue.Priority,
+		"points":    fmt.Sprintf("%d", issue.StoryPoints),
 	}
 	if input.ParentIssueID != "" {
 		activityPayload["parent_issue_id"] = input.ParentIssueID
@@ -1469,6 +1480,7 @@ func (h *Handler) updateIssue(ctx context.Context, user auth.CurrentUser, issueI
 			i.issue_type,
 			i.status,
 			i.priority,
+			i.story_points,
 			i.reporter_id::text,
 			i.assignee_id::text,
 			i.parent_issue_id::text,
@@ -1522,7 +1534,8 @@ func (h *Handler) updateIssue(ctx context.Context, user auth.CurrentUser, issueI
 			description = $4,
 			issue_type = $5,
 			priority = $6,
-			due_date = $7::date,
+			story_points = $7,
+			due_date = $8::date,
 			updated_at = now()
 		FROM projects p
 		WHERE i.project_id = p.id
@@ -1541,6 +1554,7 @@ func (h *Handler) updateIssue(ctx context.Context, user auth.CurrentUser, issueI
 			i.issue_type,
 			i.status,
 			i.priority,
+			i.story_points,
 			i.reporter_id::text,
 			i.assignee_id::text,
 			i.parent_issue_id::text,
@@ -1564,7 +1578,7 @@ func (h *Handler) updateIssue(ctx context.Context, user auth.CurrentUser, issueI
 				JOIN labels l ON l.id = il.label_id
 				WHERE il.issue_id = i.id
 			)
-	`, issueID, user.WorkspaceID, input.Title, input.Description, input.IssueType, input.Priority, dueDate))
+	`, issueID, user.WorkspaceID, input.Title, input.Description, input.IssueType, input.Priority, input.StoryPoints, dueDate))
 	if err != nil {
 		return issueResponse{}, err
 	}
@@ -1598,6 +1612,7 @@ func (h *Handler) listIssueChildren(ctx context.Context, workspaceID string, iss
 			i.issue_type,
 			i.status,
 			i.priority,
+			i.story_points,
 			i.reporter_id::text,
 			i.assignee_id::text,
 			i.parent_issue_id::text,
@@ -1673,6 +1688,7 @@ func (h *Handler) setIssueParent(ctx context.Context, user auth.CurrentUser, iss
 			i.issue_type,
 			i.status,
 			i.priority,
+			i.story_points,
 			i.reporter_id::text,
 			i.assignee_id::text,
 			i.parent_issue_id::text,
@@ -1753,6 +1769,7 @@ func (h *Handler) setIssueParent(ctx context.Context, user auth.CurrentUser, iss
 			i.issue_type,
 			i.status,
 			i.priority,
+			i.story_points,
 			i.reporter_id::text,
 			i.assignee_id::text,
 			i.parent_issue_id::text,
@@ -1984,6 +2001,7 @@ func (h *Handler) transitionIssueStatus(ctx context.Context, user auth.CurrentUs
 			i.issue_type,
 			i.status,
 			i.priority,
+			i.story_points,
 			i.reporter_id::text,
 			i.assignee_id::text,
 			i.parent_issue_id::text,
@@ -2081,6 +2099,7 @@ func (h *Handler) assignIssue(ctx context.Context, user auth.CurrentUser, issueI
 			i.issue_type,
 			i.status,
 			i.priority,
+			i.story_points,
 			i.reporter_id::text,
 			i.assignee_id::text,
 			i.parent_issue_id::text,
@@ -2200,6 +2219,7 @@ func (h *Handler) setIssueLabels(ctx context.Context, user auth.CurrentUser, iss
 			i.issue_type,
 			i.status,
 			i.priority,
+			i.story_points,
 			i.reporter_id::text,
 			i.assignee_id::text,
 			i.parent_issue_id::text,
@@ -2587,6 +2607,7 @@ func normalizeCreateIssue(req createIssueRequest) (normalizedCreateIssue, error)
 		IssueType:   withDefault(strings.TrimSpace(req.IssueType), "task"),
 		Status:      withDefault(strings.TrimSpace(req.Status), "todo"),
 		Priority:    withDefault(strings.TrimSpace(req.Priority), "medium"),
+		StoryPoints: req.StoryPoints,
 		AssigneeID:  strings.TrimSpace(req.AssigneeID),
 		DueDate:     strings.TrimSpace(req.DueDate),
 		LabelIDs:    labelIDs,
@@ -2624,6 +2645,9 @@ func normalizeCreateIssue(req createIssueRequest) (normalizedCreateIssue, error)
 	if !validIssuePriorities[input.Priority] {
 		return input, errors.New("priority is invalid")
 	}
+	if input.StoryPoints < 0 || input.StoryPoints > 100 {
+		return input, errors.New("story_points must be between 0 and 100")
+	}
 	if input.DueDate != "" {
 		if _, err := time.Parse(time.DateOnly, input.DueDate); err != nil {
 			return input, errors.New("due_date must be YYYY-MM-DD")
@@ -2642,6 +2666,7 @@ func normalizeCreateSubtask(parent issueResponse, req createSubtaskRequest) (nor
 		IssueType:     "subtask",
 		Status:        req.Status,
 		Priority:      req.Priority,
+		StoryPoints:   req.StoryPoints,
 		AssigneeID:    req.AssigneeID,
 		DueDate:       req.DueDate,
 		LabelIDs:      req.LabelIDs,
@@ -2666,6 +2691,7 @@ func normalizeUpdateIssue(req updateIssueRequest) (normalizedUpdateIssue, error)
 		Description: strings.TrimSpace(req.Description),
 		IssueType:   strings.TrimSpace(req.IssueType),
 		Priority:    strings.TrimSpace(req.Priority),
+		StoryPoints: req.StoryPoints,
 		DueDate:     strings.TrimSpace(req.DueDate),
 	}
 
@@ -2686,6 +2712,9 @@ func normalizeUpdateIssue(req updateIssueRequest) (normalizedUpdateIssue, error)
 	}
 	if !validIssuePriorities[input.Priority] {
 		return input, errors.New("priority is invalid")
+	}
+	if input.StoryPoints < 0 || input.StoryPoints > 100 {
+		return input, errors.New("story_points must be between 0 and 100")
 	}
 	if input.DueDate != "" {
 		if _, err := time.Parse(time.DateOnly, input.DueDate); err != nil {
@@ -3109,6 +3138,7 @@ func getIssueInTx(ctx context.Context, tx pgx.Tx, workspaceID string, issueID st
 			i.issue_type,
 			i.status,
 			i.priority,
+			i.story_points,
 			i.reporter_id::text,
 			i.assignee_id::text,
 			i.parent_issue_id::text,
@@ -3279,7 +3309,7 @@ func isCheckViolation(err error) bool {
 }
 
 func changedIssueFields(previous issueResponse, current issueResponse) []string {
-	fields := make([]string, 0, 5)
+	fields := make([]string, 0, 6)
 
 	if previous.Title != current.Title {
 		fields = append(fields, "title")
@@ -3292,6 +3322,9 @@ func changedIssueFields(previous issueResponse, current issueResponse) []string 
 	}
 	if previous.Priority != current.Priority {
 		fields = append(fields, "priority")
+	}
+	if previous.StoryPoints != current.StoryPoints {
+		fields = append(fields, "story_points")
 	}
 	if stringOrEmpty(previous.DueDate) != stringOrEmpty(current.DueDate) {
 		fields = append(fields, "due_date")
@@ -3323,6 +3356,7 @@ func scanIssue(row rowScanner) (issueResponse, error) {
 		&issue.IssueType,
 		&issue.Status,
 		&issue.Priority,
+		&issue.StoryPoints,
 		&issue.ReporterID,
 		&assigneeID,
 		&parentIssueID,

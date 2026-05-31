@@ -41,6 +41,9 @@ func TestNormalizeCreateIssueDefaults(t *testing.T) {
 	if got.Priority != "medium" {
 		t.Fatalf("Priority = %q, want %q", got.Priority, "medium")
 	}
+	if got.StoryPoints != 0 {
+		t.Fatalf("StoryPoints = %d, want 0", got.StoryPoints)
+	}
 	wantLabelIDs := strings.Join([]string{
 		"6d5257d4-002e-44da-8925-d9108699c504",
 		"f2d59348-61a3-491a-9eb1-5aec91fbdf1e",
@@ -149,6 +152,22 @@ func TestNormalizeCreateIssueValidation(t *testing.T) {
 			},
 		},
 		{
+			name: "negative story points",
+			req: createIssueRequest{
+				ProjectID:   "project-id",
+				Title:       "First issue",
+				StoryPoints: -1,
+			},
+		},
+		{
+			name: "too many story points",
+			req: createIssueRequest{
+				ProjectID:   "project-id",
+				Title:       "First issue",
+				StoryPoints: 101,
+			},
+		},
+		{
 			name: "bad label id",
 			req: createIssueRequest{
 				ProjectID: "project-id",
@@ -178,8 +197,9 @@ func TestNormalizeCreateSubtask(t *testing.T) {
 		ProjectID: "project-id",
 	}
 	got, err := normalizeCreateSubtask(parent, createSubtaskRequest{
-		Title:    " Child issue ",
-		Priority: "high",
+		Title:       " Child issue ",
+		Priority:    "high",
+		StoryPoints: 2,
 	})
 	if err != nil {
 		t.Fatalf("normalize create subtask: %v", err)
@@ -196,6 +216,9 @@ func TestNormalizeCreateSubtask(t *testing.T) {
 	}
 	if got.Title != "Child issue" {
 		t.Fatalf("Title = %q, want %q", got.Title, "Child issue")
+	}
+	if got.StoryPoints != 2 {
+		t.Fatalf("StoryPoints = %d, want 2", got.StoryPoints)
 	}
 }
 
@@ -252,6 +275,7 @@ func TestNormalizeUpdateIssue(t *testing.T) {
 		Description: "  More context  ",
 		IssueType:   "epic",
 		Priority:    "high",
+		StoryPoints: 8,
 		DueDate:     "2026-05-19",
 	})
 	if err != nil {
@@ -269,6 +293,9 @@ func TestNormalizeUpdateIssue(t *testing.T) {
 	}
 	if got.Priority != "high" {
 		t.Fatalf("Priority = %q, want %q", got.Priority, "high")
+	}
+	if got.StoryPoints != 8 {
+		t.Fatalf("StoryPoints = %d, want 8", got.StoryPoints)
 	}
 	if got.DueDate != "2026-05-19" {
 		t.Fatalf("DueDate = %q, want %q", got.DueDate, "2026-05-19")
@@ -328,6 +355,24 @@ func TestNormalizeUpdateIssueValidation(t *testing.T) {
 				IssueType: "task",
 				Priority:  "medium",
 				DueDate:   "2026/05/19",
+			},
+		},
+		{
+			name: "negative story points",
+			req: updateIssueRequest{
+				Title:       "Updated issue",
+				IssueType:   "task",
+				Priority:    "medium",
+				StoryPoints: -1,
+			},
+		},
+		{
+			name: "too many story points",
+			req: updateIssueRequest{
+				Title:       "Updated issue",
+				IssueType:   "task",
+				Priority:    "medium",
+				StoryPoints: 101,
 			},
 		},
 	}

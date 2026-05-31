@@ -122,6 +122,10 @@ export function issueLabelIds(issue: Issue) {
   return issue.labels.map((label) => label.id);
 }
 
+export function storyPointsLabel(points: number) {
+  return points === 1 ? "1 point" : `${points} points`;
+}
+
 export function startOfToday() {
   const now = new Date();
   return new Date(now.getFullYear(), now.getMonth(), now.getDate());

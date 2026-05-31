@@ -158,6 +158,16 @@ function upsertIssueFilterSprint(sprints: Sprint[], sprint: Sprint) {
   return sortIssueFilterSprints(nextSprints);
 }
 
+function parseStoryPoints(value: string) {
+  const normalizedValue = value.trim();
+  if (normalizedValue === "") {
+    return 0;
+  }
+
+  const points = Number(normalizedValue);
+  return Number.isInteger(points) && points >= 0 && points <= 100 ? points : null;
+}
+
 export function App() {
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [loginValue, setLoginValue] = useState("admin");
@@ -228,6 +238,7 @@ export function App() {
   const [issueDescription, setIssueDescription] = useState("");
   const [issueType, setIssueType] = useState<IssueType>("task");
   const [issuePriority, setIssuePriority] = useState<IssuePriority>("medium");
+  const [issueStoryPoints, setIssueStoryPoints] = useState("0");
   const [issueStatus, setIssueStatus] = useState<IssueStatus>("todo");
   const [issueAssigneeId, setIssueAssigneeId] = useState("");
   const [issueDueDate, setIssueDueDate] = useState("");
@@ -257,6 +268,7 @@ export function App() {
   const [editIssueType, setEditIssueType] = useState<IssueType>("task");
   const [editIssuePriority, setEditIssuePriority] =
     useState<IssuePriority>("medium");
+  const [editIssueStoryPoints, setEditIssueStoryPoints] = useState("0");
   const [editIssueDueDate, setEditIssueDueDate] = useState("");
   const [issueComments, setIssueComments] = useState<IssueComment[]>([]);
   const [commentsError, setCommentsError] = useState("");
@@ -278,6 +290,7 @@ export function App() {
   const [subtaskTitle, setSubtaskTitle] = useState("");
   const [subtaskPriority, setSubtaskPriority] =
     useState<IssuePriority>("medium");
+  const [subtaskStoryPoints, setSubtaskStoryPoints] = useState("0");
   const [subtaskStatus, setSubtaskStatus] = useState<IssueStatus>("todo");
   const [issueLinks, setIssueLinks] = useState<IssueLink[]>([]);
   const [linksError, setLinksError] = useState("");
@@ -289,6 +302,9 @@ export function App() {
   const [linkType, setLinkType] = useState<IssueLinkType>("relates");
   const [sprints, setSprints] = useState<Sprint[]>([]);
   const [issueFilterSprints, setIssueFilterSprints] = useState<Sprint[]>([]);
+  const [dashboardSprintIssues, setDashboardSprintIssues] = useState<Issue[]>([]);
+  const [dashboardSprintError, setDashboardSprintError] = useState("");
+  const [isLoadingDashboardSprint, setIsLoadingDashboardSprint] = useState(false);
   const [sprintsError, setSprintsError] = useState("");
   const [sprintFormError, setSprintFormError] = useState("");
   const [isLoadingSprints, setIsLoadingSprints] = useState(false);
@@ -718,6 +734,46 @@ export function App() {
   }, [user, sprintFilterProjectId, sprintFilterStatus]);
 
   useEffect(() => {
+    const activeSprint = issueFilterSprints.find(
+      (sprint) => sprint.status === "active",
+    );
+
+    if (!user || !activeSprint) {
+      setDashboardSprintIssues([]);
+      setDashboardSprintError("");
+      setIsLoadingDashboardSprint(false);
+      return;
+    }
+
+    let isMounted = true;
+    setDashboardSprintError("");
+    setIsLoadingDashboardSprint(true);
+
+    listIssues({ sprintId: activeSprint.id })
+      .then((response) => {
+        if (isMounted) {
+          setDashboardSprintIssues(response.issues);
+        }
+      })
+      .catch((err) => {
+        if (isMounted) {
+          setDashboardSprintError(
+            apiErrorMessage(err, "Could not load active sprint workload."),
+          );
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsLoadingDashboardSprint(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user, issueFilterSprints]);
+
+  useEffect(() => {
     if (!user || activeSection !== "sprints" || !routeSprintId) {
       return;
     }
@@ -851,6 +907,7 @@ export function App() {
       setSubtaskFormError("");
       setSubtaskTitle("");
       setSubtaskPriority("medium");
+      setSubtaskStoryPoints("0");
       setSubtaskStatus("todo");
       return;
     }
@@ -1028,6 +1085,7 @@ export function App() {
     setIssueFilterLabelId("");
     setIssueFilterDue("");
     setNewIssueLabelIds([]);
+    setIssueStoryPoints("0");
     setTransitioningIssueIds([]);
     setAssigningIssueIds([]);
     setLabelingIssueIds([]);
@@ -1052,6 +1110,7 @@ export function App() {
     setIsCreatingSubtask(false);
     setSubtaskTitle("");
     setSubtaskPriority("medium");
+    setSubtaskStoryPoints("0");
     setSubtaskStatus("todo");
     setIssueLinks([]);
     setLinksError("");
@@ -1062,6 +1121,10 @@ export function App() {
     setLinkTargetIssueId("");
     setLinkType("relates");
     setSprints([]);
+    setIssueFilterSprints([]);
+    setDashboardSprintIssues([]);
+    setDashboardSprintError("");
+    setIsLoadingDashboardSprint(false);
     setSprintsError("");
     setSprintFormError("");
     setIsLoadingSprints(false);
@@ -1674,6 +1737,15 @@ export function App() {
     setSprintPlanningIssues((currentIssues) =>
       currentIssues.map(updateIssueSprint),
     );
+    setDashboardSprintIssues((currentIssues) => {
+      if (sprintId === null) {
+        return currentIssues.filter(
+          (currentIssue) => currentIssue.id !== updatedIssue.id,
+        );
+      }
+
+      return currentIssues.map(updateIssueSprint);
+    });
     setIssueChildren((currentIssues) => currentIssues.map(updateIssueSprint));
     setSelectedIssue((currentIssue) =>
       currentIssue?.id === issue.id ? updateIssueSprint(currentIssue) : currentIssue,
@@ -1933,6 +2005,7 @@ export function App() {
     setEditIssueDescription(issue.description);
     setEditIssueType(issue.issue_type);
     setEditIssuePriority(issue.priority);
+    setEditIssueStoryPoints(String(issue.story_points));
     setEditIssueDueDate(issue.due_date ?? "");
     setIsEditingIssueDetails(true);
   }
@@ -1940,6 +2013,12 @@ export function App() {
   async function handleUpdateSelectedIssue(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!selectedIssue) {
+      return;
+    }
+
+    const storyPoints = parseStoryPoints(editIssueStoryPoints);
+    if (storyPoints === null) {
+      setSelectedIssueError("Story points must be a whole number from 0 to 100.");
       return;
     }
 
@@ -1952,6 +2031,7 @@ export function App() {
         description: editIssueDescription,
         issue_type: editIssueType,
         priority: editIssuePriority,
+        story_points: storyPoints,
         due_date: editIssueDueDate,
       });
 
@@ -1977,6 +2057,11 @@ export function App() {
           issue.id === updatedIssue.id ? updatedIssue : issue,
         );
       });
+      setDashboardSprintIssues((currentIssues) =>
+        currentIssues.map((issue) =>
+          issue.id === updatedIssue.id ? updatedIssue : issue,
+        ),
+      );
       setSelectedIssue(updatedIssue);
       setIsEditingIssueDetails(false);
       await refreshIssueActivity(updatedIssue.id);
@@ -2017,6 +2102,11 @@ export function App() {
           issue.id === updatedIssue.id ? updatedIssue : issue,
         );
       });
+      setDashboardSprintIssues((currentIssues) =>
+        currentIssues.map((issue) =>
+          issue.id === updatedIssue.id ? updatedIssue : issue,
+        ),
+      );
       setSelectedIssue((currentIssue) =>
         currentIssue?.id === updatedIssue.id ? updatedIssue : currentIssue,
       );
@@ -2075,6 +2165,11 @@ export function App() {
           issue.id === updatedIssue.id ? updatedIssue : issue,
         );
       });
+      setDashboardSprintIssues((currentIssues) =>
+        currentIssues.map((issue) =>
+          issue.id === updatedIssue.id ? updatedIssue : issue,
+        ),
+      );
       setSelectedIssue((currentIssue) =>
         currentIssue?.id === updatedIssue.id ? updatedIssue : currentIssue,
       );
@@ -2248,6 +2343,11 @@ export function App() {
         return;
       }
     }
+    const storyPoints = parseStoryPoints(issueStoryPoints);
+    if (storyPoints === null) {
+      setIssueFormError("Story points must be a whole number from 0 to 100.");
+      return;
+    }
 
     setIsCreatingIssue(true);
 
@@ -2259,6 +2359,7 @@ export function App() {
         issue_type: issueType,
         status: issueStatus,
         priority: issuePriority,
+        story_points: storyPoints,
         assignee_id: issueAssigneeId,
         due_date: issueDueDate,
         label_ids: newIssueLabelIds,
@@ -2286,6 +2387,7 @@ export function App() {
       setIssueDescription("");
       setIssueType("task");
       setIssuePriority("medium");
+      setIssueStoryPoints("0");
       setIssueStatus("todo");
       setIssueAssigneeId("");
       setIssueDueDate("");
@@ -2311,6 +2413,11 @@ export function App() {
       setSubtaskFormError("Subtask title is required.");
       return;
     }
+    const storyPoints = parseStoryPoints(subtaskStoryPoints);
+    if (storyPoints === null) {
+      setSubtaskFormError("Story points must be a whole number from 0 to 100.");
+      return;
+    }
 
     setIsCreatingSubtask(true);
 
@@ -2320,6 +2427,7 @@ export function App() {
         description: "",
         status: subtaskStatus,
         priority: subtaskPriority,
+        story_points: storyPoints,
         assignee_id: "",
         due_date: "",
         label_ids: [],
@@ -2348,6 +2456,7 @@ export function App() {
       });
       setSubtaskTitle("");
       setSubtaskPriority("medium");
+      setSubtaskStoryPoints("0");
       setSubtaskStatus("todo");
       await refreshIssueChildren(selectedIssue.id);
     } catch (err) {
@@ -2627,6 +2736,8 @@ export function App() {
   const issueFilterVisibleSprints = issueFilterProjectId
     ? issueFilterSprints.filter((sprint) => sprint.project_id === issueFilterProjectId)
     : issueFilterSprints;
+  const activeDashboardSprint =
+    issueFilterSprints.find((sprint) => sprint.status === "active") ?? null;
   const overdueIssuesCount = openIssues.filter(
     (issue) => issueDueInfo(issue, today)?.tone === "overdue",
   ).length;
@@ -2662,8 +2773,13 @@ export function App() {
     hasText(labelName) &&
     isValidLabelColor(labelColor) &&
     !isCreatingLabel;
+  const issueStoryPointsValue = parseStoryPoints(issueStoryPoints);
+  const subtaskStoryPointsValue = parseStoryPoints(subtaskStoryPoints);
   const canCreateIssue =
-    selectedProjectId !== "" && hasText(issueTitle) && !isCreatingIssue;
+    selectedProjectId !== "" &&
+    hasText(issueTitle) &&
+    issueStoryPointsValue !== null &&
+    !isCreatingIssue;
   const canCreateSprint =
     sprintProjectId !== "" && hasText(sprintName) && !isCreatingSprint;
   const canUpdateSprint =
@@ -2674,7 +2790,10 @@ export function App() {
   const canCreateComment =
     selectedIssue !== null && hasText(commentBody) && !isCreatingComment;
   const canCreateSubtask =
-    selectedIssue !== null && hasText(subtaskTitle) && !isCreatingSubtask;
+    selectedIssue !== null &&
+    hasText(subtaskTitle) &&
+    subtaskStoryPointsValue !== null &&
+    !isCreatingSubtask;
   const availableLinkIssues = selectedIssue
     ? issues.filter((issue) => issue.id !== selectedIssue.id)
     : [];
@@ -2729,13 +2848,18 @@ export function App() {
         />
 
         <DashboardSection
+          activeSprint={activeDashboardSprint}
+          activeSprintError={dashboardSprintError}
+          activeSprintIssues={dashboardSprintIssues}
           dueSoonIssuesCount={dueSoonIssuesCount}
           isActive={activeSection === "dashboard"}
+          isLoadingActiveSprint={isLoadingDashboardSprint}
           onNavigate={navigateToSection}
           openIssuesCount={openIssuesCount}
           overdueIssuesCount={overdueIssuesCount}
           projectsCount={projects.length}
           role={user.workspace.role}
+          teamMembers={teamMembers}
           teamMembersCount={teamMembers.length}
         />
 
@@ -2966,6 +3090,7 @@ export function App() {
             onLabelChange={handleCreateIssueLabel}
             onPriorityChange={setIssuePriority}
             onProjectChange={setSelectedProjectId}
+            onStoryPointsChange={setIssueStoryPoints}
             onStatusChange={setIssueStatus}
             onTitleChange={setIssueTitle}
             onTypeChange={setIssueType}
@@ -2973,6 +3098,7 @@ export function App() {
             projectId={selectedProjectId}
             projects={projects}
             status={issueStatus}
+            storyPoints={issueStoryPoints}
             teamMembers={teamMembers}
             title={issueTitle}
             type={issueType}
@@ -3045,6 +3171,7 @@ export function App() {
           editIssueDescription={editIssueDescription}
           editIssueDueDate={editIssueDueDate}
           editIssuePriority={editIssuePriority}
+          editIssueStoryPoints={editIssueStoryPoints}
           editIssueTitle={editIssueTitle}
           editIssueType={editIssueType}
           editingCommentId={editingCommentId}
@@ -3086,6 +3213,7 @@ export function App() {
             setSubtaskFormError("");
             setSubtaskTitle("");
             setSubtaskPriority("medium");
+            setSubtaskStoryPoints("0");
             setSubtaskStatus("todo");
             setIssueLinks([]);
             setLinksError("");
@@ -3114,6 +3242,7 @@ export function App() {
           onIssueDescriptionChange={setEditIssueDescription}
           onIssueDueDateChange={setEditIssueDueDate}
           onIssuePriorityChange={setEditIssuePriority}
+          onIssueStoryPointsChange={setEditIssueStoryPoints}
           onIssueTitleChange={setEditIssueTitle}
           onIssueTypeChange={setEditIssueType}
           onIssueLinkTargetChange={setLinkTargetIssueId}
@@ -3127,6 +3256,7 @@ export function App() {
           onStartEditingComment={startEditingComment}
           onStartEditingIssue={startEditingIssue}
           onSubtaskPriorityChange={setSubtaskPriority}
+          onSubtaskStoryPointsChange={setSubtaskStoryPoints}
           onSubtaskStatusChange={setSubtaskStatus}
           onSubtaskTitleChange={setSubtaskTitle}
           onTransitionIssue={(issueId, status) => {
@@ -3142,6 +3272,7 @@ export function App() {
           parentIssue={selectedParentIssue}
           subtaskFormError={subtaskFormError}
           subtaskPriority={subtaskPriority}
+          subtaskStoryPoints={subtaskStoryPoints}
           subtaskStatus={subtaskStatus}
           subtaskTitle={subtaskTitle}
           updatingCommentIds={updatingCommentIds}

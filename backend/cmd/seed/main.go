@@ -34,6 +34,7 @@ type demoIssue struct {
 	IssueType     string
 	Status        string
 	Priority      string
+	StoryPoints   int
 	AssigneeID    string
 	DueOffsetDays *int
 	LabelIDs      []string
@@ -127,6 +128,7 @@ func main() {
 			IssueType:   "task",
 			Status:      "done",
 			Priority:    "medium",
+			StoryPoints: 3,
 			AssigneeID:  adminID,
 			LabelIDs:    []string{backendLabelID},
 		},
@@ -137,6 +139,7 @@ func main() {
 			IssueType:     "story",
 			Status:        "in_progress",
 			Priority:      "high",
+			StoryPoints:   5,
 			AssigneeID:    demoMemberID,
 			DueOffsetDays: &dueSoon,
 			LabelIDs:      []string{frontendLabelID},
@@ -148,6 +151,7 @@ func main() {
 			IssueType:     "task",
 			Status:        "todo",
 			Priority:      "medium",
+			StoryPoints:   2,
 			DueOffsetDays: &later,
 			LabelIDs:      []string{frontendLabelID},
 		},
@@ -158,6 +162,7 @@ func main() {
 			IssueType:     "bug",
 			Status:        "blocked",
 			Priority:      "critical",
+			StoryPoints:   3,
 			AssigneeID:    adminID,
 			DueOffsetDays: &overdue,
 			LabelIDs:      []string{bugLabelID},
@@ -327,6 +332,7 @@ func ensureIssue(ctx context.Context, tx pgx.Tx, projectID string, reporterID st
 			issue_type,
 			status,
 			priority,
+			story_points,
 			reporter_id,
 			assignee_id,
 			due_date
@@ -342,7 +348,8 @@ func ensureIssue(ctx context.Context, tx pgx.Tx, projectID string, reporterID st
 			$8,
 			$9,
 			$10,
-			CASE WHEN $11::integer IS NULL THEN NULL ELSE CURRENT_DATE + $11::integer END
+			$11,
+			CASE WHEN $12::integer IS NULL THEN NULL ELSE CURRENT_DATE + $12::integer END
 		)
 		ON CONFLICT (issue_key) DO UPDATE SET
 			title = EXCLUDED.title,
@@ -350,13 +357,14 @@ func ensureIssue(ctx context.Context, tx pgx.Tx, projectID string, reporterID st
 			issue_type = EXCLUDED.issue_type,
 			status = EXCLUDED.status,
 			priority = EXCLUDED.priority,
+			story_points = EXCLUDED.story_points,
 			reporter_id = EXCLUDED.reporter_id,
 			assignee_id = EXCLUDED.assignee_id,
 			due_date = EXCLUDED.due_date,
 			updated_at = now(),
 			archived_at = NULL
 		RETURNING id::text
-	`, projectID, issue.Number, issueKey, issue.Title, issue.Description, issue.IssueType, issue.Status, issue.Priority, reporterID, assigneeID, dueOffset).Scan(&issueID); err != nil {
+	`, projectID, issue.Number, issueKey, issue.Title, issue.Description, issue.IssueType, issue.Status, issue.Priority, issue.StoryPoints, reporterID, assigneeID, dueOffset).Scan(&issueID); err != nil {
 		return "", err
 	}
 

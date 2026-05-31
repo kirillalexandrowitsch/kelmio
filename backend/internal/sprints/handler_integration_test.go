@@ -103,6 +103,9 @@ func TestSprintLifecycleIntegration(t *testing.T) {
 	if withIssue.IssueCount != 1 {
 		t.Fatalf("IssueCount after add = %d, want 1", withIssue.IssueCount)
 	}
+	if withIssue.PointsTotal != 5 || withIssue.PointsOpen != 5 || withIssue.PointsDone != 0 {
+		t.Fatalf("points after add = total:%d open:%d done:%d, want total:5 open:5 done:0", withIssue.PointsTotal, withIssue.PointsOpen, withIssue.PointsDone)
+	}
 	expectIssueSprint(t, ctx, db, issueID, sprint.ID)
 	expectIssueActivity(t, ctx, db, issueID, "issue_added_to_sprint")
 
@@ -269,9 +272,10 @@ func seedSprintIntegrationWorkspace(t *testing.T, ctx context.Context, db *pgxpo
 			issue_type,
 			status,
 			priority,
+			story_points,
 			reporter_id
 		)
-		VALUES ($1, 1, 'SPRT-1', 'Sprint issue', 'task', 'todo', 'medium', $2)
+		VALUES ($1, 1, 'SPRT-1', 'Sprint issue', 'task', 'todo', 'medium', 5, $2)
 		RETURNING id::text
 	`, projectID, userID).Scan(&issueID); err != nil {
 		t.Fatalf("insert issue: %v", err)

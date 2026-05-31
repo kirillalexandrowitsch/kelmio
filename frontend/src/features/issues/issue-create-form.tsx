@@ -33,6 +33,7 @@ type IssueCreateFormProps = {
   onLabelChange: (labelId: string, shouldAttach: boolean) => void;
   onPriorityChange: (value: IssuePriority) => void;
   onProjectChange: (value: string) => void;
+  onStoryPointsChange: (value: string) => void;
   onStatusChange: (value: IssueStatus) => void;
   onTitleChange: (value: string) => void;
   onTypeChange: (value: IssueType) => void;
@@ -40,6 +41,7 @@ type IssueCreateFormProps = {
   projectId: string;
   projects: Project[];
   status: IssueStatus;
+  storyPoints: string;
   teamMembers: TeamMember[];
   title: string;
   type: IssueType;
@@ -61,6 +63,7 @@ export function IssueCreateForm({
   onLabelChange,
   onPriorityChange,
   onProjectChange,
+  onStoryPointsChange,
   onStatusChange,
   onTitleChange,
   onTypeChange,
@@ -68,6 +71,7 @@ export function IssueCreateForm({
   projectId,
   projects,
   status,
+  storyPoints,
   teamMembers,
   title,
   type,
@@ -217,6 +221,17 @@ export function IssueCreateForm({
           />
         </label>
       </div>
+
+      <label>
+        <span>Story points</span>
+        <input
+          min="0"
+          max="100"
+          onChange={(event) => onStoryPointsChange(event.target.value)}
+          type="number"
+          value={storyPoints}
+        />
+      </label>
 
       <FormError message={formError} />
 

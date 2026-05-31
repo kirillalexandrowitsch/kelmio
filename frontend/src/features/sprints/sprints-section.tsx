@@ -15,6 +15,7 @@ import {
   issueTypeLabels,
   priorityLabels,
   statusLabel,
+  storyPointsLabel,
 } from "../../lib/issue-model";
 import {
   sprintDateRange,
@@ -478,6 +479,8 @@ export function SprintsSection({
                   </button>
                 </div>
 
+                <SprintPointsSummary issues={selectedSprintIssues} />
+
                 <ActiveSprintBoardPanel
                   issues={selectedSprintIssues}
                   onIssueDragOver={onSprintIssueDragOver}
@@ -526,6 +529,41 @@ type ActiveSprintBoardPanelProps = {
   today: Date;
   transitioningIssueIds: string[];
 };
+
+function SprintPointsSummary({ issues }: { issues: Issue[] }) {
+  const totalPoints = issues.reduce(
+    (sum, issue) => sum + issue.story_points,
+    0,
+  );
+  const donePoints = issues
+    .filter((issue) => issue.status === "done")
+    .reduce((sum, issue) => sum + issue.story_points, 0);
+  const openPoints = totalPoints - donePoints;
+  const doneIssues = issues.filter((issue) => issue.status === "done").length;
+
+  return (
+    <section className="sprint-points-summary" aria-label="Sprint points summary">
+      <article>
+        <span>Total points</span>
+        <strong>{totalPoints}</strong>
+      </article>
+      <article>
+        <span>Open points</span>
+        <strong>{openPoints}</strong>
+      </article>
+      <article>
+        <span>Done points</span>
+        <strong>{donePoints}</strong>
+      </article>
+      <article>
+        <span>Done issues</span>
+        <strong>
+          {doneIssues}/{issues.length}
+        </strong>
+      </article>
+    </section>
+  );
+}
 
 function ActiveSprintBoardPanel({
   issues,
@@ -602,6 +640,9 @@ function ActiveSprintBoardPanel({
                       </div>
 
                       <h4>{issue.title}</h4>
+                      <span className="detail-chip">
+                        {storyPointsLabel(issue.story_points)}
+                      </span>
 
                       {dueInfo ? (
                         <span className={`due-badge due-badge-${dueInfo.tone}`}>
@@ -784,7 +825,7 @@ function PlanningIssueCard({
         <h4>{issue.title}</h4>
         <p>
           {issueTypeLabels[issue.issue_type]} · {priorityLabels[issue.priority]} ·{" "}
-          {statusLabel(issue.status)}
+          {statusLabel(issue.status)} · {storyPointsLabel(issue.story_points)}
         </p>
       </div>
       <button

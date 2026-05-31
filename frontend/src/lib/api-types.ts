@@ -58,6 +58,7 @@ export type Issue = {
   issue_type: IssueType;
   status: IssueStatus;
   priority: IssuePriority;
+  story_points: number;
   reporter_id: string;
   assignee_id: string | null;
   parent_issue_id: string | null;
@@ -136,6 +137,10 @@ export type Sprint = {
   created_at: string;
   completed_at: string | null;
   issue_count: number;
+  done_count: number;
+  points_total: number;
+  points_done: number;
+  points_open: number;
 };
 
 export type ListProjectsResponse = {
@@ -219,6 +224,7 @@ export type CreateIssueInput = {
   issue_type: IssueType;
   status: IssueStatus;
   priority: IssuePriority;
+  story_points: number;
   assignee_id: string;
   due_date: string;
   label_ids: string[];
@@ -229,6 +235,7 @@ export type CreateSubtaskInput = {
   description: string;
   status: IssueStatus;
   priority: IssuePriority;
+  story_points: number;
   assignee_id: string;
   due_date: string;
   label_ids: string[];
@@ -257,6 +264,7 @@ export type UpdateIssueInput = {
   description: string;
   issue_type: IssueType;
   priority: IssuePriority;
+  story_points: number;
   due_date: string;
 };
 

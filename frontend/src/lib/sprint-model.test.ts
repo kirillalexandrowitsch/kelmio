@@ -25,6 +25,10 @@ const baseSprint: Sprint = {
   created_at: "2026-05-29T10:00:00Z",
   completed_at: null,
   issue_count: 0,
+  done_count: 0,
+  points_total: 0,
+  points_done: 0,
+  points_open: 0,
 };
 
 test("matches sprint project and status filters", () => {

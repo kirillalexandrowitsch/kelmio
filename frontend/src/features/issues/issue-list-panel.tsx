@@ -17,6 +17,7 @@ import {
   issueSortLabels,
   issueTypeLabels,
   priorityLabels,
+  storyPointsLabel,
 } from "../../lib/issue-model";
 import {
   sprintDisplayName,
@@ -299,7 +300,8 @@ export function IssueListPanel({
                     {priorityLabels[issue.priority]} ·{" "}
                     {columns.find((column) => column.status === issue.status)
                       ?.title ?? issue.status}{" "}
-                    · {memberDisplayName(teamMembers, issue.assignee_id)}
+                    · {storyPointsLabel(issue.story_points)} ·{" "}
+                    {memberDisplayName(teamMembers, issue.assignee_id)}
                     {sprintName ? ` · Sprint: ${sprintName}` : ""}
                   </p>
                   {dueInfo ? (

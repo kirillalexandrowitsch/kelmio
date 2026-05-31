@@ -41,6 +41,7 @@ type IssueDetailSectionProps = {
   editIssueDescription: string;
   editIssueDueDate: string;
   editIssuePriority: IssuePriority;
+  editIssueStoryPoints: string;
   editIssueTitle: string;
   editIssueType: IssueType;
   editingCommentId: string;
@@ -80,12 +81,14 @@ type IssueDetailSectionProps = {
   onIssueDescriptionChange: (value: string) => void;
   onIssueDueDateChange: (value: string) => void;
   onIssuePriorityChange: (value: IssuePriority) => void;
+  onIssueStoryPointsChange: (value: string) => void;
   onIssueTitleChange: (value: string) => void;
   onIssueTypeChange: (value: IssueType) => void;
   onIssueLinkTargetChange: (issueId: string) => void;
   onIssueLinkTypeChange: (linkType: IssueLinkType) => void;
   onOpenIssue: (issueId: string) => void;
   onSubtaskPriorityChange: (value: IssuePriority) => void;
+  onSubtaskStoryPointsChange: (value: string) => void;
   onSubtaskStatusChange: (value: IssueStatus) => void;
   onSubtaskTitleChange: (value: string) => void;
   onSetIssueLabel: (
@@ -107,6 +110,7 @@ type IssueDetailSectionProps = {
   parentIssue: Issue | null;
   subtaskFormError: string;
   subtaskPriority: IssuePriority;
+  subtaskStoryPoints: string;
   subtaskStatus: IssueStatus;
   subtaskTitle: string;
   updatingCommentIds: string[];
@@ -132,6 +136,7 @@ export function IssueDetailSection({
   editIssueDescription,
   editIssueDueDate,
   editIssuePriority,
+  editIssueStoryPoints,
   editIssueTitle,
   editIssueType,
   editingCommentId,
@@ -171,6 +176,7 @@ export function IssueDetailSection({
   onIssueDescriptionChange,
   onIssueDueDateChange,
   onIssuePriorityChange,
+  onIssueStoryPointsChange,
   onIssueTitleChange,
   onIssueTypeChange,
   onIssueLinkTargetChange,
@@ -180,6 +186,7 @@ export function IssueDetailSection({
   onStartEditingComment,
   onStartEditingIssue,
   onSubtaskPriorityChange,
+  onSubtaskStoryPointsChange,
   onSubtaskStatusChange,
   onSubtaskTitleChange,
   onTransitionIssue,
@@ -191,6 +198,7 @@ export function IssueDetailSection({
   parentIssue,
   subtaskFormError,
   subtaskPriority,
+  subtaskStoryPoints,
   subtaskStatus,
   subtaskTitle,
   updatingCommentIds,
@@ -253,6 +261,7 @@ export function IssueDetailSection({
               editDescription={editIssueDescription}
               editDueDate={editIssueDueDate}
               editPriority={editIssuePriority}
+              editStoryPoints={editIssueStoryPoints}
               editTitle={editIssueTitle}
               editType={editIssueType}
               isEditing={isEditingIssueDetails}
@@ -262,6 +271,7 @@ export function IssueDetailSection({
               onDescriptionChange={onIssueDescriptionChange}
               onDueDateChange={onIssueDueDateChange}
               onPriorityChange={onIssuePriorityChange}
+              onStoryPointsChange={onIssueStoryPointsChange}
               onSubmit={onUpdateIssue}
               onTitleChange={onIssueTitleChange}
               onTypeChange={onIssueTypeChange}
@@ -278,10 +288,12 @@ export function IssueDetailSection({
               onCreateSubtask={onCreateSubtask}
               onOpenIssue={onOpenIssue}
               onPriorityChange={onSubtaskPriorityChange}
+              onStoryPointsChange={onSubtaskStoryPointsChange}
               onStatusChange={onSubtaskStatusChange}
               onTitleChange={onSubtaskTitleChange}
               parentIssue={parentIssue}
               subtaskPriority={subtaskPriority}
+              subtaskStoryPoints={subtaskStoryPoints}
               subtaskStatus={subtaskStatus}
               subtaskTitle={subtaskTitle}
             />
