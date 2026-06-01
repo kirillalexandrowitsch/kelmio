@@ -5,6 +5,7 @@ import {
   type IssueSort,
   type IssueStatus,
   type IssueType,
+  type SavedIssueFilters,
 } from "./api-types.ts";
 
 export const columns = [
@@ -57,6 +58,18 @@ export const issueDueFilterLabels: Record<IssueDueFilter, string> = {
   today: "Due today",
   due_soon: "Due soon",
   no_due: "No due date",
+};
+
+export type IssueFilterState = {
+  query: string;
+  sort: IssueSort;
+  projectId: string;
+  sprintId: string;
+  status: IssueStatus | "";
+  priority: IssuePriority | "";
+  assigneeId: string;
+  labelId: string;
+  due: IssueDueFilter | "";
 };
 
 export type DueTone = "overdue" | "due-soon" | "scheduled" | "done";
@@ -124,6 +137,95 @@ export function issueLabelIds(issue: Issue) {
 
 export function storyPointsLabel(points: number) {
   return points === 1 ? "1 point" : `${points} points`;
+}
+
+export function savedIssueFiltersFromState(
+  state: IssueFilterState,
+): SavedIssueFilters {
+  const filters: SavedIssueFilters = {
+    sort: state.sort,
+  };
+
+  const query = state.query.trim();
+  if (query) {
+    filters.query = query;
+  }
+  if (state.projectId) {
+    filters.projectId = state.projectId;
+  }
+  if (state.sprintId) {
+    filters.sprintId = state.sprintId;
+  }
+  if (state.status) {
+    filters.status = state.status;
+  }
+  if (state.priority) {
+    filters.priority = state.priority;
+  }
+  if (state.assigneeId) {
+    filters.assigneeId = state.assigneeId;
+  }
+  if (state.labelId) {
+    filters.labelId = state.labelId;
+  }
+  if (state.due) {
+    filters.due = state.due;
+  }
+
+  return filters;
+}
+
+export function savedIssueFilterStateFromFilters(
+  filters: SavedIssueFilters,
+): IssueFilterState {
+  return {
+    query: filters.query ?? "",
+    sort: filters.sort ?? "created_desc",
+    projectId: filters.projectId ?? "",
+    sprintId: filters.sprintId ?? "",
+    status: filters.status ?? "",
+    priority: filters.priority ?? "",
+    assigneeId: filters.assigneeId ?? "",
+    labelId: filters.labelId ?? "",
+    due: filters.due ?? "",
+  };
+}
+
+export function missingFilterOptionLabel(
+  kind: "project" | "sprint" | "assignee" | "label",
+) {
+  return `Missing ${kind}`;
+}
+
+export function savedIssueFilterSummary(filters: SavedIssueFilters) {
+  const parts: string[] = [];
+  if (filters.query) {
+    parts.push(`Search: ${filters.query}`);
+  }
+  if (filters.projectId) {
+    parts.push("Project");
+  }
+  if (filters.sprintId) {
+    parts.push(filters.sprintId === "none" ? "No sprint" : "Sprint");
+  }
+  if (filters.status) {
+    parts.push(`Status: ${statusLabel(filters.status)}`);
+  }
+  if (filters.priority) {
+    parts.push(`Priority: ${priorityLabels[filters.priority]}`);
+  }
+  if (filters.assigneeId) {
+    parts.push(filters.assigneeId === "unassigned" ? "Unassigned" : "Assignee");
+  }
+  if (filters.labelId) {
+    parts.push("Label");
+  }
+  if (filters.due) {
+    parts.push(`Due: ${issueDueFilterLabels[filters.due]}`);
+  }
+  parts.push(`Sort: ${issueSortLabels[filters.sort ?? "created_desc"]}`);
+
+  return parts;
 }
 
 export function startOfToday() {

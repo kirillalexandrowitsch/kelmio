@@ -5,8 +5,12 @@ import {
   issueDueInfo,
   issueLabelIds,
   issueMatchesFilters,
+  missingFilterOptionLabel,
   editableIssueTypeOptions,
   rootIssueTypeOptions,
+  savedIssueFilterStateFromFilters,
+  savedIssueFilterSummary,
+  savedIssueFiltersFromState,
   statusLabel,
   storyPointsLabel,
 } from "./issue-model.ts";
@@ -60,6 +64,62 @@ test("formats story point labels", () => {
   assert.equal(storyPointsLabel(0), "0 points");
   assert.equal(storyPointsLabel(1), "1 point");
   assert.equal(storyPointsLabel(5), "5 points");
+});
+
+test("builds saved issue filters without empty values", () => {
+  assert.deepEqual(
+    savedIssueFiltersFromState({
+      query: " routing ",
+      sort: "priority_desc",
+      projectId: "project-1",
+      sprintId: "",
+      status: "todo",
+      priority: "",
+      assigneeId: "unassigned",
+      labelId: "",
+      due: "due_soon",
+    }),
+    {
+      query: "routing",
+      sort: "priority_desc",
+      projectId: "project-1",
+      status: "todo",
+      assigneeId: "unassigned",
+      due: "due_soon",
+    },
+  );
+});
+
+test("applies saved issue filters with defaults", () => {
+  assert.deepEqual(
+    savedIssueFilterStateFromFilters({
+      sort: "created_desc",
+      labelId: "label-1",
+    }),
+    {
+      query: "",
+      sort: "created_desc",
+      projectId: "",
+      sprintId: "",
+      status: "",
+      priority: "",
+      assigneeId: "",
+      labelId: "label-1",
+      due: "",
+    },
+  );
+});
+
+test("describes saved filters and missing options", () => {
+  assert.deepEqual(
+    savedIssueFilterSummary({
+      sort: "created_desc",
+      sprintId: "none",
+      priority: "critical",
+    }),
+    ["No sprint", "Priority: Critical", "Sort: Newest first"],
+  );
+  assert.equal(missingFilterOptionLabel("project"), "Missing project");
 });
 
 test("keeps safe issue type options for root and child issues", () => {

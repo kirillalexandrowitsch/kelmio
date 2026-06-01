@@ -143,6 +143,28 @@ export type Sprint = {
   points_open: number;
 };
 
+export type SavedIssueFilters = {
+  query?: string;
+  sort: IssueSort;
+  projectId?: string;
+  sprintId?: string;
+  status?: IssueStatus;
+  priority?: IssuePriority;
+  assigneeId?: string;
+  labelId?: string;
+  due?: IssueDueFilter;
+};
+
+export type SavedFilter = {
+  id: string;
+  workspace_id: string;
+  user_id: string;
+  name: string;
+  filters: SavedIssueFilters;
+  created_at: string;
+  updated_at: string;
+};
+
 export type ListProjectsResponse = {
   projects: Project[];
 };
@@ -188,6 +210,10 @@ export type ListSprintsResponse = {
   sprints: Sprint[];
 };
 
+export type ListSavedFiltersResponse = {
+  saved_filters: SavedFilter[];
+};
+
 export type IssueFilters = {
   query?: string;
   sort?: IssueSort;
@@ -203,6 +229,16 @@ export type IssueFilters = {
 export type SprintFilters = {
   projectId?: string;
   status?: SprintStatus;
+};
+
+export type CreateSavedFilterInput = {
+  name: string;
+  filters: SavedIssueFilters;
+};
+
+export type UpdateSavedFilterInput = {
+  name?: string;
+  filters?: SavedIssueFilters;
 };
 
 export type CreateProjectInput = {

@@ -4,6 +4,7 @@ import {
   type CreateIssueLinkInput,
   type CreateLabelInput,
   type CreateProjectInput,
+  type CreateSavedFilterInput,
   type CreateSprintInput,
   type CreateSubtaskInput,
   type CreateTeamMemberInput,
@@ -19,15 +20,18 @@ import {
   type ListIssuesResponse,
   type ListLabelsResponse,
   type ListProjectsResponse,
+  type ListSavedFiltersResponse,
   type ListSprintsResponse,
   type ListTeamMembersResponse,
   type Project,
+  type SavedFilter,
   type Sprint,
   type SprintFilters,
   type SprintStatus,
   type TeamMember,
   type UpdateIssueInput,
   type UpdateProjectInput,
+  type UpdateSavedFilterInput,
   type UpdateSprintInput,
   type UpdateTeamMemberInput,
 } from "./api-types";
@@ -46,14 +50,18 @@ export type {
   IssueType,
   Label,
   Project,
+  SavedFilter,
+  SavedIssueFilters,
   Sprint,
   SprintFilters,
   SprintStatus,
   TeamMember,
   CreateIssueLinkInput,
+  CreateSavedFilterInput,
   CreateSprintInput,
   CreateSubtaskInput,
   UpdateIssueInput,
+  UpdateSavedFilterInput,
   UpdateSprintInput,
 } from "./api-types";
 
@@ -184,6 +192,39 @@ export async function deleteLabel(labelId: string) {
   await request<void>(`/api/v1/labels/${encodeURIComponent(labelId)}`, {
     method: "DELETE",
   });
+}
+
+export async function listSavedFilters() {
+  return request<ListSavedFiltersResponse>("/api/v1/saved-filters");
+}
+
+export async function createSavedFilter(input: CreateSavedFilterInput) {
+  return request<SavedFilter>("/api/v1/saved-filters", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function updateSavedFilter(
+  savedFilterId: string,
+  input: UpdateSavedFilterInput,
+) {
+  return request<SavedFilter>(
+    `/api/v1/saved-filters/${encodeURIComponent(savedFilterId)}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    },
+  );
+}
+
+export async function deleteSavedFilter(savedFilterId: string) {
+  await request<void>(
+    `/api/v1/saved-filters/${encodeURIComponent(savedFilterId)}`,
+    {
+      method: "DELETE",
+    },
+  );
 }
 
 export async function listIssues(filters: IssueFilters = {}) {

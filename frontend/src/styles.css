@@ -131,6 +131,8 @@ a {
 .issue-edit-form textarea:focus,
 .issue-filters input:focus,
 .issue-filters select:focus,
+.saved-filter-form input:focus,
+.saved-filter-rename input:focus,
 .sprint-filters select:focus,
 .issue-card select:focus,
 .active-sprint-card select:focus,
@@ -1506,7 +1508,8 @@ h1 {
 .team-member-form label span,
 .label-form label span,
 .issue-form label span,
-.issue-filters label span {
+.issue-filters label span,
+.saved-filter-form label span {
   color: #4e5c54;
   font-size: 13px;
   font-weight: 700;
@@ -1523,7 +1526,9 @@ h1 {
 .issue-form select,
 .issue-form textarea,
 .issue-filters input,
-.issue-filters select {
+.issue-filters select,
+.saved-filter-form input,
+.saved-filter-rename input {
   width: 100%;
   padding: 10px 12px;
   border: 1px solid #c8d1cb;
@@ -1541,7 +1546,9 @@ h1 {
 .issue-form input,
 .issue-form select,
 .issue-filters input,
-.issue-filters select {
+.issue-filters select,
+.saved-filter-form input,
+.saved-filter-rename input {
   min-height: 40px;
 }
 
@@ -1683,6 +1690,86 @@ h1 {
   color: #657268;
   font-size: 13px;
   font-weight: 700;
+}
+
+.saved-filters-panel {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #dfe7e1;
+  border-radius: 12px;
+  background:
+    linear-gradient(135deg, rgba(78, 121, 93, 0.08), rgba(238, 242, 234, 0.8)),
+    #fbfcfb;
+}
+
+.saved-filters-header,
+.saved-filter-card,
+.saved-filter-actions,
+.saved-filter-rename {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.saved-filters-header,
+.saved-filter-card {
+  justify-content: space-between;
+}
+
+.saved-filters-header h3,
+.saved-filter-card h4,
+.saved-filter-card p {
+  margin: 0;
+}
+
+.saved-filter-form {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) auto;
+  align-items: end;
+  gap: 10px;
+}
+
+.saved-filter-form label {
+  display: grid;
+  gap: 8px;
+}
+
+.saved-filter-list {
+  display: grid;
+  gap: 8px;
+}
+
+.saved-filter-card {
+  padding: 10px;
+  border: 1px solid #edf0ed;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.saved-filter-card h4 {
+  font-size: 14px;
+}
+
+.saved-filter-card p,
+.saved-filter-empty {
+  color: #657268;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.saved-filter-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.saved-filter-rename {
+  width: 100%;
+}
+
+.saved-filter-rename input {
+  flex: 1;
+  min-width: 180px;
 }
 
 .issue-list {
@@ -2503,8 +2590,17 @@ h1 {
   .issue-link-form,
   .linked-issue-card,
   .issue-filters,
+  .saved-filter-form,
+  .saved-filter-card,
+  .saved-filter-rename,
   .issue-detail-body {
     grid-template-columns: 1fr;
+  }
+
+  .saved-filter-card,
+  .saved-filter-rename {
+    align-items: stretch;
+    flex-direction: column;
   }
 }
 

@@ -81,6 +81,7 @@ func TestPostgresMigrationsCreateCoreSchema(t *testing.T) {
 		"comments",
 		"issue_links",
 		"sprints",
+		"saved_filters",
 		"sessions",
 		"activity_log",
 		"schema_migrations",
@@ -160,6 +161,22 @@ func TestPostgresMigrationsCreateCoreSchema(t *testing.T) {
 	}
 	if !hasStoryPoints {
 		t.Fatal("expected issues.story_points to exist")
+	}
+
+	var hasSavedFiltersFilters bool
+	if err := db.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1
+			FROM information_schema.columns
+			WHERE table_schema = $1
+				AND table_name = 'saved_filters'
+				AND column_name = 'filters'
+		)
+	`, schemaName).Scan(&hasSavedFiltersFilters); err != nil {
+		t.Fatalf("check saved_filters.filters column: %v", err)
+	}
+	if !hasSavedFiltersFilters {
+		t.Fatal("expected saved_filters.filters to exist")
 	}
 
 	var userID string

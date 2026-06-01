@@ -16,6 +16,7 @@ import {
   issueDueInfo,
   issueSortLabels,
   issueTypeLabels,
+  missingFilterOptionLabel,
   priorityLabels,
   storyPointsLabel,
 } from "../../lib/issue-model";
@@ -107,6 +108,19 @@ export function IssueListPanel({
     : sort === "created_desc"
       ? "Showing all issues across all projects"
       : `Showing issues sorted by ${issueSortLabels[sort].toLowerCase()}`;
+  const hasMissingProjectFilter =
+    projectFilterId !== "" &&
+    !projects.some((project) => project.id === projectFilterId);
+  const hasMissingSprintFilter =
+    sprintFilterId !== "" &&
+    sprintFilterId !== "none" &&
+    !sprints.some((sprint) => sprint.id === sprintFilterId);
+  const hasMissingAssigneeFilter =
+    assigneeFilterId !== "" &&
+    assigneeFilterId !== "unassigned" &&
+    !teamMembers.some((member) => member.id === assigneeFilterId);
+  const hasMissingLabelFilter =
+    labelFilterId !== "" && !labels.some((label) => label.id === labelFilterId);
 
   return (
     <div className="issues-panel">
@@ -149,6 +163,11 @@ export function IssueListPanel({
             value={projectFilterId}
           >
             <option value="">All projects</option>
+            {hasMissingProjectFilter ? (
+              <option disabled value={projectFilterId}>
+                {missingFilterOptionLabel("project")}
+              </option>
+            ) : null}
             {projects.map((project) => (
               <option key={project.id} value={project.id}>
                 {project.key}
@@ -165,6 +184,11 @@ export function IssueListPanel({
           >
             <option value="">All sprints</option>
             <option value="none">No sprint</option>
+            {hasMissingSprintFilter ? (
+              <option disabled value={sprintFilterId}>
+                {missingFilterOptionLabel("sprint")}
+              </option>
+            ) : null}
             {sprintStatusOptions.map((status) => {
               const statusSprints = sprints.filter(
                 (sprint) => sprint.status === status,
@@ -228,6 +252,11 @@ export function IssueListPanel({
           >
             <option value="">All assignees</option>
             <option value="unassigned">Unassigned</option>
+            {hasMissingAssigneeFilter ? (
+              <option disabled value={assigneeFilterId}>
+                {missingFilterOptionLabel("assignee")}
+              </option>
+            ) : null}
             {teamMembers.map((member) => (
               <option key={member.id} value={member.id}>
                 {memberOptionLabel(member)}
@@ -243,6 +272,11 @@ export function IssueListPanel({
             value={labelFilterId}
           >
             <option value="">All labels</option>
+            {hasMissingLabelFilter ? (
+              <option disabled value={labelFilterId}>
+                {missingFilterOptionLabel("label")}
+              </option>
+            ) : null}
             {labels.map((label) => (
               <option key={label.id} value={label.id}>
                 {label.name}

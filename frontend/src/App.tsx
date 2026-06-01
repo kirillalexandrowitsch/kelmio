@@ -16,6 +16,7 @@ import {
   IssueType,
   Label,
   Project,
+  SavedFilter,
   Sprint,
   SprintStatus,
   TeamMember,
@@ -30,12 +31,14 @@ import {
   createIssueComment,
   createIssueLink,
   createProject,
+  createSavedFilter,
   createSprint,
   createSubtask,
   createTeamMember,
   deleteLabel,
   deleteIssueComment,
   deleteIssueLink,
+  deleteSavedFilter,
   getIssue,
   getCurrentUser,
   getProject,
@@ -47,6 +50,7 @@ import {
   listIssues,
   listLabels,
   listProjects,
+  listSavedFilters,
   listSprints,
   listTeamMembers,
   login,
@@ -58,6 +62,7 @@ import {
   transitionIssue,
   updateProfile,
   updateProject,
+  updateSavedFilter,
   updateIssueComment,
   updateTeamMember,
   updateIssue,
@@ -78,6 +83,8 @@ import {
   issueDueInfo,
   issueLabelIds,
   issueMatchesFilters,
+  savedIssueFilterStateFromFilters,
+  savedIssueFiltersFromState,
   startOfToday,
 } from "./lib/issue-model";
 import { sprintMatchesFilters } from "./lib/sprint-model";
@@ -96,6 +103,7 @@ import { DashboardSection } from "./features/dashboard/dashboard-section";
 import { IssueCreateForm } from "./features/issues/issue-create-form";
 import { IssueDetailSection } from "./features/issues/issue-detail-section";
 import { IssueListPanel } from "./features/issues/issue-list-panel";
+import { SavedFiltersPanel } from "./features/issues/saved-filters-panel";
 import { LabelsSection } from "./features/labels/labels-section";
 import { ProjectsSection } from "./features/projects/projects-section";
 import { SprintsSection } from "./features/sprints/sprints-section";
@@ -166,6 +174,18 @@ function parseStoryPoints(value: string) {
 
   const points = Number(normalizedValue);
   return Number.isInteger(points) && points >= 0 && points <= 100 ? points : null;
+}
+
+function upsertSavedFilter(
+  savedFilters: SavedFilter[],
+  savedFilter: SavedFilter,
+) {
+  return [
+    savedFilter,
+    ...savedFilters.filter(
+      (currentSavedFilter) => currentSavedFilter.id !== savedFilter.id,
+    ),
+  ];
 }
 
 export function App() {
@@ -254,6 +274,20 @@ export function App() {
   const [issueFilterAssigneeId, setIssueFilterAssigneeId] = useState("");
   const [issueFilterLabelId, setIssueFilterLabelId] = useState("");
   const [issueFilterDue, setIssueFilterDue] = useState<IssueDueFilter | "">("");
+  const [savedFilters, setSavedFilters] = useState<SavedFilter[]>([]);
+  const [savedFiltersError, setSavedFiltersError] = useState("");
+  const [savedFilterFormError, setSavedFilterFormError] = useState("");
+  const [savedFilterName, setSavedFilterName] = useState("");
+  const [isLoadingSavedFilters, setIsLoadingSavedFilters] = useState(false);
+  const [isCreatingSavedFilter, setIsCreatingSavedFilter] = useState(false);
+  const [updatingSavedFilterIds, setUpdatingSavedFilterIds] = useState<string[]>(
+    [],
+  );
+  const [deletingSavedFilterIds, setDeletingSavedFilterIds] = useState<string[]>(
+    [],
+  );
+  const [renameSavedFilterId, setRenameSavedFilterId] = useState("");
+  const [renameSavedFilterName, setRenameSavedFilterName] = useState("");
   const [transitioningIssueIds, setTransitioningIssueIds] = useState<string[]>([]);
   const [assigningIssueIds, setAssigningIssueIds] = useState<string[]>([]);
   const [labelingIssueIds, setLabelingIssueIds] = useState<string[]>([]);
@@ -688,6 +722,41 @@ export function App() {
 
   useEffect(() => {
     if (!user) {
+      setSavedFilters([]);
+      return;
+    }
+
+    let isMounted = true;
+    setSavedFiltersError("");
+    setSavedFilterFormError("");
+    setIsLoadingSavedFilters(true);
+
+    listSavedFilters()
+      .then((response) => {
+        if (isMounted) {
+          setSavedFilters(response.saved_filters);
+        }
+      })
+      .catch((err) => {
+        if (isMounted) {
+          setSavedFiltersError(
+            apiErrorMessage(err, "Could not load saved filters."),
+          );
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsLoadingSavedFilters(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) {
       setSprints([]);
       setSelectedSprint(null);
       return;
@@ -1079,11 +1148,22 @@ export function App() {
     setIssueFilterQuery("");
     setIssueSort("created_desc");
     setIssueFilterProjectId("");
+    setIssueFilterSprintId("");
     setIssueFilterStatus("");
     setIssueFilterPriority("");
     setIssueFilterAssigneeId("");
     setIssueFilterLabelId("");
     setIssueFilterDue("");
+    setSavedFilters([]);
+    setSavedFiltersError("");
+    setSavedFilterFormError("");
+    setSavedFilterName("");
+    setIsLoadingSavedFilters(false);
+    setIsCreatingSavedFilter(false);
+    setUpdatingSavedFilterIds([]);
+    setDeletingSavedFilterIds([]);
+    setRenameSavedFilterId("");
+    setRenameSavedFilterName("");
     setNewIssueLabelIds([]);
     setIssueStoryPoints("0");
     setTransitioningIssueIds([]);
@@ -2686,6 +2766,150 @@ export function App() {
     void handleTransitionIssue(issue.id, nextStatus);
   }
 
+  function currentSavedIssueFilters() {
+    return savedIssueFiltersFromState({
+      query: issueFilterQuery,
+      sort: issueSort,
+      projectId: issueFilterProjectId,
+      sprintId: issueFilterSprintId,
+      status: issueFilterStatus,
+      priority: issueFilterPriority,
+      assigneeId: issueFilterAssigneeId,
+      labelId: issueFilterLabelId,
+      due: issueFilterDue,
+    });
+  }
+
+  function applySavedIssueFilters(savedFilter: SavedFilter) {
+    const nextState = savedIssueFilterStateFromFilters(savedFilter.filters);
+    setIssueFilterQuery(nextState.query);
+    setIssueSort(nextState.sort);
+    setIssueFilterProjectId(nextState.projectId);
+    setIssueFilterSprintId(nextState.sprintId);
+    setIssueFilterStatus(nextState.status);
+    setIssueFilterPriority(nextState.priority);
+    setIssueFilterAssigneeId(nextState.assigneeId);
+    setIssueFilterLabelId(nextState.labelId);
+    setIssueFilterDue(nextState.due);
+    setSavedFilterFormError("");
+  }
+
+  async function handleCreateSavedFilter(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const name = savedFilterName.trim();
+    if (name === "") {
+      setSavedFilterFormError("Saved filter name is required.");
+      return;
+    }
+    if (name.length > 60) {
+      setSavedFilterFormError("Saved filter name must be 60 characters or fewer.");
+      return;
+    }
+
+    setSavedFilterFormError("");
+    setIsCreatingSavedFilter(true);
+
+    try {
+      const savedFilter = await createSavedFilter({
+        name,
+        filters: currentSavedIssueFilters(),
+      });
+      setSavedFilters((currentSavedFilters) =>
+        upsertSavedFilter(currentSavedFilters, savedFilter),
+      );
+      setSavedFilterName("");
+    } catch (err) {
+      setSavedFilterFormError(apiErrorMessage(err, "Could not save filter."));
+    } finally {
+      setIsCreatingSavedFilter(false);
+    }
+  }
+
+  async function handleUpdateSavedFilter(savedFilter: SavedFilter) {
+    setSavedFilterFormError("");
+    setUpdatingSavedFilterIds((currentIds) => [...currentIds, savedFilter.id]);
+
+    try {
+      const updated = await updateSavedFilter(savedFilter.id, {
+        name: savedFilter.name,
+        filters: currentSavedIssueFilters(),
+      });
+      setSavedFilters((currentSavedFilters) =>
+        upsertSavedFilter(currentSavedFilters, updated),
+      );
+    } catch (err) {
+      setSavedFilterFormError(apiErrorMessage(err, "Could not update filter."));
+    } finally {
+      setUpdatingSavedFilterIds((currentIds) =>
+        currentIds.filter((currentId) => currentId !== savedFilter.id),
+      );
+    }
+  }
+
+  function handleStartRenameSavedFilter(savedFilter: SavedFilter) {
+    setRenameSavedFilterId(savedFilter.id);
+    setRenameSavedFilterName(savedFilter.name);
+    setSavedFilterFormError("");
+  }
+
+  async function handleRenameSavedFilter(savedFilter: SavedFilter) {
+    const name = renameSavedFilterName.trim();
+    if (name === "") {
+      setSavedFilterFormError("Saved filter name is required.");
+      return;
+    }
+    if (name.length > 60) {
+      setSavedFilterFormError("Saved filter name must be 60 characters or fewer.");
+      return;
+    }
+
+    setSavedFilterFormError("");
+    setUpdatingSavedFilterIds((currentIds) => [...currentIds, savedFilter.id]);
+
+    try {
+      const updated = await updateSavedFilter(savedFilter.id, {
+        name,
+        filters: savedFilter.filters,
+      });
+      setSavedFilters((currentSavedFilters) =>
+        upsertSavedFilter(currentSavedFilters, updated),
+      );
+      setRenameSavedFilterId("");
+      setRenameSavedFilterName("");
+    } catch (err) {
+      setSavedFilterFormError(apiErrorMessage(err, "Could not rename filter."));
+    } finally {
+      setUpdatingSavedFilterIds((currentIds) =>
+        currentIds.filter((currentId) => currentId !== savedFilter.id),
+      );
+    }
+  }
+
+  async function handleDeleteSavedFilter(savedFilter: SavedFilter) {
+    setSavedFilterFormError("");
+    setDeletingSavedFilterIds((currentIds) => [...currentIds, savedFilter.id]);
+
+    try {
+      await deleteSavedFilter(savedFilter.id);
+      setSavedFilters((currentSavedFilters) =>
+        currentSavedFilters.filter(
+          (currentSavedFilter) => currentSavedFilter.id !== savedFilter.id,
+        ),
+      );
+      if (renameSavedFilterId === savedFilter.id) {
+        setRenameSavedFilterId("");
+        setRenameSavedFilterName("");
+      }
+    } catch (err) {
+      setSavedFilterFormError(apiErrorMessage(err, "Could not delete filter."));
+    } finally {
+      setDeletingSavedFilterIds((currentIds) =>
+        currentIds.filter((currentId) => currentId !== savedFilter.id),
+      );
+    }
+  }
+
   function handleIssueProjectFilterChange(projectId: string) {
     setIssueFilterProjectId(projectId);
     setIssueFilterSprintId((currentSprintId) => {
@@ -3102,6 +3326,39 @@ export function App() {
             teamMembers={teamMembers}
             title={issueTitle}
             type={issueType}
+          />
+
+          <SavedFiltersPanel
+            deletingSavedFilterIds={deletingSavedFilterIds}
+            isCreatingSavedFilter={isCreatingSavedFilter}
+            isLoadingSavedFilters={isLoadingSavedFilters}
+            onApplySavedFilter={applySavedIssueFilters}
+            onCancelRenameSavedFilter={() => {
+              setRenameSavedFilterId("");
+              setRenameSavedFilterName("");
+            }}
+            onCreateSavedFilter={(event) => {
+              void handleCreateSavedFilter(event);
+            }}
+            onDeleteSavedFilter={(savedFilter) => {
+              void handleDeleteSavedFilter(savedFilter);
+            }}
+            onRenameSavedFilter={(savedFilter) => {
+              void handleRenameSavedFilter(savedFilter);
+            }}
+            onRenameSavedFilterNameChange={setRenameSavedFilterName}
+            onSavedFilterNameChange={setSavedFilterName}
+            onStartRenameSavedFilter={handleStartRenameSavedFilter}
+            onUpdateSavedFilter={(savedFilter) => {
+              void handleUpdateSavedFilter(savedFilter);
+            }}
+            renameSavedFilterId={renameSavedFilterId}
+            renameSavedFilterName={renameSavedFilterName}
+            savedFilterFormError={savedFilterFormError}
+            savedFilterName={savedFilterName}
+            savedFilters={savedFilters}
+            savedFiltersError={savedFiltersError}
+            updatingSavedFilterIds={updatingSavedFilterIds}
           />
 
           <IssueListPanel
