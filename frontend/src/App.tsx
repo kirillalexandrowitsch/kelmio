@@ -2,6 +2,7 @@ import { DragEvent, FormEvent, useEffect, useState } from "react";
 import "./styles.css";
 import {
   ApiError,
+  AppNotification,
   API_UNAUTHORIZED_EVENT,
   CurrentUser,
   Issue,
@@ -43,18 +44,22 @@ import {
   getCurrentUser,
   getProject,
   getSprint,
+  getUnreadNotificationsCount,
   listIssueActivity,
   listIssueComments,
   listIssueChildren,
   listIssueLinks,
   listIssues,
   listLabels,
+  listNotifications,
   listProjects,
   listSavedFilters,
   listSprints,
   listTeamMembers,
   login,
   logout,
+  markAllNotificationsRead,
+  markNotificationRead,
   resetTeamMemberPassword,
   removeIssueFromSprint,
   setIssueLabels,
@@ -105,6 +110,7 @@ import { IssueDetailSection } from "./features/issues/issue-detail-section";
 import { IssueListPanel } from "./features/issues/issue-list-panel";
 import { SavedFiltersPanel } from "./features/issues/saved-filters-panel";
 import { LabelsSection } from "./features/labels/labels-section";
+import { NotificationsSection } from "./features/notifications/notifications-section";
 import { ProjectsSection } from "./features/projects/projects-section";
 import { SprintsSection } from "./features/sprints/sprints-section";
 import { TeamSection } from "./features/team/team-section";
@@ -372,6 +378,11 @@ export function App() {
   const [removingIssueFromSprintIds, setRemovingIssueFromSprintIds] = useState<
     string[]
   >([]);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [notificationsError, setNotificationsError] = useState("");
+  const [isLoadingNotifications, setIsLoadingNotifications] = useState(false);
+  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const selectedIssueId = selectedIssue?.id ?? "";
 
   function navigateToSection(
@@ -752,6 +763,64 @@ export function App() {
 
     return () => {
       isMounted = false;
+    };
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) {
+      setNotifications([]);
+      setUnreadNotificationsCount(0);
+      return;
+    }
+
+    let isMounted = true;
+    setNotificationsError("");
+    setIsLoadingNotifications(true);
+
+    Promise.all([listNotifications(), getUnreadNotificationsCount()])
+      .then(([notificationsResponse, unreadResponse]) => {
+        if (isMounted) {
+          setNotifications(notificationsResponse.notifications);
+          setUnreadNotificationsCount(unreadResponse.unread_count);
+        }
+      })
+      .catch((err) => {
+        if (isMounted) {
+          setNotificationsError(
+            apiErrorMessage(err, "Could not load notifications."),
+          );
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsLoadingNotifications(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) {
+      return;
+    }
+
+    const intervalID = window.setInterval(() => {
+      getUnreadNotificationsCount()
+        .then((response) => {
+          setUnreadNotificationsCount(response.unread_count);
+        })
+        .catch((err) => {
+          setNotificationsError(
+            apiErrorMessage(err, "Could not refresh notifications."),
+          );
+        });
+    }, 30000);
+
+    return () => {
+      window.clearInterval(intervalID);
     };
   }, [user]);
 
@@ -1232,6 +1301,11 @@ export function App() {
     setIsLoadingSprintPlanning(false);
     setAddingIssueToSprintIds([]);
     setRemovingIssueFromSprintIds([]);
+    setNotifications([]);
+    setNotificationsError("");
+    setIsLoadingNotifications(false);
+    setUnreadNotificationsCount(0);
+    setIsNotificationsOpen(false);
   }
 
   async function handleUpdateProfile(event: FormEvent<HTMLFormElement>) {
@@ -2910,6 +2984,70 @@ export function App() {
     }
   }
 
+  async function refreshNotifications() {
+    setNotificationsError("");
+    setIsLoadingNotifications(true);
+
+    try {
+      const [notificationsResponse, unreadResponse] = await Promise.all([
+        listNotifications(),
+        getUnreadNotificationsCount(),
+      ]);
+      setNotifications(notificationsResponse.notifications);
+      setUnreadNotificationsCount(unreadResponse.unread_count);
+    } catch (err) {
+      setNotificationsError(apiErrorMessage(err, "Could not load notifications."));
+    } finally {
+      setIsLoadingNotifications(false);
+    }
+  }
+
+  async function handleMarkNotificationRead(notification: AppNotification) {
+    if (notification.read_at !== null) {
+      return;
+    }
+
+    setNotificationsError("");
+
+    try {
+      const updatedNotification = await markNotificationRead(notification.id);
+      setNotifications((currentNotifications) =>
+        currentNotifications.map((currentNotification) =>
+          currentNotification.id === updatedNotification.id
+            ? updatedNotification
+            : currentNotification,
+        ),
+      );
+      const unreadResponse = await getUnreadNotificationsCount();
+      setUnreadNotificationsCount(unreadResponse.unread_count);
+    } catch (err) {
+      setNotificationsError(apiErrorMessage(err, "Could not mark notification read."));
+    }
+  }
+
+  async function handleMarkAllNotificationsRead() {
+    setNotificationsError("");
+
+    try {
+      await markAllNotificationsRead();
+      await refreshNotifications();
+    } catch (err) {
+      setNotificationsError(apiErrorMessage(err, "Could not mark notifications read."));
+    }
+  }
+
+  async function handleOpenNotificationIssue(notification: AppNotification) {
+    if (notification.read_at === null) {
+      await handleMarkNotificationRead(notification);
+    }
+    setIsNotificationsOpen(false);
+    if (notification.issue_id) {
+      await handleSelectIssue(notification.issue_id);
+    } else {
+      navigateToSection("notifications");
+    }
+  }
+
   function handleIssueProjectFilterChange(projectId: string) {
     setIssueFilterProjectId(projectId);
     setIssueFilterSprintId((currentSprintId) => {
@@ -3066,9 +3204,31 @@ export function App() {
         <WorkspaceTopbar
           heading={activeSectionHeading}
           isLoggingOut={isLoggingOut}
+          isNotificationsOpen={isNotificationsOpen}
+          notifications={notifications}
+          notificationsError={notificationsError}
+          onMarkAllNotificationsRead={() => {
+            void handleMarkAllNotificationsRead();
+          }}
+          onMarkNotificationRead={(notification) => {
+            void handleMarkNotificationRead(notification);
+          }}
           onLogout={handleLogout}
+          onOpenNotifications={() => {
+            setIsNotificationsOpen(false);
+            navigateToSection("notifications");
+            void refreshNotifications();
+          }}
+          onOpenNotificationIssue={(notification) => {
+            void handleOpenNotificationIssue(notification);
+          }}
+          onToggleNotifications={() => {
+            setIsNotificationsOpen((currentValue) => !currentValue);
+            void refreshNotifications();
+          }}
           role={user.workspace.role}
           subtitle={activeSectionSubtitle}
+          unreadNotificationsCount={unreadNotificationsCount}
         />
 
         <DashboardSection
@@ -3085,6 +3245,23 @@ export function App() {
           role={user.workspace.role}
           teamMembers={teamMembers}
           teamMembersCount={teamMembers.length}
+        />
+
+        <NotificationsSection
+          error={notificationsError}
+          isActive={activeSection === "notifications"}
+          isLoading={isLoadingNotifications}
+          notifications={notifications}
+          onMarkAllRead={() => {
+            void handleMarkAllNotificationsRead();
+          }}
+          onMarkRead={(notification) => {
+            void handleMarkNotificationRead(notification);
+          }}
+          onOpenIssue={(notification) => {
+            void handleOpenNotificationIssue(notification);
+          }}
+          unreadCount={unreadNotificationsCount}
         />
 
         <AccountSection

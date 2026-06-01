@@ -17,6 +17,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"team-task-tracker/backend/internal/auth"
+	"team-task-tracker/backend/internal/notifications"
 )
 
 var uuidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
@@ -34,8 +35,9 @@ var errSprintNotPlanned = errors.New("sprint not planned")
 var errSprintIssueProjectMismatch = errors.New("sprint issue project mismatch")
 
 type Handler struct {
-	db   *pgxpool.Pool
-	auth *auth.Handler
+	db            *pgxpool.Pool
+	auth          *auth.Handler
+	notifications *notifications.Service
 }
 
 type createSprintRequest struct {
@@ -97,10 +99,16 @@ type normalizedUpdateSprint struct {
 	EndDate   string
 }
 
-func NewHandler(db *pgxpool.Pool, authHandler *auth.Handler) *Handler {
+func NewHandler(db *pgxpool.Pool, authHandler *auth.Handler, notificationServices ...*notifications.Service) *Handler {
+	var notificationService *notifications.Service
+	if len(notificationServices) > 0 {
+		notificationService = notificationServices[0]
+	}
+
 	return &Handler{
-		db:   db,
-		auth: authHandler,
+		db:            db,
+		auth:          authHandler,
+		notifications: notificationService,
 	}
 }
 
@@ -269,7 +277,7 @@ func (h *Handler) start(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
-	sprint, err := h.startSprint(ctx, user.WorkspaceID, sprintID)
+	sprint, err := h.startSprint(ctx, user, sprintID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			writeError(w, http.StatusNotFound, "sprint_not_found", "sprint was not found")
@@ -306,7 +314,7 @@ func (h *Handler) complete(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
-	sprint, err := h.completeSprint(ctx, user.WorkspaceID, sprintID)
+	sprint, err := h.completeSprint(ctx, user, sprintID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			writeError(w, http.StatusNotFound, "sprint_not_found", "sprint was not found")
@@ -653,7 +661,7 @@ func (h *Handler) updateSprint(ctx context.Context, workspaceID string, sprintID
 	return sprint, nil
 }
 
-func (h *Handler) startSprint(ctx context.Context, workspaceID string, sprintID string) (sprintResponse, error) {
+func (h *Handler) startSprint(ctx context.Context, user auth.CurrentUser, sprintID string) (sprintResponse, error) {
 	tx, err := h.db.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return sprintResponse{}, err
@@ -662,7 +670,7 @@ func (h *Handler) startSprint(ctx context.Context, workspaceID string, sprintID 
 		_ = tx.Rollback(ctx)
 	}()
 
-	current, err := getSprintForUpdate(ctx, tx, workspaceID, sprintID, true)
+	current, err := getSprintForUpdate(ctx, tx, user.WorkspaceID, sprintID, true)
 	if err != nil {
 		return sprintResponse{}, err
 	}
@@ -726,12 +734,18 @@ func (h *Handler) startSprint(ctx context.Context, workspaceID string, sprintID 
 					AND i.archived_at IS NULL
 					AND i.status <> 'done'
 			)
-	`, sprintID, workspaceID))
+	`, sprintID, user.WorkspaceID))
 	if err != nil {
 		if isUniqueViolation(err) {
 			return sprintResponse{}, errActiveSprintExists
 		}
 		return sprintResponse{}, err
+	}
+
+	if h.notifications != nil {
+		if err := h.notifications.NotifySprintEvent(ctx, tx, user.WorkspaceID, user.ID, notificationSprintContext(sprint), notifications.TypeSprintStarted); err != nil {
+			return sprintResponse{}, err
+		}
 	}
 
 	if err := tx.Commit(ctx); err != nil {
@@ -741,7 +755,7 @@ func (h *Handler) startSprint(ctx context.Context, workspaceID string, sprintID 
 	return sprint, nil
 }
 
-func (h *Handler) completeSprint(ctx context.Context, workspaceID string, sprintID string) (sprintResponse, error) {
+func (h *Handler) completeSprint(ctx context.Context, user auth.CurrentUser, sprintID string) (sprintResponse, error) {
 	tx, err := h.db.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return sprintResponse{}, err
@@ -750,7 +764,7 @@ func (h *Handler) completeSprint(ctx context.Context, workspaceID string, sprint
 		_ = tx.Rollback(ctx)
 	}()
 
-	current, err := getSprintForUpdate(ctx, tx, workspaceID, sprintID, true)
+	current, err := getSprintForUpdate(ctx, tx, user.WorkspaceID, sprintID, true)
 	if err != nil {
 		return sprintResponse{}, err
 	}
@@ -814,9 +828,15 @@ func (h *Handler) completeSprint(ctx context.Context, workspaceID string, sprint
 					AND i.archived_at IS NULL
 					AND i.status <> 'done'
 			)
-	`, sprintID, workspaceID))
+	`, sprintID, user.WorkspaceID))
 	if err != nil {
 		return sprintResponse{}, err
+	}
+
+	if h.notifications != nil {
+		if err := h.notifications.NotifySprintEvent(ctx, tx, user.WorkspaceID, user.ID, notificationSprintContext(sprint), notifications.TypeSprintCompleted); err != nil {
+			return sprintResponse{}, err
+		}
 	}
 
 	if err := tx.Commit(ctx); err != nil {
@@ -1156,6 +1176,14 @@ func scanSprint(row rowScanner) (sprintResponse, error) {
 	sprint.EndDate = nullableText(endDate)
 
 	return sprint, nil
+}
+
+func notificationSprintContext(sprint sprintResponse) notifications.SprintContext {
+	return notifications.SprintContext{
+		ID:         sprint.ID,
+		Name:       sprint.Name,
+		ProjectKey: sprint.ProjectKey,
+	}
 }
 
 func nullableText(value pgtype.Text) *string {

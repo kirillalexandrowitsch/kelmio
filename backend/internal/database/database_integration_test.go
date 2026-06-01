@@ -82,6 +82,7 @@ func TestPostgresMigrationsCreateCoreSchema(t *testing.T) {
 		"issue_links",
 		"sprints",
 		"saved_filters",
+		"notifications",
 		"sessions",
 		"activity_log",
 		"schema_migrations",

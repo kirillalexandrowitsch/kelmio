@@ -14,6 +14,7 @@ test("maps app sections to canonical paths", () => {
   assert.equal(appSectionPath("issues"), "/issues");
   assert.equal(appSectionPath("board"), "/board");
   assert.equal(appSectionPath("sprints"), "/sprints");
+  assert.equal(appSectionPath("notifications"), "/notifications");
   assert.equal(appSectionPath("team"), "/team");
   assert.equal(appSectionPath("labels"), "/labels");
   assert.equal(appSectionPath("account"), "/account");
@@ -26,6 +27,7 @@ test("maps direct paths to app sections", () => {
   assert.equal(appSectionFromPath("/board"), "board");
   assert.equal(appSectionFromPath("/sprints"), "sprints");
   assert.equal(appSectionFromPath("/sprints/example-id"), "sprints");
+  assert.equal(appSectionFromPath("/notifications"), "notifications");
   assert.equal(appSectionFromPath("/team"), "team");
   assert.equal(appSectionFromPath("/labels"), "labels");
   assert.equal(appSectionFromPath("/account"), "account");

@@ -4,6 +4,7 @@ export type AppSection =
   | "issues"
   | "board"
   | "sprints"
+  | "notifications"
   | "team"
   | "labels"
   | "account";
@@ -14,6 +15,7 @@ export const appSections = [
   { id: "issues", title: "Issues" },
   { id: "board", title: "Board" },
   { id: "sprints", title: "Sprints" },
+  { id: "notifications", title: "Notifications" },
   { id: "team", title: "Team" },
   { id: "labels", title: "Labels" },
   { id: "account", title: "Account" },
@@ -25,6 +27,7 @@ const appSectionPaths: Record<AppSection, string> = {
   issues: "/issues",
   board: "/board",
   sprints: "/sprints",
+  notifications: "/notifications",
   team: "/team",
   labels: "/labels",
   account: "/account",

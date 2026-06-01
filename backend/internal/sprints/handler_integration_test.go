@@ -74,7 +74,7 @@ func TestSprintLifecycleIntegration(t *testing.T) {
 		t.Fatalf("updated sprint name = %q, want Sprint 1 Updated", updated.Name)
 	}
 
-	active, err := handler.startSprint(ctx, user.WorkspaceID, sprint.ID)
+	active, err := handler.startSprint(ctx, user, sprint.ID)
 	if err != nil {
 		t.Fatalf("start sprint: %v", err)
 	}
@@ -89,10 +89,10 @@ func TestSprintLifecycleIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create second sprint: %v", err)
 	}
-	if _, err := handler.startSprint(ctx, user.WorkspaceID, secondSprint.ID); !errors.Is(err, errActiveSprintExists) {
+	if _, err := handler.startSprint(ctx, user, secondSprint.ID); !errors.Is(err, errActiveSprintExists) {
 		t.Fatalf("start second active sprint error = %v, want %v", err, errActiveSprintExists)
 	}
-	if _, err := handler.completeSprint(ctx, user.WorkspaceID, secondSprint.ID); !errors.Is(err, errSprintNotActive) {
+	if _, err := handler.completeSprint(ctx, user, secondSprint.ID); !errors.Is(err, errSprintNotActive) {
 		t.Fatalf("complete planned sprint error = %v, want %v", err, errSprintNotActive)
 	}
 
@@ -119,7 +119,7 @@ func TestSprintLifecycleIntegration(t *testing.T) {
 		t.Fatalf("re-add issue to sprint: %v", err)
 	}
 
-	completed, err := handler.completeSprint(ctx, user.WorkspaceID, sprint.ID)
+	completed, err := handler.completeSprint(ctx, user, sprint.ID)
 	if err != nil {
 		t.Fatalf("complete sprint: %v", err)
 	}
@@ -139,11 +139,11 @@ func TestSprintLifecycleIntegration(t *testing.T) {
 	if _, err := handler.addIssueToSprint(ctx, user, sprint.ID, issueID); !errors.Is(err, errSprintCompleted) {
 		t.Fatalf("add issue to completed sprint error = %v, want %v", err, errSprintCompleted)
 	}
-	if _, err := handler.startSprint(ctx, user.WorkspaceID, sprint.ID); !errors.Is(err, errSprintNotPlanned) {
+	if _, err := handler.startSprint(ctx, user, sprint.ID); !errors.Is(err, errSprintNotPlanned) {
 		t.Fatalf("start completed sprint error = %v, want %v", err, errSprintNotPlanned)
 	}
 
-	secondActive, err := handler.startSprint(ctx, user.WorkspaceID, secondSprint.ID)
+	secondActive, err := handler.startSprint(ctx, user, secondSprint.ID)
 	if err != nil {
 		t.Fatalf("start second sprint after completing first: %v", err)
 	}

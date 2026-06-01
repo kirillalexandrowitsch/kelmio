@@ -46,6 +46,12 @@ export type IssueLinkType = "blocks" | "relates";
 export type IssueSort = "created_desc" | "created_asc" | "priority_desc" | "due_date_asc";
 export type IssueDueFilter = "overdue" | "today" | "due_soon" | "no_due";
 export type SprintStatus = "planned" | "active" | "completed";
+export type NotificationType =
+  | "issue_assigned"
+  | "issue_mentioned"
+  | "issue_commented"
+  | "sprint_started"
+  | "sprint_completed";
 
 export type Issue = {
   id: string;
@@ -165,6 +171,21 @@ export type SavedFilter = {
   updated_at: string;
 };
 
+export type AppNotification = {
+  id: string;
+  workspace_id: string;
+  user_id: string;
+  actor_id: string | null;
+  actor_display_name: string | null;
+  issue_id: string | null;
+  issue_key: string | null;
+  issue_title: string | null;
+  notification_type: NotificationType;
+  payload: Record<string, string>;
+  read_at: string | null;
+  created_at: string;
+};
+
 export type ListProjectsResponse = {
   projects: Project[];
 };
@@ -212,6 +233,14 @@ export type ListSprintsResponse = {
 
 export type ListSavedFiltersResponse = {
   saved_filters: SavedFilter[];
+};
+
+export type ListNotificationsResponse = {
+  notifications: AppNotification[];
+};
+
+export type UnreadNotificationsCountResponse = {
+  unread_count: number;
 };
 
 export type IssueFilters = {

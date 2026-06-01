@@ -15,6 +15,7 @@ import (
 	"team-task-tracker/backend/internal/database"
 	"team-task-tracker/backend/internal/issues"
 	"team-task-tracker/backend/internal/labels"
+	"team-task-tracker/backend/internal/notifications"
 	"team-task-tracker/backend/internal/projects"
 	"team-task-tracker/backend/internal/savedfilters"
 	"team-task-tracker/backend/internal/sprints"
@@ -45,11 +46,12 @@ func main() {
 
 	authHandler := auth.NewHandler(db, 7*24*time.Hour)
 	authHandler.RegisterRoutes(mux)
+	notificationService := notifications.NewService()
 
 	projectsHandler := projects.NewHandler(db, authHandler)
 	projectsHandler.RegisterRoutes(mux)
 
-	issuesHandler := issues.NewHandler(db, authHandler)
+	issuesHandler := issues.NewHandler(db, authHandler, notificationService)
 	issuesHandler.RegisterRoutes(mux)
 
 	labelsHandler := labels.NewHandler(db, authHandler)
@@ -58,11 +60,14 @@ func main() {
 	teamHandler := team.NewHandler(db, authHandler)
 	teamHandler.RegisterRoutes(mux)
 
-	sprintsHandler := sprints.NewHandler(db, authHandler)
+	sprintsHandler := sprints.NewHandler(db, authHandler, notificationService)
 	sprintsHandler.RegisterRoutes(mux)
 
 	savedFiltersHandler := savedfilters.NewHandler(db, authHandler)
 	savedFiltersHandler.RegisterRoutes(mux)
+
+	notificationsHandler := notifications.NewHandler(db, authHandler)
+	notificationsHandler.RegisterRoutes(mux)
 
 	server := &http.Server{
 		Addr:         ":" + cfg.Port,

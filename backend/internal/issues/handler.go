@@ -18,6 +18,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"team-task-tracker/backend/internal/auth"
+	"team-task-tracker/backend/internal/notifications"
 )
 
 var validIssueTypes = map[string]bool{
@@ -53,8 +54,9 @@ var uuidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]
 var errCommentForbidden = errors.New("comment update is forbidden")
 
 type Handler struct {
-	db   *pgxpool.Pool
-	auth *auth.Handler
+	db            *pgxpool.Pool
+	auth          *auth.Handler
+	notifications *notifications.Service
 }
 
 type createIssueRequest struct {
@@ -232,10 +234,16 @@ type normalizedCreateIssueLink struct {
 	LinkType      string
 }
 
-func NewHandler(db *pgxpool.Pool, authHandler *auth.Handler) *Handler {
+func NewHandler(db *pgxpool.Pool, authHandler *auth.Handler, notificationServices ...*notifications.Service) *Handler {
+	var notificationService *notifications.Service
+	if len(notificationServices) > 0 {
+		notificationService = notificationServices[0]
+	}
+
 	return &Handler{
-		db:   db,
-		auth: authHandler,
+		db:            db,
+		auth:          authHandler,
+		notifications: notificationService,
 	}
 }
 
@@ -2137,6 +2145,11 @@ func (h *Handler) assignIssue(ctx context.Context, user auth.CurrentUser, issueI
 		}); err != nil {
 			return issueResponse{}, err
 		}
+		if h.notifications != nil && current != "" {
+			if err := h.notifications.NotifyIssueAssigned(ctx, tx, user.WorkspaceID, user.ID, notificationIssueContext(issue), current); err != nil {
+				return issueResponse{}, err
+			}
+		}
 	}
 
 	if err := tx.Commit(ctx); err != nil {
@@ -2393,6 +2406,11 @@ func (h *Handler) createIssueComment(ctx context.Context, user auth.CurrentUser,
 		"preview":    commentPreview(comment.Body),
 	}); err != nil {
 		return issueCommentResponse{}, err
+	}
+	if h.notifications != nil {
+		if err := h.notifications.NotifyIssueComment(ctx, tx, user.WorkspaceID, user.ID, issueID, comment.ID, body); err != nil {
+			return issueCommentResponse{}, err
+		}
 	}
 
 	if err := tx.Commit(ctx); err != nil {
@@ -3380,6 +3398,16 @@ func scanIssue(row rowScanner) (issueResponse, error) {
 	issue.Labels = labels
 
 	return issue, nil
+}
+
+func notificationIssueContext(issue issueResponse) notifications.IssueContext {
+	return notifications.IssueContext{
+		ID:         issue.ID,
+		IssueKey:   issue.IssueKey,
+		Title:      issue.Title,
+		ReporterID: issue.ReporterID,
+		AssigneeID: stringOrEmpty(issue.AssigneeID),
+	}
 }
 
 func decodeIssueLabels(labelsJSON []byte) ([]issueLabelResponse, error) {

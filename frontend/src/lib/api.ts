@@ -1,4 +1,5 @@
 import {
+  type AppNotification,
   type AuthResponse,
   type CreateIssueInput,
   type CreateIssueLinkInput,
@@ -19,6 +20,7 @@ import {
   type ListIssueLinksResponse,
   type ListIssuesResponse,
   type ListLabelsResponse,
+  type ListNotificationsResponse,
   type ListProjectsResponse,
   type ListSavedFiltersResponse,
   type ListSprintsResponse,
@@ -29,6 +31,7 @@ import {
   type SprintFilters,
   type SprintStatus,
   type TeamMember,
+  type UnreadNotificationsCountResponse,
   type UpdateIssueInput,
   type UpdateProjectInput,
   type UpdateSavedFilterInput,
@@ -36,6 +39,7 @@ import {
   type UpdateTeamMemberInput,
 } from "./api-types";
 export type {
+  AppNotification,
   CurrentUser,
   Issue,
   IssueActivity,
@@ -49,6 +53,7 @@ export type {
   IssueStatus,
   IssueType,
   Label,
+  NotificationType,
   Project,
   SavedFilter,
   SavedIssueFilters,
@@ -225,6 +230,31 @@ export async function deleteSavedFilter(savedFilterId: string) {
       method: "DELETE",
     },
   );
+}
+
+export async function listNotifications() {
+  return request<ListNotificationsResponse>("/api/v1/notifications");
+}
+
+export async function getUnreadNotificationsCount() {
+  return request<UnreadNotificationsCountResponse>(
+    "/api/v1/notifications/unread-count",
+  );
+}
+
+export async function markNotificationRead(notificationId: string) {
+  return request<AppNotification>(
+    `/api/v1/notifications/${encodeURIComponent(notificationId)}/read`,
+    {
+      method: "POST",
+    },
+  );
+}
+
+export async function markAllNotificationsRead() {
+  await request<void>("/api/v1/notifications/read-all", {
+    method: "POST",
+  });
 }
 
 export async function listIssues(filters: IssueFilters = {}) {
