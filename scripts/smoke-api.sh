@@ -8,11 +8,24 @@ MEMBER_LOGIN="${MEMBER_LOGIN:-demo_member}"
 MEMBER_PASSWORD="${MEMBER_PASSWORD:-demo12345}"
 COOKIE_JAR="$(mktemp "${TMPDIR:-/tmp}/team-task-tracker-smoke.XXXXXX")"
 MEMBER_COOKIE_JAR="$(mktemp "${TMPDIR:-/tmp}/team-task-tracker-smoke-member.XXXXXX")"
+TEMP_MEMBER_COOKIE_JAR="$(mktemp "${TMPDIR:-/tmp}/team-task-tracker-smoke-v2-member.XXXXXX")"
 PROJECT_ID=""
 ISSUE_ID=""
 LABEL_ID=""
+SAVED_FILTER_ID=""
+SMOKE_MEMBER_ID=""
 
 cleanup() {
+	if [ -n "$SMOKE_MEMBER_ID" ]; then
+		curl -fsS -b "$COOKIE_JAR" \
+			-X PATCH \
+			-H "Content-Type: application/json" \
+			-d '{"role":"member","is_active":false}' \
+			"$API_BASE_URL/api/v1/team/members/$SMOKE_MEMBER_ID" >/dev/null 2>&1 || true
+	fi
+	if [ -n "$SAVED_FILTER_ID" ]; then
+		curl -fsS -b "$COOKIE_JAR" -X DELETE "$API_BASE_URL/api/v1/saved-filters/$SAVED_FILTER_ID" >/dev/null 2>&1 || true
+	fi
 	if [ -n "$LABEL_ID" ]; then
 		curl -fsS -b "$COOKIE_JAR" -X DELETE "$API_BASE_URL/api/v1/labels/$LABEL_ID" >/dev/null 2>&1 || true
 	fi
@@ -22,7 +35,7 @@ cleanup() {
 	if [ -n "$PROJECT_ID" ]; then
 		curl -fsS -b "$COOKIE_JAR" -X POST "$API_BASE_URL/api/v1/projects/$PROJECT_ID/archive" >/dev/null 2>&1 || true
 	fi
-	rm -f "$COOKIE_JAR" "$MEMBER_COOKIE_JAR"
+	rm -f "$COOKIE_JAR" "$MEMBER_COOKIE_JAR" "$TEMP_MEMBER_COOKIE_JAR"
 }
 trap cleanup EXIT
 
@@ -54,6 +67,10 @@ api_get() {
 	curl -fsS -b "$COOKIE_JAR" "$API_BASE_URL$1"
 }
 
+api_get_with_jar() {
+	curl -fsS -b "$1" "$API_BASE_URL$2"
+}
+
 api_status() {
 	curl -sS -o /dev/null -w '%{http_code}' -b "$COOKIE_JAR" "$API_BASE_URL$1"
 }
@@ -63,6 +80,13 @@ api_post() {
 		-H "Content-Type: application/json" \
 		-d "$2" \
 		"$API_BASE_URL$1"
+}
+
+api_post_with_jar() {
+	curl -fsS -b "$1" -c "$1" \
+		-H "Content-Type: application/json" \
+		-d "$3" \
+		"$API_BASE_URL$2"
 }
 
 api_post_status_with_jar() {
@@ -215,5 +239,54 @@ api_get "/api/v1/issues/$ISSUE_ID/activity" | json_value 'data.activity.some((en
 api_get "/api/v1/issues/$ISSUE_ID/activity" | json_value 'data.activity.some((entry) => entry.action === "comment_added")' >/dev/null
 api_get "/api/v1/issues/$ISSUE_ID/activity" | json_value 'data.activity.some((entry) => entry.action === "comment_updated")' >/dev/null
 api_get "/api/v1/issues/$ISSUE_ID/activity" | json_value 'data.activity.some((entry) => entry.action === "comment_deleted")' >/dev/null
+
+printf 'Checking V2 hierarchy\n'
+EPIC_ID="$(api_post "/api/v1/issues" "{\"project_id\":\"$PROJECT_ID\",\"title\":\"Smoke V2 epic $RUN_ID\",\"description\":\"Created by API smoke test.\",\"issue_type\":\"epic\",\"status\":\"todo\",\"priority\":\"high\",\"story_points\":13}" | json_value 'data.id')"
+CHILD_ID="$(api_post "/api/v1/issues" "{\"project_id\":\"$PROJECT_ID\",\"parent_issue_id\":\"$EPIC_ID\",\"title\":\"Smoke V2 child story $RUN_ID\",\"description\":\"Created by API smoke test.\",\"issue_type\":\"story\",\"status\":\"todo\",\"priority\":\"high\",\"story_points\":8}" | json_value 'data.id')"
+SUBTASK_ID="$(api_post "/api/v1/issues/$CHILD_ID/subtasks" "{\"title\":\"Smoke V2 subtask $RUN_ID\",\"description\":\"Created by API smoke test.\",\"status\":\"todo\",\"priority\":\"medium\",\"story_points\":2,\"assignee_id\":\"\",\"due_date\":\"\",\"label_ids\":[]}" | json_value 'data.id')"
+api_get "/api/v1/issues/$EPIC_ID/children" | json_value "data.issues.some((issue) => issue.id === \"$CHILD_ID\" && issue.parent_issue_id === \"$EPIC_ID\")" >/dev/null
+api_get "/api/v1/issues/$CHILD_ID/children" | json_value "data.issues.some((issue) => issue.id === \"$SUBTASK_ID\" && issue.parent_issue_id === \"$CHILD_ID\" && issue.issue_type === \"subtask\")" >/dev/null
+
+printf 'Checking V2 issue links\n'
+BLOCKER_ID="$(api_post "/api/v1/issues" "{\"project_id\":\"$PROJECT_ID\",\"title\":\"Smoke V2 blocker $RUN_ID\",\"description\":\"Created by API smoke test.\",\"issue_type\":\"bug\",\"status\":\"blocked\",\"priority\":\"critical\",\"story_points\":3}" | json_value 'data.id')"
+api_post "/api/v1/issues/$BLOCKER_ID/links" "{\"target_issue_id\":\"$CHILD_ID\",\"link_type\":\"blocks\"}" | json_value 'data.link_type === "blocks"' >/dev/null
+api_post "/api/v1/issues/$EPIC_ID/links" "{\"target_issue_id\":\"$BLOCKER_ID\",\"link_type\":\"relates\"}" | json_value 'data.link_type === "relates"' >/dev/null
+api_get "/api/v1/issues/$BLOCKER_ID/links" | json_value "data.links.some((link) => link.link_type === \"blocks\" && link.target_issue.id === \"$CHILD_ID\")" >/dev/null
+api_get "/api/v1/issues/$EPIC_ID/links" | json_value "data.links.some((link) => link.link_type === \"relates\" && link.target_issue.id === \"$BLOCKER_ID\")" >/dev/null
+
+printf 'Checking V2 sprints\n'
+SPRINT_ID="$(api_post "/api/v1/sprints" "{\"project_id\":\"$PROJECT_ID\",\"name\":\"Smoke Sprint $RUN_ID\",\"goal\":\"Created by API smoke test.\",\"start_date\":\"\",\"end_date\":\"\"}" | json_value 'data.id')"
+api_post "/api/v1/sprints/$SPRINT_ID/issues" "{\"issue_id\":\"$ISSUE_ID\"}" | json_value 'data.issue_count >= 1' >/dev/null
+api_post "/api/v1/sprints/$SPRINT_ID/issues" "{\"issue_id\":\"$CHILD_ID\"}" | json_value 'data.issue_count >= 2 && data.points_total >= 8' >/dev/null
+api_post "/api/v1/sprints/$SPRINT_ID/issues" "{\"issue_id\":\"$BLOCKER_ID\"}" | json_value 'data.issue_count >= 3 && data.points_total >= 11' >/dev/null
+api_post "/api/v1/sprints/$SPRINT_ID/start" '{}' | json_value 'data.status === "active"' >/dev/null
+api_post "/api/v1/issues/$CHILD_ID/transition" '{"status":"done"}' | json_value 'data.status === "done"' >/dev/null
+api_post "/api/v1/sprints/$SPRINT_ID/complete" '{}' | json_value 'data.status === "completed" && data.points_total >= 11 && data.points_done >= 8' >/dev/null
+api_get "/api/v1/sprints/$SPRINT_ID" | json_value 'data.status === "completed" && data.issue_count >= 3' >/dev/null
+api_get "/api/v1/issues?sprint_id=$SPRINT_ID&status=done" | json_value "data.issues.some((issue) => issue.id === \"$CHILD_ID\")" >/dev/null
+
+printf 'Checking V2 saved filters\n'
+SAVED_FILTER_ID="$(api_post "/api/v1/saved-filters" "{\"name\":\"Smoke active blockers $RUN_ID\",\"filters\":{\"sort\":\"priority_desc\",\"sprintId\":\"$SPRINT_ID\",\"status\":\"blocked\"}}" | json_value 'data.id')"
+api_get "/api/v1/saved-filters" | json_value "data.saved_filters.some((filter) => filter.id === \"$SAVED_FILTER_ID\" && filter.filters.sprintId === \"$SPRINT_ID\")" >/dev/null
+api_patch "/api/v1/saved-filters/$SAVED_FILTER_ID" "{\"name\":\"Smoke done sprint $RUN_ID\",\"filters\":{\"sort\":\"created_desc\",\"sprintId\":\"$SPRINT_ID\",\"status\":\"done\"}}" | json_value 'data.filters.status === "done"' >/dev/null
+api_delete "/api/v1/saved-filters/$SAVED_FILTER_ID" >/dev/null
+api_get "/api/v1/saved-filters" | json_value "data.saved_filters.every((filter) => filter.id !== \"$SAVED_FILTER_ID\")" >/dev/null
+SAVED_FILTER_ID=""
+
+printf 'Checking V2 notifications\n'
+SMOKE_MEMBER_USERNAME="smoke_member_$RUN_ID"
+SMOKE_MEMBER_PASSWORD="smoke12345"
+SMOKE_MEMBER_ID="$(api_post "/api/v1/team/members" "{\"email\":\"$SMOKE_MEMBER_USERNAME@example.com\",\"username\":\"$SMOKE_MEMBER_USERNAME\",\"display_name\":\"Smoke Member $RUN_ID\",\"password\":\"$SMOKE_MEMBER_PASSWORD\",\"role\":\"member\"}" | json_value 'data.id')"
+api_post "/api/v1/issues/$BLOCKER_ID/assign" "{\"assignee_id\":\"$SMOKE_MEMBER_ID\"}" | json_value "data.assignee_id === \"$SMOKE_MEMBER_ID\"" >/dev/null
+api_post "/api/v1/issues/$BLOCKER_ID/comments" "{\"body\":\"@$SMOKE_MEMBER_USERNAME Please check this smoke notification.\"}" | json_value "data.body.includes(\"@$SMOKE_MEMBER_USERNAME\")" >/dev/null
+
+api_post_with_jar "$TEMP_MEMBER_COOKIE_JAR" "/api/v1/auth/login" "{\"login\":\"$SMOKE_MEMBER_USERNAME\",\"password\":\"$SMOKE_MEMBER_PASSWORD\"}" >/dev/null
+api_get_with_jar "$TEMP_MEMBER_COOKIE_JAR" "/api/v1/notifications/unread-count" | json_value 'data.unread_count >= 2' >/dev/null
+api_get_with_jar "$TEMP_MEMBER_COOKIE_JAR" "/api/v1/notifications" | json_value 'data.notifications.some((notification) => notification.notification_type === "issue_assigned" && notification.read_at === null)' >/dev/null
+api_get_with_jar "$TEMP_MEMBER_COOKIE_JAR" "/api/v1/notifications" | json_value 'data.notifications.some((notification) => notification.notification_type === "issue_mentioned" && notification.read_at === null)' >/dev/null
+NOTIFICATION_ID="$(api_get_with_jar "$TEMP_MEMBER_COOKIE_JAR" "/api/v1/notifications" | json_value 'data.notifications.find((notification) => notification.notification_type === "issue_assigned").id')"
+api_post_with_jar "$TEMP_MEMBER_COOKIE_JAR" "/api/v1/notifications/$NOTIFICATION_ID/read" '{}' | json_value 'data.read_at !== null' >/dev/null
+api_post_with_jar "$TEMP_MEMBER_COOKIE_JAR" "/api/v1/notifications/read-all" '{}' >/dev/null
+api_get_with_jar "$TEMP_MEMBER_COOKIE_JAR" "/api/v1/notifications/unread-count" | json_value 'data.unread_count === 0' >/dev/null
 
 printf 'API smoke test passed\n'
