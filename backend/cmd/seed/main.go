@@ -60,7 +60,7 @@ func main() {
 		Level: slog.LevelInfo,
 	}))
 
-	cfg := config.Load()
+	cfg := config.MustLoad()
 	seed := seedConfig{
 		WorkspaceName: env("SEED_WORKSPACE_NAME", "Local Workspace"),
 		AdminEmail:    env("SEED_ADMIN_EMAIL", "admin@example.com"),

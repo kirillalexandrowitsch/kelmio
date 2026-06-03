@@ -23,7 +23,7 @@ import (
 )
 
 func main() {
-	cfg := config.Load()
+	cfg := config.MustLoad()
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
 		Level: slog.LevelInfo,
 	}))
@@ -44,7 +44,7 @@ func main() {
 	mux.HandleFunc("GET /readyz", readinessHandler(db))
 	mux.HandleFunc("GET /api/v1/ready", readinessHandler(db))
 
-	authHandler := auth.NewHandler(db, 7*24*time.Hour)
+	authHandler := auth.NewHandler(db, cfg.SessionTTL)
 	authHandler.RegisterRoutes(mux)
 	notificationService := notifications.NewService()
 
