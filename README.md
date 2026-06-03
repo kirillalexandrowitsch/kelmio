@@ -2,7 +2,7 @@
 
 Локальный team task tracker для небольших команд.
 
-Текущий статус: localhost V2 feature set реализован по [docs/v2-plan.md](docs/v2-plan.md). Остался финальный плановый шаг V2: `final V2 QA polish`.
+Текущий статус: localhost V2 полностью завершена по [docs/v2-plan.md](docs/v2-plan.md).
 
 ## Stack
 
@@ -24,6 +24,24 @@
 - Saved issue filters/views с обработкой missing project/sprint/assignee/label values.
 - In-app notifications без email/WebSocket: unread count, dropdown, page, mark read/read all.
 - Расширенные V2 seed data: DEMO issues, sprints, links, saved filters и notifications.
+
+## V2 Final QA Status
+
+Финальный V2 QA завершен 2026-06-03. Блокирующих V2 bugs не найдено.
+
+Проверенный automated baseline:
+
+```sh
+GOCACHE=/private/tmp/team-task-tracker-gocache make setup-db
+GOCACHE=/private/tmp/team-task-tracker-gocache make setup-db
+make smoke-api
+make frontend-e2e
+GOCACHE=/private/tmp/team-task-tracker-gocache make verify
+GOCACHE=/private/tmp/team-task-tracker-gocache make backend-integration-test
+git diff --check
+```
+
+Проверенный manual localhost QA: admin direct navigation, seeded dashboard sprint summary, issue hierarchy/subtask flow, linked issue visibility, sprint detail/active board/planning, saved filter save/apply/delete, notifications dropdown/page/read-all, `demo_member` read flows and absence of admin-only project/team actions.
 
 ## Local Development
 
