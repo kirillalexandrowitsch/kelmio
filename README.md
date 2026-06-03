@@ -2,7 +2,7 @@
 
 Локальный team task tracker для небольших команд.
 
-Текущий статус: localhost V1 завершена по плану из [docs/mvp-plan.md](docs/mvp-plan.md).
+Текущий статус: localhost V2 feature set реализован по [docs/v2-plan.md](docs/v2-plan.md). Остался финальный плановый шаг V2: `final V2 QA polish`.
 
 ## Stack
 
@@ -10,9 +10,20 @@
 - Frontend: React + TypeScript, Vite, обычный CSS
 - Database: PostgreSQL
 - Local infrastructure: Docker Compose
-- Tests: Go tests, backend PostgreSQL integration test, API smoke script, Playwright browser e2e smoke
+- Tests: Go tests, backend PostgreSQL integration tests, API smoke script, Playwright browser e2e smoke
 
-V1 намеренно держит зависимости небольшими. [docs/mvp-plan.md](docs/mvp-plan.md) перечисляет несколько технологий, которые разрешены для будущего роста, но localhost V1 использует более легкие встроенные решения там, где они закрывают те же MVP-сценарии с меньшей сложностью.
+Проект остается localhost-first: без cloud deployment, email, WebSocket, Redis и внешних интеграций. V2 расширяет V1 функциональность, но сохраняет простой Go modular monolith, REST JSON API, PostgreSQL, React + TypeScript и Docker Compose.
+
+## V2 Features
+
+- Route-level navigation для основных разделов приложения.
+- Issue hierarchy: `epic`, `story/task`, `subtask`, parent/children UI и activity.
+- Issue links: `blocks` и `relates` связи между задачами.
+- Sprints: list/detail, backlog planning, start/complete flow, active sprint board.
+- Story points и sprint summary на dashboard: progress, done/open points, workload by assignee.
+- Saved issue filters/views с обработкой missing project/sprint/assignee/label values.
+- In-app notifications без email/WebSocket: unread count, dropdown, page, mark read/read all.
+- Расширенные V2 seed data: DEMO issues, sprints, links, saved filters и notifications.
 
 ## Local Development
 
@@ -94,7 +105,7 @@ make setup-db
 make smoke-api
 ```
 
-`make smoke-api` проверяет основной сценарий V1: readiness -> auth guard -> admin login -> member access guards -> team/users list -> create project -> project detail -> project permission guards -> create issue -> attach label -> move issue -> add/edit/delete comment через planned comments API -> comment permission guards -> filters -> activity log. По умолчанию используется `http://localhost:8080`, `admin` / `admin12345` и `demo_member` / `demo12345`; при необходимости можно переопределить `API_BASE_URL`, `ADMIN_LOGIN`, `ADMIN_PASSWORD`, `MEMBER_LOGIN` и `MEMBER_PASSWORD`.
+`make smoke-api` проверяет V1 flow и V2 сценарии: readiness -> auth guard -> admin login -> member access guards -> team/users list -> project/issue/label/comment/activity flow -> hierarchy -> issue links -> sprint lifecycle -> saved filters -> notifications. По умолчанию используется `http://localhost:8080`, `admin` / `admin12345` и `demo_member` / `demo12345`; при необходимости можно переопределить `API_BASE_URL`, `ADMIN_LOGIN`, `ADMIN_PASSWORD`, `MEMBER_LOGIN` и `MEMBER_PASSWORD`.
 
 Перед commit/push удобно запускать:
 
@@ -130,7 +141,32 @@ make setup-db
 make frontend-e2e
 ```
 
-`make frontend-e2e` запускает Playwright-сценарий V1 в браузере: login -> create project -> create issue -> move issue -> add comment. По умолчанию используется `http://localhost:5173`, `admin` / `admin12345`; при необходимости можно переопределить `E2E_BASE_URL`, `E2E_ADMIN_LOGIN` и `E2E_ADMIN_PASSWORD`.
+`make frontend-e2e` запускает Playwright browser smoke: V1 login/project/issue/board/comment flow плюс V2 hierarchy/links, sprint workflow, saved filters и notifications. По умолчанию используется `http://localhost:5173`, backend API `http://localhost:8080`, `admin` / `admin12345`; при необходимости можно переопределить `E2E_BASE_URL`, `E2E_API_BASE_URL`, `E2E_ADMIN_LOGIN` и `E2E_ADMIN_PASSWORD`.
+
+## V2 Local QA Flow
+
+Для полной локальной проверки V2:
+
+```sh
+# terminal 1
+make dev
+
+# terminal 2, after postgres/backend/frontend containers are up
+make setup-db
+make smoke-api
+make frontend-e2e
+make verify
+GOCACHE=/private/tmp/team-task-tracker-gocache make backend-integration-test
+```
+
+Ручные localhost сценарии для V2:
+
+- Открыть `http://localhost:5173`, войти как `admin` / `admin12345`, проверить direct navigation между Dashboard, Issues, Board, Sprints, Notifications, Team, Labels, Account.
+- В Issues открыть задачу, создать subtask, проверить hierarchy block и activity.
+- В issue detail добавить linked issue с типом `blocks` или `relates`, проверить linked issues block и activity.
+- В Sprints создать sprint, добавить backlog issue, start sprint, поменять status на active sprint board, complete sprint.
+- В issue list выставить filters, сохранить view, очистить filters, применить saved filter, удалить saved filter.
+- Создать/использовать member, назначить issue и добавить comment с `@username`, затем войти под member и проверить notification badge/dropdown/page, mark read и mark all read.
 
 Auth API smoke test:
 
@@ -385,7 +421,11 @@ password: demo12345
 demo project:
 key: DEMO
 labels: frontend, backend, bug
-issues: DEMO-1, DEMO-2, DEMO-3, DEMO-4
+issues: DEMO-1 ... DEMO-10
+sprints: Demo Active Sprint, Demo Next Sprint, Demo Completed Sprint
+links: DEMO-9 blocks DEMO-6, DEMO-7 relates DEMO-6
+saved filters: admin and demo_member V2 planning views
+notifications: seeded unread admin/demo_member notifications
 ```
 
 ## Environment
