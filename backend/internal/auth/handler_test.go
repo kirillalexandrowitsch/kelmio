@@ -185,54 +185,82 @@ func TestSessionCookie(t *testing.T) {
 	t.Parallel()
 
 	expiresAt := time.Date(2026, time.May, 23, 12, 0, 0, 0, time.UTC)
-	cookie := sessionCookie("session-token", expiresAt, 3600)
 
-	if cookie.Name != SessionCookieName {
-		t.Fatalf("Name = %q, want %q", cookie.Name, SessionCookieName)
-	}
-	if cookie.Value != "session-token" {
-		t.Fatalf("Value = %q, want session-token", cookie.Value)
-	}
-	if cookie.Path != "/" {
-		t.Fatalf("Path = %q, want /", cookie.Path)
-	}
-	if !cookie.Expires.Equal(expiresAt) {
-		t.Fatalf("Expires = %s, want %s", cookie.Expires, expiresAt)
-	}
-	if cookie.MaxAge != 3600 {
-		t.Fatalf("MaxAge = %d, want 3600", cookie.MaxAge)
-	}
-	if !cookie.HttpOnly {
-		t.Fatal("HttpOnly = false, want true")
-	}
-	if cookie.SameSite != http.SameSiteLaxMode {
-		t.Fatalf("SameSite = %v, want %v", cookie.SameSite, http.SameSiteLaxMode)
+	for _, secure := range []bool{false, true} {
+		secure := secure
+		t.Run("secure_"+boolName(secure), func(t *testing.T) {
+			t.Parallel()
+
+			cookie := sessionCookie("session-token", expiresAt, 3600, secure)
+
+			if cookie.Name != SessionCookieName {
+				t.Fatalf("Name = %q, want %q", cookie.Name, SessionCookieName)
+			}
+			if cookie.Value != "session-token" {
+				t.Fatalf("Value = %q, want session-token", cookie.Value)
+			}
+			if cookie.Path != "/" {
+				t.Fatalf("Path = %q, want /", cookie.Path)
+			}
+			if !cookie.Expires.Equal(expiresAt) {
+				t.Fatalf("Expires = %s, want %s", cookie.Expires, expiresAt)
+			}
+			if cookie.MaxAge != 3600 {
+				t.Fatalf("MaxAge = %d, want 3600", cookie.MaxAge)
+			}
+			if !cookie.HttpOnly {
+				t.Fatal("HttpOnly = false, want true")
+			}
+			if cookie.Secure != secure {
+				t.Fatalf("Secure = %t, want %t", cookie.Secure, secure)
+			}
+			if cookie.SameSite != http.SameSiteLaxMode {
+				t.Fatalf("SameSite = %v, want %v", cookie.SameSite, http.SameSiteLaxMode)
+			}
+		})
 	}
 }
 
 func TestExpiredSessionCookie(t *testing.T) {
 	t.Parallel()
 
-	cookie := expiredSessionCookie()
+	for _, secure := range []bool{false, true} {
+		secure := secure
+		t.Run("secure_"+boolName(secure), func(t *testing.T) {
+			t.Parallel()
 
-	if cookie.Name != SessionCookieName {
-		t.Fatalf("Name = %q, want %q", cookie.Name, SessionCookieName)
+			cookie := expiredSessionCookie(secure)
+
+			if cookie.Name != SessionCookieName {
+				t.Fatalf("Name = %q, want %q", cookie.Name, SessionCookieName)
+			}
+			if cookie.Value != "" {
+				t.Fatalf("Value = %q, want empty", cookie.Value)
+			}
+			if cookie.Path != "/" {
+				t.Fatalf("Path = %q, want /", cookie.Path)
+			}
+			if cookie.MaxAge != -1 {
+				t.Fatalf("MaxAge = %d, want -1", cookie.MaxAge)
+			}
+			if !cookie.HttpOnly {
+				t.Fatal("HttpOnly = false, want true")
+			}
+			if cookie.Secure != secure {
+				t.Fatalf("Secure = %t, want %t", cookie.Secure, secure)
+			}
+			if cookie.SameSite != http.SameSiteLaxMode {
+				t.Fatalf("SameSite = %v, want %v", cookie.SameSite, http.SameSiteLaxMode)
+			}
+		})
 	}
-	if cookie.Value != "" {
-		t.Fatalf("Value = %q, want empty", cookie.Value)
+}
+
+func boolName(value bool) string {
+	if value {
+		return "true"
 	}
-	if cookie.Path != "/" {
-		t.Fatalf("Path = %q, want /", cookie.Path)
-	}
-	if cookie.MaxAge != -1 {
-		t.Fatalf("MaxAge = %d, want -1", cookie.MaxAge)
-	}
-	if !cookie.HttpOnly {
-		t.Fatal("HttpOnly = false, want true")
-	}
-	if cookie.SameSite != http.SameSiteLaxMode {
-		t.Fatalf("SameSite = %v, want %v", cookie.SameSite, http.SameSiteLaxMode)
-	}
+	return "false"
 }
 
 func TestNewSessionToken(t *testing.T) {

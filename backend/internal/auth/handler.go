@@ -24,8 +24,9 @@ var errInvalidCredentials = errors.New("invalid credentials")
 var ErrUnauthorized = errors.New("unauthorized")
 
 type Handler struct {
-	db         *pgxpool.Pool
-	sessionTTL time.Duration
+	db                  *pgxpool.Pool
+	sessionTTL          time.Duration
+	sessionCookieSecure bool
 }
 
 type loginRequest struct {
@@ -85,10 +86,11 @@ type CurrentUser struct {
 	Role        string
 }
 
-func NewHandler(db *pgxpool.Pool, sessionTTL time.Duration) *Handler {
+func NewHandler(db *pgxpool.Pool, sessionTTL time.Duration, sessionCookieSecure bool) *Handler {
 	return &Handler{
-		db:         db,
-		sessionTTL: sessionTTL,
+		db:                  db,
+		sessionTTL:          sessionTTL,
+		sessionCookieSecure: sessionCookieSecure,
 	}
 }
 
@@ -165,7 +167,7 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.SetCookie(w, sessionCookie(token, expiresAt, int(h.sessionTTL.Seconds())))
+	http.SetCookie(w, sessionCookie(token, expiresAt, int(h.sessionTTL.Seconds()), h.sessionCookieSecure))
 	writeJSON(w, http.StatusOK, loginResponse{
 		User:      user.toResponse(),
 		ExpiresAt: expiresAt,
@@ -179,7 +181,7 @@ func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
 		_ = h.deleteSession(ctx, hashToken(cookie.Value))
 	}
 
-	http.SetCookie(w, expiredSessionCookie())
+	http.SetCookie(w, expiredSessionCookie(h.sessionCookieSecure))
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -196,7 +198,7 @@ func (h *Handler) me(w http.ResponseWriter, r *http.Request) {
 	user, err := h.userBySession(ctx, hashToken(cookie.Value))
 	if err != nil {
 		if errors.Is(err, errInvalidCredentials) {
-			http.SetCookie(w, expiredSessionCookie())
+			http.SetCookie(w, expiredSessionCookie(h.sessionCookieSecure))
 			writeError(w, http.StatusUnauthorized, "unauthorized", "session is invalid")
 			return
 		}
@@ -236,7 +238,7 @@ func (h *Handler) updateProfile(w http.ResponseWriter, r *http.Request) {
 	currentUser, err := h.userBySession(ctx, tokenHash)
 	if err != nil {
 		if errors.Is(err, errInvalidCredentials) {
-			http.SetCookie(w, expiredSessionCookie())
+			http.SetCookie(w, expiredSessionCookie(h.sessionCookieSecure))
 			writeError(w, http.StatusUnauthorized, "unauthorized", "session is invalid")
 			return
 		}
@@ -282,7 +284,7 @@ func (h *Handler) changePassword(w http.ResponseWriter, r *http.Request) {
 	user, err := h.userBySession(ctx, tokenHash)
 	if err != nil {
 		if errors.Is(err, errInvalidCredentials) {
-			http.SetCookie(w, expiredSessionCookie())
+			http.SetCookie(w, expiredSessionCookie(h.sessionCookieSecure))
 			writeError(w, http.StatusUnauthorized, "unauthorized", "session is invalid")
 			return
 		}
@@ -553,7 +555,7 @@ func hashToken(token string) string {
 	return hex.EncodeToString(hash[:])
 }
 
-func sessionCookie(token string, expiresAt time.Time, maxAge int) *http.Cookie {
+func sessionCookie(token string, expiresAt time.Time, maxAge int, secure bool) *http.Cookie {
 	return &http.Cookie{
 		Name:     SessionCookieName,
 		Value:    token,
@@ -561,11 +563,12 @@ func sessionCookie(token string, expiresAt time.Time, maxAge int) *http.Cookie {
 		Expires:  expiresAt,
 		MaxAge:   maxAge,
 		HttpOnly: true,
+		Secure:   secure,
 		SameSite: http.SameSiteLaxMode,
 	}
 }
 
-func expiredSessionCookie() *http.Cookie {
+func expiredSessionCookie(secure bool) *http.Cookie {
 	return &http.Cookie{
 		Name:     SessionCookieName,
 		Value:    "",
@@ -573,6 +576,7 @@ func expiredSessionCookie() *http.Cookie {
 		Expires:  time.Unix(0, 0),
 		MaxAge:   -1,
 		HttpOnly: true,
+		Secure:   secure,
 		SameSite: http.SameSiteLaxMode,
 	}
 }

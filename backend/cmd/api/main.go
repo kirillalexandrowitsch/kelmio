@@ -22,6 +22,8 @@ import (
 	"team-task-tracker/backend/internal/team"
 )
 
+const maxRequestBodyBytes int64 = 1 << 20
+
 func main() {
 	cfg := config.MustLoad()
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
@@ -44,7 +46,7 @@ func main() {
 	mux.HandleFunc("GET /readyz", readinessHandler(db))
 	mux.HandleFunc("GET /api/v1/ready", readinessHandler(db))
 
-	authHandler := auth.NewHandler(db, cfg.SessionTTL)
+	authHandler := auth.NewHandler(db, cfg.SessionTTL, cfg.SessionCookieSecure)
 	authHandler.RegisterRoutes(mux)
 	notificationService := notifications.NewService()
 
@@ -71,7 +73,7 @@ func main() {
 
 	server := &http.Server{
 		Addr:         ":" + cfg.Port,
-		Handler:      requestLogger(logger, cors(cfg.FrontendURL, mux)),
+		Handler:      requestLogger(logger, securityHeaders(requestBodyLimit(maxRequestBodyBytes, cors(cfg.TrustedOrigins, mux)))),
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 10 * time.Second,
 		IdleTimeout:  120 * time.Second,
@@ -144,15 +146,51 @@ func requestLogger(logger *slog.Logger, next http.Handler) http.Handler {
 	})
 }
 
-func cors(frontendURL string, next http.Handler) http.Handler {
+func securityHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("Referrer-Policy", "no-referrer")
+		w.Header().Set("Cross-Origin-Opener-Policy", "same-origin")
+		w.Header().Set("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+func requestBodyLimit(maxBytes int64, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if maxBytes > 0 && r.Body != nil {
+			if r.ContentLength > maxBytes {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusRequestEntityTooLarge)
+				_, _ = w.Write([]byte(`{"error":{"code":"request_too_large","message":"request body is too large"}}`))
+				return
+			}
+
+			r.Body = http.MaxBytesReader(w, r.Body, maxBytes)
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+func cors(trustedOrigins []string, next http.Handler) http.Handler {
+	allowedOrigins := make(map[string]struct{}, len(trustedOrigins))
+	for _, origin := range trustedOrigins {
+		if origin != "" {
+			allowedOrigins[origin] = struct{}{}
+		}
+	}
+
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		origin := r.Header.Get("Origin")
-		if origin != "" && origin == frontendURL {
+		if _, ok := allowedOrigins[origin]; origin != "" && ok {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 			w.Header().Set("Access-Control-Allow-Credentials", "true")
 			w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, PUT, DELETE, OPTIONS")
-			w.Header().Set("Vary", "Origin")
+			w.Header().Add("Vary", "Origin")
 		}
 
 		if r.Method == http.MethodOptions {
