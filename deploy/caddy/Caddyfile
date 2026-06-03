@@ -1,0 +1,18 @@
+{$PUBLIC_APP_HOST:localhost} {
+	encode zstd gzip
+
+	@frontendApi path /api/api/*
+	handle @frontendApi {
+		uri strip_prefix /api
+		reverse_proxy backend:8080
+	}
+
+	@backend path /api/* /healthz /readyz /api/v1/health /api/v1/ready
+	handle @backend {
+		reverse_proxy backend:8080
+	}
+
+	handle {
+		reverse_proxy frontend:8080
+	}
+}
