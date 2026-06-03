@@ -1,4 +1,5 @@
 bin/
 tmp/
+.cache/
 coverage.out
-
+*.test
