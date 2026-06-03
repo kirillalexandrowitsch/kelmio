@@ -12,6 +12,7 @@ import (
 
 	"team-task-tracker/backend/internal/auth"
 	"team-task-tracker/backend/internal/config"
+	"team-task-tracker/backend/internal/csrf"
 	"team-task-tracker/backend/internal/database"
 	"team-task-tracker/backend/internal/issues"
 	"team-task-tracker/backend/internal/labels"
@@ -46,7 +47,13 @@ func main() {
 	mux.HandleFunc("GET /readyz", readinessHandler(db))
 	mux.HandleFunc("GET /api/v1/ready", readinessHandler(db))
 
-	authHandler := auth.NewHandler(db, cfg.SessionTTL, cfg.SessionCookieSecure)
+	csrfManager, err := csrf.NewManager(cfg.CSRFSecret)
+	if err != nil {
+		logger.Error("csrf manager setup failed", "error", err)
+		os.Exit(1)
+	}
+
+	authHandler := auth.NewHandler(db, cfg.SessionTTL, cfg.SessionCookieSecure, csrfManager)
 	authHandler.RegisterRoutes(mux)
 	notificationService := notifications.NewService()
 
@@ -73,7 +80,7 @@ func main() {
 
 	server := &http.Server{
 		Addr:         ":" + cfg.Port,
-		Handler:      requestLogger(logger, securityHeaders(requestBodyLimit(maxRequestBodyBytes, cors(cfg.TrustedOrigins, mux)))),
+		Handler:      requestLogger(logger, securityHeaders(requestBodyLimit(maxRequestBodyBytes, cors(cfg.TrustedOrigins, csrfProtection(csrfManager, mux))))),
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 10 * time.Second,
 		IdleTimeout:  120 * time.Second,
@@ -175,6 +182,41 @@ func requestBodyLimit(maxBytes int64, next http.Handler) http.Handler {
 	})
 }
 
+func csrfProtection(manager *csrf.Manager, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if isSafeMethod(r.Method) || isCSRFExempt(r) {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		cookie, err := r.Cookie(auth.SessionCookieName)
+		if err != nil || cookie.Value == "" {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		token := r.Header.Get(csrf.HeaderName)
+		if token == "" {
+			writeAPIError(w, http.StatusForbidden, "csrf_token_required", "csrf token is required")
+			return
+		}
+		if manager == nil || !manager.Valid(cookie.Value, token) {
+			writeAPIError(w, http.StatusForbidden, "invalid_csrf_token", "csrf token is invalid")
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+func isSafeMethod(method string) bool {
+	return method == http.MethodGet || method == http.MethodHead || method == http.MethodOptions
+}
+
+func isCSRFExempt(r *http.Request) bool {
+	return r.Method == http.MethodPost && r.URL.Path == "/api/v1/auth/login"
+}
+
 func cors(trustedOrigins []string, next http.Handler) http.Handler {
 	allowedOrigins := make(map[string]struct{}, len(trustedOrigins))
 	for _, origin := range trustedOrigins {
@@ -188,7 +230,7 @@ func cors(trustedOrigins []string, next http.Handler) http.Handler {
 		if _, ok := allowedOrigins[origin]; origin != "" && ok {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 			w.Header().Set("Access-Control-Allow-Credentials", "true")
-			w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, "+csrf.HeaderName)
 			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, PUT, DELETE, OPTIONS")
 			w.Header().Add("Vary", "Origin")
 		}
@@ -200,4 +242,10 @@ func cors(trustedOrigins []string, next http.Handler) http.Handler {
 
 		next.ServeHTTP(w, r)
 	})
+}
+
+func writeAPIError(w http.ResponseWriter, status int, code string, message string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_, _ = w.Write([]byte(`{"error":{"code":"` + code + `","message":"` + message + `"}}`))
 }

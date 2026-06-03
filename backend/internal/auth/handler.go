@@ -16,6 +16,8 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/crypto/bcrypt"
+
+	"team-task-tracker/backend/internal/csrf"
 )
 
 const SessionCookieName = "team_task_tracker_session"
@@ -27,6 +29,7 @@ type Handler struct {
 	db                  *pgxpool.Pool
 	sessionTTL          time.Duration
 	sessionCookieSecure bool
+	csrfManager         *csrf.Manager
 }
 
 type loginRequest struct {
@@ -52,6 +55,10 @@ type loginResponse struct {
 
 type meResponse struct {
 	User userResponse `json:"user"`
+}
+
+type csrfTokenResponse struct {
+	CSRFToken string `json:"csrf_token"`
 }
 
 type userRecord struct {
@@ -86,11 +93,17 @@ type CurrentUser struct {
 	Role        string
 }
 
-func NewHandler(db *pgxpool.Pool, sessionTTL time.Duration, sessionCookieSecure bool) *Handler {
+func NewHandler(
+	db *pgxpool.Pool,
+	sessionTTL time.Duration,
+	sessionCookieSecure bool,
+	csrfManager *csrf.Manager,
+) *Handler {
 	return &Handler{
 		db:                  db,
 		sessionTTL:          sessionTTL,
 		sessionCookieSecure: sessionCookieSecure,
+		csrfManager:         csrfManager,
 	}
 }
 
@@ -98,6 +111,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/auth/login", h.login)
 	mux.HandleFunc("POST /api/v1/auth/logout", h.logout)
 	mux.HandleFunc("GET /api/v1/auth/me", h.me)
+	mux.HandleFunc("GET /api/v1/auth/csrf-token", h.csrfToken)
 	mux.HandleFunc("PATCH /api/v1/auth/profile", h.updateProfile)
 	mux.HandleFunc("PATCH /api/v1/auth/password", h.changePassword)
 }
@@ -209,6 +223,43 @@ func (h *Handler) me(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, http.StatusOK, meResponse{
 		User: user.toResponse(),
+	})
+}
+
+func (h *Handler) csrfToken(w http.ResponseWriter, r *http.Request) {
+	cookie, err := r.Cookie(SessionCookieName)
+	if err != nil || cookie.Value == "" {
+		writeError(w, http.StatusUnauthorized, "unauthorized", "session is required")
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	if _, err := h.userBySession(ctx, hashToken(cookie.Value)); err != nil {
+		if errors.Is(err, errInvalidCredentials) {
+			http.SetCookie(w, expiredSessionCookie(h.sessionCookieSecure))
+			writeError(w, http.StatusUnauthorized, "unauthorized", "session is invalid")
+			return
+		}
+
+		writeError(w, http.StatusInternalServerError, "internal_error", "could not load session")
+		return
+	}
+
+	if h.csrfManager == nil {
+		writeError(w, http.StatusInternalServerError, "internal_error", "csrf manager is not configured")
+		return
+	}
+
+	token, err := h.csrfManager.Generate(cookie.Value)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "internal_error", "could not create csrf token")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, csrfTokenResponse{
+		CSRFToken: token,
 	})
 }
 

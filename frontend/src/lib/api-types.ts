@@ -13,6 +13,10 @@ export type AuthResponse = {
   user: CurrentUser;
 };
 
+export type CSRFTokenResponse = {
+  csrf_token: string;
+};
+
 export type Project = {
   id: string;
   key: string;

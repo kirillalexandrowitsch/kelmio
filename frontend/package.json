@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
-    "test": "node --test --experimental-strip-types src/lib/validation.test.ts src/lib/permissions.test.ts src/lib/routing.test.ts src/lib/issue-model.test.ts src/lib/sprint-model.test.ts src/lib/team-view.test.ts src/lib/activity-view.test.ts src/lib/notification-view.test.ts src/components/form-feedback.test.ts",
+    "test": "node --test --experimental-strip-types src/lib/validation.test.ts src/lib/permissions.test.ts src/lib/routing.test.ts src/lib/issue-model.test.ts src/lib/sprint-model.test.ts src/lib/team-view.test.ts src/lib/activity-view.test.ts src/lib/notification-view.test.ts src/lib/csrf.test.ts src/components/form-feedback.test.ts",
     "e2e": "playwright test",
     "preview": "vite preview"
   },

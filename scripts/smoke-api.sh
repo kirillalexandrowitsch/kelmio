@@ -14,26 +14,30 @@ ISSUE_ID=""
 LABEL_ID=""
 SAVED_FILTER_ID=""
 SMOKE_MEMBER_ID=""
+CSRF_TOKEN=""
+MEMBER_CSRF_TOKEN=""
+TEMP_MEMBER_CSRF_TOKEN=""
 
 cleanup() {
 	if [ -n "$SMOKE_MEMBER_ID" ]; then
 		curl -fsS -b "$COOKIE_JAR" \
 			-X PATCH \
 			-H "Content-Type: application/json" \
+			-H "X-CSRF-Token: $CSRF_TOKEN" \
 			-d '{"role":"member","is_active":false}' \
 			"$API_BASE_URL/api/v1/team/members/$SMOKE_MEMBER_ID" >/dev/null 2>&1 || true
 	fi
 	if [ -n "$SAVED_FILTER_ID" ]; then
-		curl -fsS -b "$COOKIE_JAR" -X DELETE "$API_BASE_URL/api/v1/saved-filters/$SAVED_FILTER_ID" >/dev/null 2>&1 || true
+		curl -fsS -b "$COOKIE_JAR" -H "X-CSRF-Token: $CSRF_TOKEN" -X DELETE "$API_BASE_URL/api/v1/saved-filters/$SAVED_FILTER_ID" >/dev/null 2>&1 || true
 	fi
 	if [ -n "$LABEL_ID" ]; then
-		curl -fsS -b "$COOKIE_JAR" -X DELETE "$API_BASE_URL/api/v1/labels/$LABEL_ID" >/dev/null 2>&1 || true
+		curl -fsS -b "$COOKIE_JAR" -H "X-CSRF-Token: $CSRF_TOKEN" -X DELETE "$API_BASE_URL/api/v1/labels/$LABEL_ID" >/dev/null 2>&1 || true
 	fi
 	if [ -n "$ISSUE_ID" ]; then
-		curl -fsS -b "$COOKIE_JAR" -X POST "$API_BASE_URL/api/v1/issues/$ISSUE_ID/archive" >/dev/null 2>&1 || true
+		curl -fsS -b "$COOKIE_JAR" -H "X-CSRF-Token: $CSRF_TOKEN" -X POST "$API_BASE_URL/api/v1/issues/$ISSUE_ID/archive" >/dev/null 2>&1 || true
 	fi
 	if [ -n "$PROJECT_ID" ]; then
-		curl -fsS -b "$COOKIE_JAR" -X POST "$API_BASE_URL/api/v1/projects/$PROJECT_ID/archive" >/dev/null 2>&1 || true
+		curl -fsS -b "$COOKIE_JAR" -H "X-CSRF-Token: $CSRF_TOKEN" -X POST "$API_BASE_URL/api/v1/projects/$PROJECT_ID/archive" >/dev/null 2>&1 || true
 	fi
 	rm -f "$COOKIE_JAR" "$MEMBER_COOKIE_JAR" "$TEMP_MEMBER_COOKIE_JAR"
 }
@@ -75,9 +79,24 @@ api_status() {
 	curl -sS -o /dev/null -w '%{http_code}' -b "$COOKIE_JAR" "$API_BASE_URL$1"
 }
 
+api_csrf_token_with_jar() {
+	curl -fsS -b "$1" "$API_BASE_URL/api/v1/auth/csrf-token" | json_value 'data.csrf_token'
+}
+
+csrf_token_for_jar() {
+	if [ "$1" = "$COOKIE_JAR" ]; then
+		printf '%s' "$CSRF_TOKEN"
+	elif [ "$1" = "$MEMBER_COOKIE_JAR" ]; then
+		printf '%s' "$MEMBER_CSRF_TOKEN"
+	elif [ "$1" = "$TEMP_MEMBER_COOKIE_JAR" ]; then
+		printf '%s' "$TEMP_MEMBER_CSRF_TOKEN"
+	fi
+}
+
 api_post() {
 	curl -fsS -b "$COOKIE_JAR" -c "$COOKIE_JAR" \
 		-H "Content-Type: application/json" \
+		-H "X-CSRF-Token: $CSRF_TOKEN" \
 		-d "$2" \
 		"$API_BASE_URL$1"
 }
@@ -85,6 +104,7 @@ api_post() {
 api_post_with_jar() {
 	curl -fsS -b "$1" -c "$1" \
 		-H "Content-Type: application/json" \
+		-H "X-CSRF-Token: $(csrf_token_for_jar "$1")" \
 		-d "$3" \
 		"$API_BASE_URL$2"
 }
@@ -92,6 +112,7 @@ api_post_with_jar() {
 api_post_status_with_jar() {
 	curl -sS -o /dev/null -w '%{http_code}' -b "$1" -c "$1" \
 		-H "Content-Type: application/json" \
+		-H "X-CSRF-Token: $(csrf_token_for_jar "$1")" \
 		-d "$3" \
 		"$API_BASE_URL$2"
 }
@@ -100,6 +121,7 @@ api_patch_status_with_jar() {
 	curl -sS -o /dev/null -w '%{http_code}' -b "$1" \
 		-X PATCH \
 		-H "Content-Type: application/json" \
+		-H "X-CSRF-Token: $(csrf_token_for_jar "$1")" \
 		-d "$3" \
 		"$API_BASE_URL$2"
 }
@@ -107,6 +129,7 @@ api_patch_status_with_jar() {
 api_delete_status_with_jar() {
 	curl -sS -o /dev/null -w '%{http_code}' -b "$1" \
 		-X DELETE \
+		-H "X-CSRF-Token: $(csrf_token_for_jar "$1")" \
 		"$API_BASE_URL$2"
 }
 
@@ -114,6 +137,7 @@ api_patch() {
 	curl -fsS -b "$COOKIE_JAR" \
 		-X PATCH \
 		-H "Content-Type: application/json" \
+		-H "X-CSRF-Token: $CSRF_TOKEN" \
 		-d "$2" \
 		"$API_BASE_URL$1"
 }
@@ -122,6 +146,7 @@ api_put() {
 	curl -fsS -b "$COOKIE_JAR" \
 		-X PUT \
 		-H "Content-Type: application/json" \
+		-H "X-CSRF-Token: $CSRF_TOKEN" \
 		-d "$2" \
 		"$API_BASE_URL$1"
 }
@@ -129,6 +154,7 @@ api_put() {
 api_delete() {
 	curl -fsS -b "$COOKIE_JAR" \
 		-X DELETE \
+		-H "X-CSRF-Token: $CSRF_TOKEN" \
 		"$API_BASE_URL$1"
 }
 
@@ -147,6 +173,7 @@ fi
 
 printf 'Logging in as %s\n' "$ADMIN_LOGIN"
 api_post "/api/v1/auth/login" "{\"login\":\"$ADMIN_LOGIN\",\"password\":\"$ADMIN_PASSWORD\"}" >/dev/null
+CSRF_TOKEN="$(api_csrf_token_with_jar "$COOKIE_JAR")"
 
 ADMIN_USER_ID="$(api_get "/api/v1/auth/me" | json_value 'data.user.id')"
 
@@ -160,6 +187,7 @@ if [ "$(api_post_status_with_jar "$MEMBER_COOKIE_JAR" "/api/v1/auth/login" "$MEM
 	printf 'Expected member login to succeed for %s\n' "$MEMBER_LOGIN" >&2
 	exit 1
 fi
+MEMBER_CSRF_TOKEN="$(api_csrf_token_with_jar "$MEMBER_COOKIE_JAR")"
 if [ "$(api_post_status_with_jar "$MEMBER_COOKIE_JAR" "/api/v1/projects" '{"key":"MEMBERTRY","name":"Member Project"}')" != "403" ]; then
 	printf 'Expected member project creation to return 403\n' >&2
 	exit 1
@@ -281,6 +309,7 @@ api_post "/api/v1/issues/$BLOCKER_ID/assign" "{\"assignee_id\":\"$SMOKE_MEMBER_I
 api_post "/api/v1/issues/$BLOCKER_ID/comments" "{\"body\":\"@$SMOKE_MEMBER_USERNAME Please check this smoke notification.\"}" | json_value "data.body.includes(\"@$SMOKE_MEMBER_USERNAME\")" >/dev/null
 
 api_post_with_jar "$TEMP_MEMBER_COOKIE_JAR" "/api/v1/auth/login" "{\"login\":\"$SMOKE_MEMBER_USERNAME\",\"password\":\"$SMOKE_MEMBER_PASSWORD\"}" >/dev/null
+TEMP_MEMBER_CSRF_TOKEN="$(api_csrf_token_with_jar "$TEMP_MEMBER_COOKIE_JAR")"
 api_get_with_jar "$TEMP_MEMBER_COOKIE_JAR" "/api/v1/notifications/unread-count" | json_value 'data.unread_count >= 2' >/dev/null
 api_get_with_jar "$TEMP_MEMBER_COOKIE_JAR" "/api/v1/notifications" | json_value 'data.notifications.some((notification) => notification.notification_type === "issue_assigned" && notification.read_at === null)' >/dev/null
 api_get_with_jar "$TEMP_MEMBER_COOKIE_JAR" "/api/v1/notifications" | json_value 'data.notifications.some((notification) => notification.notification_type === "issue_mentioned" && notification.read_at === null)' >/dev/null

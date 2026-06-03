@@ -67,7 +67,9 @@ test("V1 browser smoke: create and move issue with a comment", async ({ page }) 
     await expect(page.getByText("Added comment")).toBeVisible();
   } finally {
     if (projectId) {
-      await page.request.post(`${apiBaseURL}/api/v1/projects/${projectId}/archive`);
+      await page.request.post(`${apiBaseURL}/api/v1/projects/${projectId}/archive`, {
+        headers: await csrfHeaders(page),
+      });
     }
   }
 });
@@ -86,4 +88,14 @@ async function projectIdByKey(page: Page, key: string) {
   expect(project).toBeDefined();
 
   return project?.id ?? "";
+}
+
+async function csrfHeaders(page: Page) {
+  const response = await page.request.get(`${apiBaseURL}/api/v1/auth/csrf-token`);
+  expect(response.ok()).toBe(true);
+
+  const payload = (await response.json()) as { csrf_token: string };
+  return {
+    "X-CSRF-Token": payload.csrf_token,
+  };
 }

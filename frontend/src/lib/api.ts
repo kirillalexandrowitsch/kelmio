@@ -1,6 +1,7 @@
 import {
   type AppNotification,
   type AuthResponse,
+  type CSRFTokenResponse,
   type CreateIssueInput,
   type CreateIssueLinkInput,
   type CreateLabelInput,
@@ -38,8 +39,15 @@ import {
   type UpdateSprintInput,
   type UpdateTeamMemberInput,
 } from "./api-types";
+import {
+  CSRF_HEADER_NAME,
+  CSRF_TOKEN_PATH,
+  isCSRFError,
+  requestNeedsCSRF,
+} from "./csrf";
 export type {
   AppNotification,
+  CSRFTokenResponse,
   CurrentUser,
   Issue,
   IssueActivity,
@@ -73,6 +81,9 @@ export type {
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080";
 
 export const API_UNAUTHORIZED_EVENT = "team-task-tracker:unauthorized";
+
+let csrfToken: string | null = null;
+let csrfTokenRequest: Promise<string> | null = null;
 
 export class ApiError extends Error {
   status: number;
@@ -501,30 +512,50 @@ export async function deleteIssueComment(issueId: string, commentId: string) {
   );
 }
 
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+async function request<T>(
+  path: string,
+  init: RequestInit = {},
+  allowCSRFRetry = true,
+): Promise<T> {
+  const method = (init.method ?? "GET").toUpperCase();
+  const headers = new Headers(init.headers);
+  if (!headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+
+  const needsCSRF = requestNeedsCSRF(path, method);
+  if (needsCSRF) {
+    headers.set(CSRF_HEADER_NAME, await getCSRFToken());
+  }
+
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
     credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      ...init.headers,
-    },
+    headers,
   });
 
   if (response.status === 204) {
+    if (path === "/api/v1/auth/logout") {
+      resetCSRFToken();
+    }
     return undefined as T;
   }
 
   const payload = await response.json().catch(() => null);
   if (!response.ok) {
+    const errorCode = payload?.error?.code;
+    if (allowCSRFRetry && needsCSRF && isCSRFError(response.status, errorCode)) {
+      resetCSRFToken();
+      return request<T>(path, init, false);
+    }
+
     if (
       response.status === 401 &&
       path !== "/api/v1/auth/login" &&
       path !== "/api/v1/auth/me"
     ) {
-      const event = document.createEvent("Event");
-      event.initEvent(API_UNAUTHORIZED_EVENT, false, false);
-      window.dispatchEvent(event);
+      resetCSRFToken();
+      dispatchUnauthorizedEvent();
     }
 
     const message =
@@ -532,5 +563,63 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     throw new ApiError(message, response.status);
   }
 
+  if (path === "/api/v1/auth/login" || path === "/api/v1/auth/logout") {
+    resetCSRFToken();
+  }
+
   return payload as T;
+}
+
+async function getCSRFToken() {
+  if (csrfToken) {
+    return csrfToken;
+  }
+
+  if (!csrfTokenRequest) {
+    csrfTokenRequest = fetch(`${API_BASE_URL}${CSRF_TOKEN_PATH}`, {
+      credentials: "include",
+    })
+      .then(async (response) => {
+        const payload = await response.json().catch(() => null);
+        if (!response.ok) {
+          if (response.status === 401) {
+            resetCSRFToken();
+            dispatchUnauthorizedEvent();
+          }
+
+          const message =
+            payload?.error?.message ??
+            `Request failed with status ${response.status}`;
+          throw new ApiError(message, response.status);
+        }
+
+        const token = (payload as CSRFTokenResponse | null)?.csrf_token;
+        if (!token) {
+          throw new ApiError("CSRF token response is invalid", response.status);
+        }
+
+        csrfToken = token;
+        return token;
+      })
+      .finally(() => {
+        csrfTokenRequest = null;
+      });
+  }
+
+  return csrfTokenRequest;
+}
+
+function resetCSRFToken() {
+  csrfToken = null;
+  csrfTokenRequest = null;
+}
+
+function dispatchUnauthorizedEvent() {
+  if (typeof document === "undefined" || typeof window === "undefined") {
+    return;
+  }
+
+  const event = document.createEvent("Event");
+  event.initEvent(API_UNAUTHORIZED_EVENT, false, false);
+  window.dispatchEvent(event);
 }

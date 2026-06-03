@@ -257,11 +257,13 @@ test("V2 browser smoke: notifications", async ({ page }) => {
 
     await expectJson<Issue>(
       await page.request.post(`${apiBaseURL}/api/v1/issues/${issue.id}/assign`, {
+        headers: await csrfHeaders(page),
         data: { assignee_id: member.id },
       }),
     );
     await expectJson(
       await page.request.post(`${apiBaseURL}/api/v1/issues/${issue.id}/comments`, {
+        headers: await csrfHeaders(page),
         data: { body: `@${memberUsername} please check V2 notifications.` },
       }),
     );
@@ -324,6 +326,7 @@ async function reloadWorkspace(page: Page) {
 async function createProjectViaApi(page: Page, key: string, name: string) {
   return expectJson<Project>(
     await page.request.post(`${apiBaseURL}/api/v1/projects`, {
+      headers: await csrfHeaders(page),
       data: {
         key,
         name,
@@ -347,6 +350,7 @@ async function createIssueViaApi(
 ) {
   return expectJson<Issue>(
     await page.request.post(`${apiBaseURL}/api/v1/issues`, {
+      headers: await csrfHeaders(page),
       data: {
         description: "Created by V2 browser e2e smoke.",
         due_date: "",
@@ -369,6 +373,7 @@ async function createTeamMemberViaApi(
 ) {
   return expectJson<TeamMember>(
     await page.request.post(`${apiBaseURL}/api/v1/team/members`, {
+      headers: await csrfHeaders(page),
       data: {
         email: `${username}@example.com`,
         username,
@@ -382,13 +387,16 @@ async function createTeamMemberViaApi(
 
 async function archiveProjectViaApi(page: Page, projectId: string) {
   await expectOk(
-    await page.request.post(`${apiBaseURL}/api/v1/projects/${projectId}/archive`),
+    await page.request.post(`${apiBaseURL}/api/v1/projects/${projectId}/archive`, {
+      headers: await csrfHeaders(page),
+    }),
   );
 }
 
 async function deactivateMemberViaApi(page: Page, memberId: string) {
   await expectJson<TeamMember>(
     await page.request.patch(`${apiBaseURL}/api/v1/team/members/${memberId}`, {
+      headers: await csrfHeaders(page),
       data: {
         role: "member",
         is_active: false,
@@ -420,7 +428,21 @@ async function ensureAdminSession(page: Page) {
 }
 
 async function logoutViaApi(page: Page) {
-  await expectOk(await page.request.post(`${apiBaseURL}/api/v1/auth/logout`));
+  await expectOk(
+    await page.request.post(`${apiBaseURL}/api/v1/auth/logout`, {
+      headers: await csrfHeaders(page),
+    }),
+  );
+}
+
+async function csrfHeaders(page: Page) {
+  const response = await page.request.get(`${apiBaseURL}/api/v1/auth/csrf-token`);
+  await expectOk(response);
+
+  const payload = (await response.json()) as { csrf_token: string };
+  return {
+    "X-CSRF-Token": payload.csrf_token,
+  };
 }
 
 async function expectJson<T = unknown>(response: APIResponse) {
