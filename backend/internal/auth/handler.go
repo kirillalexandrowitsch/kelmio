@@ -10,6 +10,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -18,6 +19,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"team-task-tracker/backend/internal/csrf"
+	"team-task-tracker/backend/internal/ratelimit"
 )
 
 const SessionCookieName = "team_task_tracker_session"
@@ -30,6 +32,7 @@ type Handler struct {
 	sessionTTL          time.Duration
 	sessionCookieSecure bool
 	csrfManager         *csrf.Manager
+	loginLimiter        *ratelimit.Limiter
 }
 
 type loginRequest struct {
@@ -98,12 +101,14 @@ func NewHandler(
 	sessionTTL time.Duration,
 	sessionCookieSecure bool,
 	csrfManager *csrf.Manager,
+	loginLimiter *ratelimit.Limiter,
 ) *Handler {
 	return &Handler{
 		db:                  db,
 		sessionTTL:          sessionTTL,
 		sessionCookieSecure: sessionCookieSecure,
 		csrfManager:         csrfManager,
+		loginLimiter:        loginLimiter,
 	}
 }
 
@@ -150,8 +155,20 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	rateLimitKey := normalizeLoginRateLimitKey(identifier)
+	if h.loginLimiter != nil {
+		result := h.loginLimiter.Allow(rateLimitKey)
+		if !result.Allowed {
+			w.Header().Set("Retry-After", strconv.Itoa(retryAfterSeconds(result.RetryAfter)))
+			writeError(w, http.StatusTooManyRequests, "rate_limited", "too many login attempts, try again later")
+			return
+		}
+	}
+
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
+
+	_ = h.cleanupExpiredSessions(ctx)
 
 	user, err := h.userByIdentifier(ctx, identifier)
 	if err != nil {
@@ -181,6 +198,10 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if h.loginLimiter != nil {
+		h.loginLimiter.Reset(rateLimitKey)
+	}
+
 	http.SetCookie(w, sessionCookie(token, expiresAt, int(h.sessionTTL.Seconds()), h.sessionCookieSecure))
 	writeJSON(w, http.StatusOK, loginResponse{
 		User:      user.toResponse(),
@@ -189,9 +210,11 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	_ = h.cleanupExpiredSessions(ctx)
 	if cookie, err := r.Cookie(SessionCookieName); err == nil && cookie.Value != "" {
-		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
-		defer cancel()
 		_ = h.deleteSession(ctx, hashToken(cookie.Value))
 	}
 
@@ -208,6 +231,8 @@ func (h *Handler) me(w http.ResponseWriter, r *http.Request) {
 
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
+
+	_ = h.cleanupExpiredSessions(ctx)
 
 	user, err := h.userBySession(ctx, hashToken(cookie.Value))
 	if err != nil {
@@ -443,14 +468,15 @@ func (h *Handler) userBySession(ctx context.Context, tokenHash string) (userReco
 }
 
 func (h *Handler) createSession(ctx context.Context, userID string, tokenHash string, expiresAt time.Time) error {
-	if _, err := h.db.Exec(ctx, `DELETE FROM sessions WHERE expires_at <= now()`); err != nil {
-		return err
-	}
-
 	_, err := h.db.Exec(ctx, `
 		INSERT INTO sessions (user_id, token_hash, expires_at)
 		VALUES ($1, $2, $3)
 	`, userID, tokenHash, expiresAt)
+	return err
+}
+
+func (h *Handler) cleanupExpiredSessions(ctx context.Context) error {
+	_, err := h.db.Exec(ctx, `DELETE FROM sessions WHERE expires_at <= now()`)
 	return err
 }
 
@@ -531,6 +557,25 @@ func (req loginRequest) identifier() string {
 		return strings.TrimSpace(req.Email)
 	}
 	return strings.TrimSpace(req.Username)
+}
+
+func normalizeLoginRateLimitKey(identifier string) string {
+	return strings.ToLower(strings.TrimSpace(identifier))
+}
+
+func retryAfterSeconds(duration time.Duration) int {
+	if duration <= 0 {
+		return 1
+	}
+
+	seconds := int(duration / time.Second)
+	if duration%time.Second != 0 {
+		seconds++
+	}
+	if seconds < 1 {
+		return 1
+	}
+	return seconds
 }
 
 func normalizeDisplayName(displayName string) (string, error) {

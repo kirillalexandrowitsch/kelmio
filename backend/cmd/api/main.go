@@ -18,6 +18,7 @@ import (
 	"team-task-tracker/backend/internal/labels"
 	"team-task-tracker/backend/internal/notifications"
 	"team-task-tracker/backend/internal/projects"
+	"team-task-tracker/backend/internal/ratelimit"
 	"team-task-tracker/backend/internal/savedfilters"
 	"team-task-tracker/backend/internal/sprints"
 	"team-task-tracker/backend/internal/team"
@@ -53,7 +54,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	authHandler := auth.NewHandler(db, cfg.SessionTTL, cfg.SessionCookieSecure, csrfManager)
+	loginLimiter := ratelimit.NewLimiter(cfg.RateLimitLoginPerMinute, time.Minute, time.Now)
+	authHandler := auth.NewHandler(db, cfg.SessionTTL, cfg.SessionCookieSecure, csrfManager, loginLimiter)
 	authHandler.RegisterRoutes(mux)
 	notificationService := notifications.NewService()
 

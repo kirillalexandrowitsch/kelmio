@@ -332,6 +332,8 @@ V3 UX должен быть безопасным, но не тяжелым.
 - покрыть tests;
 - документировать ограничения single-node подхода.
 
+Ограничение: login limiter в V3 является in-memory single-node защитой. Он сбрасывается при restart backend и не синхронизируется между несколькими backend instances; Redis/distributed limiter остается вне scope V3.
+
 Результат: basic brute-force protection есть без Redis и без background worker.
 
 ## Phase 7. Invite-Based Onboarding Backend

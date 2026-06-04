@@ -53,6 +53,40 @@ func TestLoginRequestIdentifier(t *testing.T) {
 	}
 }
 
+func TestNormalizeLoginRateLimitKey(t *testing.T) {
+	t.Parallel()
+
+	if got := normalizeLoginRateLimitKey(" Admin@Example.COM "); got != "admin@example.com" {
+		t.Fatalf("normalizeLoginRateLimitKey() = %q, want admin@example.com", got)
+	}
+}
+
+func TestRetryAfterSeconds(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		duration time.Duration
+		want     int
+	}{
+		{name: "zero", duration: 0, want: 1},
+		{name: "sub second", duration: 500 * time.Millisecond, want: 1},
+		{name: "whole seconds", duration: 3 * time.Second, want: 3},
+		{name: "round up", duration: 3*time.Second + time.Millisecond, want: 4},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := retryAfterSeconds(tt.duration); got != tt.want {
+				t.Fatalf("retryAfterSeconds() = %d, want %d", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestHashToken(t *testing.T) {
 	t.Parallel()
 
