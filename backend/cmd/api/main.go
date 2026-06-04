@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 	"team-task-tracker/backend/internal/config"
 	"team-task-tracker/backend/internal/csrf"
 	"team-task-tracker/backend/internal/database"
+	"team-task-tracker/backend/internal/invites"
 	"team-task-tracker/backend/internal/issues"
 	"team-task-tracker/backend/internal/labels"
 	"team-task-tracker/backend/internal/notifications"
@@ -70,6 +72,9 @@ func main() {
 
 	teamHandler := team.NewHandler(db, authHandler)
 	teamHandler.RegisterRoutes(mux)
+
+	invitesHandler := invites.NewHandler(db, authHandler)
+	invitesHandler.RegisterRoutes(mux)
 
 	sprintsHandler := sprints.NewHandler(db, authHandler, notificationService)
 	sprintsHandler.RegisterRoutes(mux)
@@ -216,7 +221,14 @@ func isSafeMethod(method string) bool {
 }
 
 func isCSRFExempt(r *http.Request) bool {
-	return r.Method == http.MethodPost && r.URL.Path == "/api/v1/auth/login"
+	if r.Method != http.MethodPost {
+		return false
+	}
+	if r.URL.Path == "/api/v1/auth/login" {
+		return true
+	}
+
+	return strings.HasPrefix(r.URL.Path, "/api/v1/auth/invites/") && strings.HasSuffix(r.URL.Path, "/accept")
 }
 
 func cors(trustedOrigins []string, next http.Handler) http.Handler {

@@ -187,6 +187,24 @@ func TestCSRFProtectionAllowsLoginWithoutToken(t *testing.T) {
 	}
 }
 
+func TestCSRFProtectionAllowsInviteAcceptWithoutToken(t *testing.T) {
+	t.Parallel()
+
+	manager := newTestCSRFManager(t)
+	handler := csrfProtection(manager, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/auth/invites/invite-token/accept", nil)
+	request.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "session-token"})
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusNoContent {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusNoContent)
+	}
+}
+
 func TestCSRFProtectionRejectsMissingTokenWithSessionCookie(t *testing.T) {
 	t.Parallel()
 

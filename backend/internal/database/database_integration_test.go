@@ -83,6 +83,7 @@ func TestPostgresMigrationsCreateCoreSchema(t *testing.T) {
 		"sprints",
 		"saved_filters",
 		"notifications",
+		"team_invites",
 		"sessions",
 		"activity_log",
 		"schema_migrations",
@@ -178,6 +179,22 @@ func TestPostgresMigrationsCreateCoreSchema(t *testing.T) {
 	}
 	if !hasSavedFiltersFilters {
 		t.Fatal("expected saved_filters.filters to exist")
+	}
+
+	var hasTeamInvitesTokenHash bool
+	if err := db.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1
+			FROM information_schema.columns
+			WHERE table_schema = $1
+				AND table_name = 'team_invites'
+				AND column_name = 'token_hash'
+		)
+	`, schemaName).Scan(&hasTeamInvitesTokenHash); err != nil {
+		t.Fatalf("check team_invites.token_hash column: %v", err)
+	}
+	if !hasTeamInvitesTokenHash {
+		t.Fatal("expected team_invites.token_hash to exist")
 	}
 
 	var userID string
