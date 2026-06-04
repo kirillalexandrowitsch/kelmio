@@ -5,6 +5,7 @@ import {
   AppNotification,
   API_UNAUTHORIZED_EVENT,
   CurrentUser,
+  TeamInvite,
   Issue,
   IssueActivity,
   IssueComment,
@@ -35,6 +36,7 @@ import {
   createSavedFilter,
   createSprint,
   createSubtask,
+  createTeamInvite,
   createTeamMember,
   deleteLabel,
   deleteIssueComment,
@@ -55,12 +57,14 @@ import {
   listProjects,
   listSavedFilters,
   listSprints,
+  listTeamInvites,
   listTeamMembers,
   login,
   logout,
   markAllNotificationsRead,
   markNotificationRead,
   resetTeamMemberPassword,
+  revokeTeamInvite,
   removeIssueFromSprint,
   setIssueLabels,
   startSprint,
@@ -96,12 +100,19 @@ import { sprintMatchesFilters } from "./lib/sprint-model";
 import {
   appSectionPath,
   appSections,
+  currentInviteAcceptTokenFromLocation,
   currentAppSectionFromLocation,
   sprintIdFromPath,
   type AppSection,
 } from "./lib/routing";
+import {
+  buildInviteAcceptURL,
+  normalizedInviteEmail,
+  validateInviteEmail,
+} from "./lib/invite-view";
 import { AppSidebar, WorkspaceTopbar } from "./components/app-shell";
 import { AccountSection } from "./features/account/account-section";
+import { InviteAcceptScreen } from "./features/auth/invite-accept-screen";
 import { BootingScreen, SignInScreen } from "./features/auth/auth-screens";
 import { BoardSection } from "./features/board/board-section";
 import { DashboardSection } from "./features/dashboard/dashboard-section";
@@ -206,6 +217,9 @@ export function App() {
     currentAppSectionFromLocation,
   );
   const [routeSprintId, setRouteSprintId] = useState(currentSprintIdFromLocation);
+  const [inviteAcceptToken, setInviteAcceptToken] = useState<
+    string | null
+  >(currentInviteAcceptTokenFromLocation);
   const [accountError, setAccountError] = useState("");
   const [accountSuccess, setAccountSuccess] = useState("");
   const [accountDisplayName, setAccountDisplayName] = useState("");
@@ -239,6 +253,19 @@ export function App() {
   const [teamMemberPassword, setTeamMemberPassword] = useState("");
   const [teamMemberRole, setTeamMemberRole] =
     useState<TeamMember["role"]>("member");
+  const [teamInvites, setTeamInvites] = useState<TeamInvite[]>([]);
+  const [teamInvitesError, setTeamInvitesError] = useState("");
+  const [teamInviteFormError, setTeamInviteFormError] = useState("");
+  const [isLoadingTeamInvites, setIsLoadingTeamInvites] = useState(false);
+  const [isCreatingTeamInvite, setIsCreatingTeamInvite] = useState(false);
+  const [teamInviteEmail, setTeamInviteEmail] = useState("");
+  const [teamInviteRole, setTeamInviteRole] =
+    useState<TeamMember["role"]>("member");
+  const [teamInviteLinksById, setTeamInviteLinksById] = useState<
+    Record<string, string>
+  >({});
+  const [copiedTeamInviteId, setCopiedTeamInviteId] = useState("");
+  const [revokingTeamInviteIds, setRevokingTeamInviteIds] = useState<string[]>([]);
   const [updatingTeamMemberIds, setUpdatingTeamMemberIds] = useState<string[]>([]);
   const [passwordResetMemberId, setPasswordResetMemberId] = useState("");
   const [teamMemberResetPassword, setTeamMemberResetPassword] = useState("");
@@ -390,6 +417,7 @@ export function App() {
     mode: "push" | "replace" = "push",
   ) {
     setActiveSection(section);
+    setInviteAcceptToken(null);
     if (section !== "sprints") {
       setRouteSprintId("");
     }
@@ -421,6 +449,7 @@ export function App() {
   ) {
     setActiveSection("sprints");
     setRouteSprintId(sprintId);
+    setInviteAcceptToken(null);
 
     if (typeof window === "undefined") {
       return;
@@ -476,6 +505,7 @@ export function App() {
     function handleRouteChange() {
       setActiveSection(currentAppSectionFromLocation());
       setRouteSprintId(currentSprintIdFromLocation());
+      setInviteAcceptToken(currentInviteAcceptTokenFromLocation());
     }
 
     window.addEventListener("popstate", handleRouteChange);
@@ -483,6 +513,16 @@ export function App() {
       window.removeEventListener("popstate", handleRouteChange);
     };
   }, []);
+
+  function handleInviteAcceptSignIn() {
+    if (user) {
+      void handleLogout();
+      return;
+    }
+
+    setError("");
+    navigateToSection("dashboard", "replace");
+  }
 
   useEffect(() => {
     function handleUnauthorized() {
@@ -609,6 +649,48 @@ export function App() {
       .finally(() => {
         if (isMounted) {
           setIsLoadingTeamMembers(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user]);
+
+  useEffect(() => {
+    if (!user || user.workspace.role !== "admin") {
+      setTeamInvites([]);
+      setTeamInvitesError("");
+      setTeamInviteFormError("");
+      setIsLoadingTeamInvites(false);
+      setIsCreatingTeamInvite(false);
+      setTeamInviteEmail("");
+      setTeamInviteRole("member");
+      setTeamInviteLinksById({});
+      setCopiedTeamInviteId("");
+      setRevokingTeamInviteIds([]);
+      return;
+    }
+
+    let isMounted = true;
+    setTeamInvitesError("");
+    setTeamInviteFormError("");
+    setIsLoadingTeamInvites(true);
+
+    listTeamInvites()
+      .then((response) => {
+        if (isMounted) {
+          setTeamInvites(response.invites);
+        }
+      })
+      .catch((err) => {
+        if (isMounted) {
+          setTeamInvitesError(apiErrorMessage(err, "Could not load team invites."));
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsLoadingTeamInvites(false);
         }
       });
 
@@ -1204,6 +1286,16 @@ export function App() {
     setTeamMemberDisplayName("");
     setTeamMemberPassword("");
     setTeamMemberRole("member");
+    setTeamInvites([]);
+    setTeamInvitesError("");
+    setTeamInviteFormError("");
+    setIsLoadingTeamInvites(false);
+    setIsCreatingTeamInvite(false);
+    setTeamInviteEmail("");
+    setTeamInviteRole("member");
+    setTeamInviteLinksById({});
+    setCopiedTeamInviteId("");
+    setRevokingTeamInviteIds([]);
     setUpdatingTeamMemberIds([]);
     setPasswordResetMemberId("");
     setTeamMemberResetPassword("");
@@ -1618,6 +1710,96 @@ export function App() {
       setTeamMemberFormError(apiErrorMessage(err, "Could not create team member."));
     } finally {
       setIsCreatingTeamMember(false);
+    }
+  }
+
+  async function handleCreateTeamInvite(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setTeamInviteFormError("");
+    setTeamInvitesError("");
+
+    const email = normalizedInviteEmail(teamInviteEmail);
+    const validationError = validateInviteEmail(email);
+    if (validationError) {
+      setTeamInviteFormError(validationError);
+      return;
+    }
+
+    setIsCreatingTeamInvite(true);
+
+    try {
+      const invite = await createTeamInvite({
+        email,
+        role: teamInviteRole,
+      });
+      const origin = typeof window === "undefined" ? "" : window.location.origin;
+      const inviteURL = buildInviteAcceptURL(invite.accept_url_path, origin);
+
+      setTeamInvites((currentInvites) => [
+        invite,
+        ...currentInvites.filter((currentInvite) => currentInvite.id !== invite.id),
+      ]);
+      setTeamInviteLinksById((currentLinks) => ({
+        ...currentLinks,
+        [invite.id]: inviteURL,
+      }));
+      setCopiedTeamInviteId("");
+      setTeamInviteEmail("");
+      setTeamInviteRole("member");
+    } catch (err) {
+      setTeamInviteFormError(apiErrorMessage(err, "Could not create invite."));
+    } finally {
+      setIsCreatingTeamInvite(false);
+    }
+  }
+
+  async function handleRevokeTeamInvite(invite: TeamInvite) {
+    if (invite.status !== "pending") {
+      return;
+    }
+
+    setTeamInvitesError("");
+    setRevokingTeamInviteIds((currentIds) =>
+      currentIds.includes(invite.id) ? currentIds : [...currentIds, invite.id],
+    );
+
+    try {
+      const revokedInvite = await revokeTeamInvite(invite.id);
+      setTeamInvites((currentInvites) =>
+        currentInvites.map((currentInvite) =>
+          currentInvite.id === revokedInvite.id ? revokedInvite : currentInvite,
+        ),
+      );
+      setTeamInviteLinksById((currentLinks) => {
+        const nextLinks = { ...currentLinks };
+        delete nextLinks[invite.id];
+        return nextLinks;
+      });
+      setCopiedTeamInviteId((currentId) =>
+        currentId === invite.id ? "" : currentId,
+      );
+    } catch (err) {
+      setTeamInvitesError(apiErrorMessage(err, "Could not revoke invite."));
+    } finally {
+      setRevokingTeamInviteIds((currentIds) =>
+        currentIds.filter((currentId) => currentId !== invite.id),
+      );
+    }
+  }
+
+  async function handleCopyTeamInviteLink(inviteId: string) {
+    setTeamInvitesError("");
+    const inviteLink = teamInviteLinksById[inviteId];
+    if (!inviteLink) {
+      setTeamInvitesError("Invite link is only available right after creation.");
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(inviteLink);
+      setCopiedTeamInviteId(inviteId);
+    } catch {
+      setTeamInvitesError("Could not copy invite link. Select and copy it manually.");
     }
   }
 
@@ -3127,6 +3309,8 @@ export function App() {
     hasText(teamMemberDisplayName) &&
     hasMinTrimmedLength(teamMemberPassword, 8) &&
     !isCreatingTeamMember;
+  const canCreateTeamInvite =
+    isValidEmail(teamInviteEmail) && !isCreatingTeamInvite;
   const canResetTeamMemberPassword = hasMinTrimmedLength(
     teamMemberResetPassword,
     8,
@@ -3179,6 +3363,15 @@ export function App() {
 
   if (isBooting) {
     return <BootingScreen />;
+  }
+
+  if (inviteAcceptToken !== null) {
+    return (
+      <InviteAcceptScreen
+        onGoToSignIn={handleInviteAcceptSignIn}
+        token={inviteAcceptToken}
+      />
+    );
   }
 
   if (!user) {
@@ -3286,17 +3479,30 @@ export function App() {
         />
 
         <TeamSection
+          canCreateTeamInvite={canCreateTeamInvite}
           canCreateTeamMember={canCreateTeamMember}
           canResetTeamMemberPassword={canResetTeamMemberPassword}
+          copiedTeamInviteId={copiedTeamInviteId}
           currentUser={user}
+          isCreatingTeamInvite={isCreatingTeamInvite}
           isActive={activeSection === "team"}
           isCreatingTeamMember={isCreatingTeamMember}
+          isLoadingTeamInvites={isLoadingTeamInvites}
           isLoadingTeamMembers={isLoadingTeamMembers}
           onCancelResetPassword={cancelResetTeamMemberPassword}
+          onCopyTeamInviteLink={(inviteId) => {
+            void handleCopyTeamInviteLink(inviteId);
+          }}
+          onCreateTeamInvite={handleCreateTeamInvite}
           onCreateTeamMember={handleCreateTeamMember}
           onDisplayNameChange={setTeamMemberDisplayName}
           onEmailChange={setTeamMemberEmail}
+          onInviteEmailChange={setTeamInviteEmail}
+          onInviteRoleChange={setTeamInviteRole}
           onPasswordChange={setTeamMemberPassword}
+          onRevokeTeamInvite={(invite) => {
+            void handleRevokeTeamInvite(invite);
+          }}
           onResetPassword={(event, memberId) => {
             void handleResetTeamMemberPassword(event, memberId);
           }}
@@ -3308,7 +3514,14 @@ export function App() {
           }}
           onUsernameChange={setTeamMemberUsername}
           passwordResetMemberId={passwordResetMemberId}
+          revokingTeamInviteIds={revokingTeamInviteIds}
           resettingTeamMemberPasswordIds={resettingTeamMemberPasswordIds}
+          teamInviteEmail={teamInviteEmail}
+          teamInviteFormError={teamInviteFormError}
+          teamInviteLinksById={teamInviteLinksById}
+          teamInviteRole={teamInviteRole}
+          teamInvites={teamInvites}
+          teamInvitesError={teamInvitesError}
           teamMemberDisplayName={teamMemberDisplayName}
           teamMemberEmail={teamMemberEmail}
           teamMemberFormError={teamMemberFormError}

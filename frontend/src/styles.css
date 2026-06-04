@@ -108,6 +108,35 @@ a {
   outline: none;
 }
 
+.invite-preview-card,
+.invite-success-card {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid #d7ded8;
+  border-radius: 10px;
+  background: #fbfcfb;
+}
+
+.invite-preview-card span {
+  color: #657268;
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.invite-preview-card strong,
+.invite-success-card h2,
+.invite-preview-card p,
+.invite-success-card p {
+  margin: 0;
+}
+
+.invite-success-card {
+  border-color: #b8c5bd;
+  background: linear-gradient(135deg, rgba(78, 121, 93, 0.12), #ffffff);
+}
+
 .auth-form input:focus,
 .account-form input:focus,
 .project-form input:focus,
@@ -117,6 +146,9 @@ a {
 .sprint-form input:focus,
 .sprint-form select:focus,
 .sprint-form textarea:focus,
+.team-invite-form input:focus,
+.team-invite-form select:focus,
+.invite-link-field input:focus,
 .sprint-inline-form input:focus,
 .sprint-inline-form textarea:focus,
 .team-member-form input:focus,
@@ -150,6 +182,7 @@ a {
 .account-form button,
 .project-form button,
 .sprint-form button,
+.team-invite-form button,
 .team-member-form button,
 .label-form button,
 .issue-form button,
@@ -1427,6 +1460,104 @@ h1 {
   gap: 8px;
 }
 
+.team-invite-panel {
+  display: grid;
+  gap: 12px;
+  padding-top: 14px;
+  border-top: 1px solid #edf0ed;
+}
+
+.team-invite-form {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) 140px auto;
+  align-items: end;
+  gap: 10px;
+}
+
+.team-invite-form label,
+.invite-link-field {
+  display: grid;
+  gap: 8px;
+}
+
+.team-invite-form .form-error {
+  grid-column: 1 / -1;
+}
+
+.team-invite-list {
+  display: grid;
+  gap: 8px;
+}
+
+.team-invite-card {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) auto minmax(260px, 1.4fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid #edf0ed;
+  border-radius: 8px;
+  background: #fbfcfb;
+}
+
+.team-invite-card h3,
+.team-invite-card p {
+  margin: 0;
+}
+
+.team-invite-card h3 {
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.team-invite-card p {
+  margin-top: 3px;
+  color: #657268;
+  font-size: 13px;
+}
+
+.invite-status {
+  padding: 6px 9px;
+  border: 1px solid #c8d1cb;
+  border-radius: 999px;
+  color: #4e5c54;
+  background: #ffffff;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.invite-status-pending {
+  border-color: #b8c5bd;
+  color: #365d43;
+  background: #edf7ef;
+}
+
+.invite-status-accepted {
+  border-color: #b8c5bd;
+  color: #2f6142;
+  background: #e7f3ea;
+}
+
+.invite-status-revoked,
+.invite-status-expired {
+  border-color: #d9aaa2;
+  color: #923c2d;
+  background: #fff7f5;
+}
+
+.invite-link-note {
+  color: #8a968d !important;
+  font-size: 12px !important;
+  font-weight: 700;
+}
+
+.invite-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .team-member-row {
   display: grid;
   grid-template-columns: 42px minmax(220px, 1fr) auto minmax(280px, auto);
@@ -1626,6 +1757,8 @@ h1 {
 
 .project-form label span,
 .project-inline-form label span,
+.team-invite-form label span,
+.invite-link-field span,
 .team-member-form label span,
 .label-form label span,
 .issue-form label span,
@@ -1640,6 +1773,9 @@ h1 {
 .project-form textarea,
 .project-inline-form input,
 .project-inline-form textarea,
+.team-invite-form input,
+.team-invite-form select,
+.invite-link-field input,
 .team-member-form input,
 .team-member-form select,
 .label-form input,
@@ -1661,6 +1797,9 @@ h1 {
 
 .project-form input,
 .project-inline-form input,
+.team-invite-form input,
+.team-invite-form select,
+.invite-link-field input,
 .team-member-form input,
 .team-member-form select,
 .label-form input,
@@ -2703,6 +2842,8 @@ h1 {
   .projects-layout,
   .sprints-layout,
   .issues-layout,
+  .team-invite-form,
+  .team-invite-card,
   .team-member-row,
   .team-member-form,
   .sprint-filters,

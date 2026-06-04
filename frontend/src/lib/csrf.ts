@@ -8,8 +8,13 @@ export function requestNeedsCSRF(path: string, method = "GET") {
   return (
     unsafeMethods.has(normalizedMethod) &&
     path !== "/api/v1/auth/login" &&
+    !isInviteAcceptPath(path) &&
     path !== CSRF_TOKEN_PATH
   );
+}
+
+export function isInviteAcceptPath(path: string) {
+  return path.startsWith("/api/v1/auth/invites/") && path.endsWith("/accept");
 }
 
 export function isCSRFError(status: number, code: unknown) {

@@ -1,4 +1,6 @@
 import {
+  type AcceptInviteResponse,
+  type AcceptTeamInviteInput,
   type AppNotification,
   type AuthResponse,
   type CSRFTokenResponse,
@@ -9,7 +11,10 @@ import {
   type CreateSavedFilterInput,
   type CreateSprintInput,
   type CreateSubtaskInput,
+  type CreateTeamInviteInput,
+  type CreateTeamInviteResponse,
   type CreateTeamMemberInput,
+  type InvitePreview,
   type Issue,
   type IssueComment,
   type IssueFilters,
@@ -25,12 +30,14 @@ import {
   type ListProjectsResponse,
   type ListSavedFiltersResponse,
   type ListSprintsResponse,
+  type ListTeamInvitesResponse,
   type ListTeamMembersResponse,
   type Project,
   type SavedFilter,
   type Sprint,
   type SprintFilters,
   type SprintStatus,
+  type TeamInvite,
   type TeamMember,
   type UnreadNotificationsCountResponse,
   type UpdateIssueInput,
@@ -46,9 +53,14 @@ import {
   requestNeedsCSRF,
 } from "./csrf";
 export type {
+  AcceptInviteResponse,
+  AcceptTeamInviteInput,
   AppNotification,
   CSRFTokenResponse,
   CurrentUser,
+  CreateTeamInviteInput,
+  CreateTeamInviteResponse,
+  InvitePreview,
   Issue,
   IssueActivity,
   IssueComment,
@@ -68,6 +80,8 @@ export type {
   Sprint,
   SprintFilters,
   SprintStatus,
+  TeamInvite,
+  TeamInviteStatus,
   TeamMember,
   CreateIssueLinkInput,
   CreateSavedFilterInput,
@@ -164,6 +178,45 @@ export async function archiveProject(projectId: string) {
 
 export async function listTeamMembers() {
   return request<ListTeamMembersResponse>("/api/v1/team/members");
+}
+
+export async function listTeamInvites() {
+  return request<ListTeamInvitesResponse>("/api/v1/team/invites");
+}
+
+export async function createTeamInvite(input: CreateTeamInviteInput) {
+  return request<CreateTeamInviteResponse>("/api/v1/team/invites", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function revokeTeamInvite(inviteId: string) {
+  return request<TeamInvite>(
+    `/api/v1/team/invites/${encodeURIComponent(inviteId)}/revoke`,
+    {
+      method: "POST",
+    },
+  );
+}
+
+export async function getTeamInvitePreview(token: string) {
+  return request<InvitePreview>(
+    `/api/v1/auth/invites/${encodeURIComponent(token)}`,
+  );
+}
+
+export async function acceptTeamInvite(
+  token: string,
+  input: AcceptTeamInviteInput,
+) {
+  return request<AcceptInviteResponse>(
+    `/api/v1/auth/invites/${encodeURIComponent(token)}/accept`,
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
 }
 
 export async function createTeamMember(input: CreateTeamMemberInput) {

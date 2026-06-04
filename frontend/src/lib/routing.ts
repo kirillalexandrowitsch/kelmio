@@ -33,6 +33,8 @@ const appSectionPaths: Record<AppSection, string> = {
   account: "/account",
 };
 
+const inviteAcceptPath = "/accept-invite";
+
 export function appSectionPath(section: AppSection) {
   return appSectionPaths[section];
 }
@@ -47,6 +49,34 @@ export function appSectionFromPath(pathname: string): AppSection {
   }
 
   return matchingSection?.id ?? "dashboard";
+}
+
+export function isInviteAcceptRoute(pathname: string) {
+  return pathname === inviteAcceptPath;
+}
+
+export function inviteAcceptTokenFromLocation(
+  location: Pick<Location, "pathname" | "search">,
+) {
+  if (!isInviteAcceptRoute(location.pathname)) {
+    return null;
+  }
+
+  return new URLSearchParams(location.search).get("token")?.trim() ?? "";
+}
+
+export function currentInviteAcceptTokenFromLocation(
+  location: Pick<Location, "pathname" | "search"> | undefined = undefined,
+) {
+  if (location) {
+    return inviteAcceptTokenFromLocation(location);
+  }
+
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  return inviteAcceptTokenFromLocation(window.location);
 }
 
 export function sprintIdFromPath(pathname: string) {

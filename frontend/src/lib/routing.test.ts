@@ -5,6 +5,7 @@ import {
   appSectionFromPath,
   appSectionPath,
   currentAppSectionFromLocation,
+  inviteAcceptTokenFromLocation,
   sprintIdFromPath,
 } from "./routing.ts";
 
@@ -36,6 +37,30 @@ test("maps direct paths to app sections", () => {
 test("falls back to dashboard for unknown paths", () => {
   assert.equal(appSectionFromPath("/unknown"), "dashboard");
   assert.equal(currentAppSectionFromLocation({ pathname: "/missing" }), "dashboard");
+});
+
+test("extracts invite accept tokens from public route", () => {
+  assert.equal(
+    inviteAcceptTokenFromLocation({
+      pathname: "/accept-invite",
+      search: "?token=invite-token",
+    }),
+    "invite-token",
+  );
+  assert.equal(
+    inviteAcceptTokenFromLocation({
+      pathname: "/accept-invite",
+      search: "",
+    }),
+    "",
+  );
+  assert.equal(
+    inviteAcceptTokenFromLocation({
+      pathname: "/team",
+      search: "?token=invite-token",
+    }),
+    null,
+  );
 });
 
 test("extracts sprint ids from direct sprint paths", () => {

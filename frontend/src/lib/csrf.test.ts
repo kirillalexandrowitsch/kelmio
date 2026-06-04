@@ -14,6 +14,10 @@ test("does not require CSRF for safe requests and login", () => {
   assert.equal(requestNeedsCSRF("/api/v1/projects", "GET"), false);
   assert.equal(requestNeedsCSRF("/api/v1/auth/me"), false);
   assert.equal(requestNeedsCSRF("/api/v1/auth/login", "POST"), false);
+  assert.equal(
+    requestNeedsCSRF("/api/v1/auth/invites/invite-token/accept", "POST"),
+    false,
+  );
   assert.equal(requestNeedsCSRF("/api/v1/auth/csrf-token", "GET"), false);
 });
 

@@ -37,6 +37,42 @@ export type TeamMember = {
   joined_at: string;
 };
 
+export type TeamInviteStatus = "pending" | "accepted" | "revoked" | "expired";
+
+export type TeamInvite = {
+  id: string;
+  workspace_id: string;
+  email: string;
+  role: TeamMember["role"];
+  status: TeamInviteStatus;
+  created_by: string;
+  created_at: string;
+  expires_at: string;
+  accepted_at: string | null;
+  revoked_at: string | null;
+};
+
+export type CreateTeamInviteResponse = TeamInvite & {
+  accept_token: string;
+  accept_url_path: string;
+};
+
+export type InvitePreview = {
+  workspace_id: string;
+  workspace_name: string;
+  email: string;
+  role: TeamMember["role"];
+  expires_at: string;
+};
+
+export type AcceptInviteResponse = {
+  accepted: boolean;
+  workspace_id: string;
+  email: string;
+  username: string;
+  role: TeamMember["role"];
+};
+
 export type Label = {
   id: string;
   name: string;
@@ -198,12 +234,27 @@ export type ListTeamMembersResponse = {
   members: TeamMember[];
 };
 
+export type ListTeamInvitesResponse = {
+  invites: TeamInvite[];
+};
+
 export type CreateTeamMemberInput = {
   email: string;
   username: string;
   display_name: string;
   password: string;
   role: TeamMember["role"];
+};
+
+export type CreateTeamInviteInput = {
+  email: string;
+  role: TeamMember["role"];
+};
+
+export type AcceptTeamInviteInput = {
+  username: string;
+  display_name: string;
+  password: string;
 };
 
 export type UpdateTeamMemberInput = {
