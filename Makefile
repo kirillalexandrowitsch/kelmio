@@ -1,6 +1,6 @@
 SHELL := /bin/sh
 
-.PHONY: help doctor dev down logs ps db-up wait-db migrate-up seed setup-db backend-dev backend-test backend-integration-test frontend-install frontend-dev frontend-build frontend-test frontend-e2e-install frontend-e2e smoke-api verify
+.PHONY: help doctor dev down logs ps db-up wait-db migrate-up seed setup-db backup restore restore-check backend-dev backend-test backend-integration-test frontend-install frontend-dev frontend-build frontend-test frontend-e2e-install frontend-e2e smoke-api verify
 
 help:
 	@printf '%s\n' 'Available commands:'
@@ -14,6 +14,9 @@ help:
 	@printf '%s\n' '  make migrate-up       Apply database migrations'
 	@printf '%s\n' '  make seed             Create local admin seed data'
 	@printf '%s\n' '  make setup-db         Start DB, migrate, and seed'
+	@printf '%s\n' '  make backup           Create compressed PostgreSQL backup in backups/'
+	@printf '%s\n' '  make restore          Restore BACKUP into selected PostgreSQL database'
+	@printf '%s\n' '  make restore-check    Verify BACKUP in isolated temporary PostgreSQL'
 	@printf '%s\n' '  make backend-dev      Run backend locally'
 	@printf '%s\n' '  make backend-test     Run Go tests'
 	@printf '%s\n' '  make backend-integration-test Run Go integration tests against local PostgreSQL'
@@ -55,6 +58,17 @@ seed:
 
 setup-db: db-up wait-db migrate-up seed
 
+backup:
+	sh scripts/backup-db.sh
+
+restore:
+	@if [ -z "$(BACKUP)" ]; then printf '%s\n' 'Usage: BACKUP=backups/file.sql.gz RESTORE_CONFIRM=I_UNDERSTAND make restore' >&2; exit 2; fi
+	sh scripts/restore-db.sh "$(BACKUP)"
+
+restore-check:
+	@if [ -z "$(BACKUP)" ]; then printf '%s\n' 'Usage: BACKUP=backups/file.sql.gz make restore-check' >&2; exit 2; fi
+	sh scripts/restore-check-db.sh "$(BACKUP)"
+
 backend-dev:
 	cd backend && go run ./cmd/api
 
@@ -88,6 +102,9 @@ smoke-api:
 verify:
 	sh -n scripts/smoke-api.sh
 	sh -n scripts/doctor.sh
+	sh -n scripts/backup-db.sh
+	sh -n scripts/restore-db.sh
+	sh -n scripts/restore-check-db.sh
 	./scripts/doctor.sh
 	cd backend && go test ./...
 	cd frontend && npm test

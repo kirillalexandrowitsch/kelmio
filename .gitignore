@@ -23,6 +23,7 @@ frontend/test-results/
 
 # Docker/local data
 .docker/
+backups/
 tmp/
 
 # Editors
