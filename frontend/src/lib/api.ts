@@ -33,6 +33,7 @@ import {
   type ListTeamInvitesResponse,
   type ListTeamMembersResponse,
   type Project,
+  type RuntimeVersion,
   type SavedFilter,
   type Sprint,
   type SprintFilters,
@@ -75,6 +76,7 @@ export type {
   Label,
   NotificationType,
   Project,
+  RuntimeVersion,
   SavedFilter,
   SavedIssueFilters,
   Sprint,
@@ -121,6 +123,10 @@ export async function login(loginValue: string, password: string) {
 
 export async function getCurrentUser() {
   return request<AuthResponse>("/api/v1/auth/me");
+}
+
+export async function getRuntimeVersion() {
+  return request<RuntimeVersion>("/api/v1/version");
 }
 
 export async function logout() {

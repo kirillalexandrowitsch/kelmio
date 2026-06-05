@@ -44,6 +44,9 @@ func TestLoadDevelopmentDefaults(t *testing.T) {
 	if cfg.RateLimitLoginPerMinute != 10 {
 		t.Fatalf("RateLimitLoginPerMinute = %d, want 10", cfg.RateLimitLoginPerMinute)
 	}
+	if cfg.BuildTime != "" {
+		t.Fatalf("BuildTime = %q, want empty default", cfg.BuildTime)
+	}
 }
 
 func TestLoadProductionRequiresPublicAppURL(t *testing.T) {
@@ -125,6 +128,9 @@ func TestLoadValidProductionConfig(t *testing.T) {
 	if cfg.RateLimitLoginPerMinute != 5 {
 		t.Fatalf("RateLimitLoginPerMinute = %d, want 5", cfg.RateLimitLoginPerMinute)
 	}
+	if cfg.BuildTime != "2026-06-05T20:00:00Z" {
+		t.Fatalf("BuildTime = %q, want configured build time", cfg.BuildTime)
+	}
 }
 
 func TestLoadRejectsInvalidPort(t *testing.T) {
@@ -172,6 +178,7 @@ func clearConfigEnv(t *testing.T) {
 		"RATE_LIMIT_LOGIN_PER_MINUTE",
 		"APP_VERSION",
 		"BUILD_COMMIT",
+		"BUILD_TIME",
 	} {
 		t.Setenv(key, "")
 	}
@@ -189,4 +196,5 @@ func setValidProductionEnv(t *testing.T) {
 	t.Setenv("SESSION_COOKIE_SECURE", "true")
 	t.Setenv("CSRF_SECRET", "0123456789abcdef0123456789abcdef")
 	t.Setenv("RATE_LIMIT_LOGIN_PER_MINUTE", "5")
+	t.Setenv("BUILD_TIME", "2026-06-05T20:00:00Z")
 }

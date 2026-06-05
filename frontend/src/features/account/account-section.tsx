@@ -1,7 +1,8 @@
 import { type FormEvent } from "react";
 
 import { FormError } from "../../components/form-feedback";
-import { type CurrentUser } from "../../lib/api-types";
+import { type CurrentUser, type RuntimeVersion } from "../../lib/api-types";
+import { runtimeVersionDisplay } from "../../lib/runtime-version";
 
 type AccountSectionProps = {
   accountDisplayName: string;
@@ -13,6 +14,7 @@ type AccountSectionProps = {
   currentPassword: string;
   isActive: boolean;
   isChangingPassword: boolean;
+  isLoadingRuntimeVersion: boolean;
   isUpdatingProfile: boolean;
   newPassword: string;
   onChangePassword: (event: FormEvent<HTMLFormElement>) => void;
@@ -21,6 +23,8 @@ type AccountSectionProps = {
   onDisplayNameChange: (value: string) => void;
   onNewPasswordChange: (value: string) => void;
   onUpdateProfile: (event: FormEvent<HTMLFormElement>) => void;
+  runtimeVersion: RuntimeVersion | null;
+  runtimeVersionError: string;
   user: CurrentUser;
 };
 
@@ -34,6 +38,7 @@ export function AccountSection({
   currentPassword,
   isActive,
   isChangingPassword,
+  isLoadingRuntimeVersion,
   isUpdatingProfile,
   newPassword,
   onChangePassword,
@@ -42,8 +47,12 @@ export function AccountSection({
   onDisplayNameChange,
   onNewPasswordChange,
   onUpdateProfile,
+  runtimeVersion,
+  runtimeVersionError,
   user,
 }: AccountSectionProps) {
+  const versionDisplay = runtimeVersionDisplay(runtimeVersion);
+
   return (
     <section
       className="account-panel"
@@ -75,6 +84,43 @@ export function AccountSection({
           <strong>{user.workspace.role}</strong>
         </div>
       </div>
+
+      <section className="account-form account-metadata-panel">
+        <header className="section-header">
+          <div>
+            <p className="eyebrow">Deployment</p>
+            <h2>Runtime metadata</h2>
+          </div>
+        </header>
+
+        {isLoadingRuntimeVersion ? (
+          <p className="muted">Loading deployment metadata...</p>
+        ) : null}
+        <FormError message={runtimeVersionError} />
+
+        {runtimeVersion ? (
+          <div className="account-card account-metadata-card">
+            <div>
+              <span>Version</span>
+              <strong>{versionDisplay.version}</strong>
+            </div>
+            <div>
+              <span>Commit</span>
+              <strong>{versionDisplay.commit}</strong>
+            </div>
+            <div>
+              <span>Environment</span>
+              <strong>{versionDisplay.environment}</strong>
+            </div>
+            <div>
+              <span>Build time</span>
+              <strong>{versionDisplay.buildTime}</strong>
+            </div>
+          </div>
+        ) : !isLoadingRuntimeVersion && !runtimeVersionError ? (
+          <p className="muted">Deployment metadata is not available.</p>
+        ) : null}
+      </section>
 
       <FormError message={accountError} />
       {accountSuccess ? <p className="form-success">{accountSuccess}</p> : null}

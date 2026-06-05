@@ -17,6 +17,13 @@ export type CSRFTokenResponse = {
   csrf_token: string;
 };
 
+export type RuntimeVersion = {
+  version: string;
+  commit: string;
+  environment: string;
+  build_time: string | null;
+};
+
 export type Project = {
   id: string;
   key: string;

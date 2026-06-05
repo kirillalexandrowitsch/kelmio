@@ -117,6 +117,7 @@ Backend observability:
 - Every backend response includes `X-Request-ID`; use this value to find the matching request in backend logs.
 - With `APP_ENV=production`, backend logs use JSON format and include `request_id`, `method`, `path`, `status`, `duration_ms` and `response_bytes`.
 - Request logs intentionally exclude query strings, headers, cookies and request bodies, so secrets such as passwords, sessions, CSRF tokens and invite tokens are not written to logs.
+- `GET /api/v1/version` returns runtime deployment metadata: version, commit, environment and optional build time.
 
 API smoke test:
 

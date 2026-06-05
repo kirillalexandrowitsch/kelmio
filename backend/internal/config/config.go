@@ -29,6 +29,7 @@ type Config struct {
 	RateLimitLoginPerMinute int
 	AppVersion              string
 	BuildCommit             string
+	BuildTime               string
 }
 
 func Load() (Config, error) {
@@ -46,6 +47,7 @@ func Load() (Config, error) {
 		RateLimitLoginPerMinute: intEnv("RATE_LIMIT_LOGIN_PER_MINUTE", 10),
 		AppVersion:              env("APP_VERSION", "development"),
 		BuildCommit:             env("BUILD_COMMIT", "local"),
+		BuildTime:               env("BUILD_TIME", ""),
 	}
 
 	if cfg.AppEnv == EnvProduction && cfg.FrontendURL == "" {

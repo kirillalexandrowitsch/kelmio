@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -54,6 +55,7 @@ func main() {
 	mux.HandleFunc("GET /api/v1/health", healthHandler)
 	mux.HandleFunc("GET /readyz", readinessHandler(db))
 	mux.HandleFunc("GET /api/v1/ready", readinessHandler(db))
+	mux.HandleFunc("GET /api/v1/version", versionHandler(cfg))
 
 	csrfManager, err := csrf.NewManager(cfg.CSRFSecret)
 	if err != nil {
@@ -100,7 +102,7 @@ func main() {
 
 	serverErrors := make(chan error, 1)
 	go func() {
-		logger.Info("backend server starting", "addr", server.Addr, "env", cfg.AppEnv)
+		logServerStarting(logger, server.Addr, cfg)
 		serverErrors <- server.ListenAndServe()
 	}()
 
@@ -159,6 +161,47 @@ func readinessHandler(db interface {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"status":"ok","database":"up"}`))
 	}
+}
+
+type versionResponse struct {
+	Version     string  `json:"version"`
+	Commit      string  `json:"commit"`
+	Environment string  `json:"environment"`
+	BuildTime   *string `json:"build_time"`
+}
+
+func versionHandler(cfg config.Config) http.HandlerFunc {
+	return func(w http.ResponseWriter, _ *http.Request) {
+		response := versionResponse{
+			Version:     cfg.AppVersion,
+			Commit:      cfg.BuildCommit,
+			Environment: cfg.AppEnv,
+			BuildTime:   nullableString(cfg.BuildTime),
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(response)
+	}
+}
+
+func nullableString(value string) *string {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return nil
+	}
+	return &trimmed
+}
+
+func logServerStarting(logger *slog.Logger, addr string, cfg config.Config) {
+	logger.Info(
+		"backend server starting",
+		"addr", addr,
+		"env", cfg.AppEnv,
+		"version", cfg.AppVersion,
+		"commit", cfg.BuildCommit,
+		"build_time", cfg.BuildTime,
+	)
 }
 
 func requestLogger(logger *slog.Logger, next http.Handler) http.Handler {

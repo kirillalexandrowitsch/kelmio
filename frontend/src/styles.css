@@ -1371,6 +1371,14 @@ h1 {
   border-top: 1px solid #edf0ed;
 }
 
+.account-metadata-panel {
+  max-width: 780px;
+}
+
+.account-metadata-card {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 .account-form label {
   display: grid;
   gap: 8px;

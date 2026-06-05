@@ -164,6 +164,7 @@ require_command node
 printf 'Checking backend health at %s\n' "$API_BASE_URL"
 curl -fsS "$API_BASE_URL/healthz" >/dev/null
 curl -fsS "$API_BASE_URL/readyz" | json_value 'data.database === "up"' >/dev/null
+curl -fsS "$API_BASE_URL/api/v1/version" | json_value 'typeof data.version === "string" && typeof data.commit === "string" && typeof data.environment === "string" && Object.prototype.hasOwnProperty.call(data, "build_time")' >/dev/null
 
 printf 'Checking unauthenticated session guard\n'
 if [ "$(api_status "/api/v1/auth/me")" != "401" ]; then

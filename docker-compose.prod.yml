@@ -35,6 +35,7 @@ services:
       RATE_LIMIT_LOGIN_PER_MINUTE: ${RATE_LIMIT_LOGIN_PER_MINUTE:-10}
       APP_VERSION: ${APP_VERSION:-production}
       BUILD_COMMIT: ${BUILD_COMMIT:-unknown}
+      BUILD_TIME: ${BUILD_TIME:-}
     expose:
       - "8080"
     depends_on:

@@ -18,6 +18,7 @@ import {
   IssueType,
   Label,
   Project,
+  RuntimeVersion,
   SavedFilter,
   Sprint,
   SprintStatus,
@@ -45,6 +46,7 @@ import {
   getIssue,
   getCurrentUser,
   getProject,
+  getRuntimeVersion,
   getSprint,
   getUnreadNotificationsCount,
   listIssueActivity,
@@ -223,6 +225,11 @@ export function App() {
   const [accountError, setAccountError] = useState("");
   const [accountSuccess, setAccountSuccess] = useState("");
   const [accountDisplayName, setAccountDisplayName] = useState("");
+  const [runtimeVersion, setRuntimeVersion] = useState<RuntimeVersion | null>(
+    null,
+  );
+  const [runtimeVersionError, setRuntimeVersionError] = useState("");
+  const [isLoadingRuntimeVersion, setIsLoadingRuntimeVersion] = useState(false);
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -542,6 +549,43 @@ export function App() {
     }
 
     setAccountDisplayName(user.display_name);
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) {
+      setRuntimeVersion(null);
+      setRuntimeVersionError("");
+      setIsLoadingRuntimeVersion(false);
+      return;
+    }
+
+    let isMounted = true;
+    setRuntimeVersionError("");
+    setIsLoadingRuntimeVersion(true);
+
+    getRuntimeVersion()
+      .then((response) => {
+        if (isMounted) {
+          setRuntimeVersion(response);
+        }
+      })
+      .catch((err) => {
+        if (isMounted) {
+          setRuntimeVersion(null);
+          setRuntimeVersionError(
+            apiErrorMessage(err, "Could not load deployment metadata."),
+          );
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsLoadingRuntimeVersion(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
   }, [user]);
 
   useEffect(() => {
@@ -1261,6 +1305,9 @@ export function App() {
     setAccountError("");
     setAccountSuccess("");
     setAccountDisplayName("");
+    setRuntimeVersion(null);
+    setRuntimeVersionError("");
+    setIsLoadingRuntimeVersion(false);
     setIsUpdatingProfile(false);
     setCurrentPassword("");
     setNewPassword("");
@@ -3467,6 +3514,7 @@ export function App() {
           currentPassword={currentPassword}
           isActive={activeSection === "account"}
           isChangingPassword={isChangingPassword}
+          isLoadingRuntimeVersion={isLoadingRuntimeVersion}
           isUpdatingProfile={isUpdatingProfile}
           newPassword={newPassword}
           onChangePassword={handleChangePassword}
@@ -3475,6 +3523,8 @@ export function App() {
           onDisplayNameChange={setAccountDisplayName}
           onNewPasswordChange={setNewPassword}
           onUpdateProfile={handleUpdateProfile}
+          runtimeVersion={runtimeVersion}
+          runtimeVersionError={runtimeVersionError}
           user={user}
         />
 

@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"team-task-tracker/backend/internal/auth"
+	"team-task-tracker/backend/internal/config"
 	"team-task-tracker/backend/internal/csrf"
 )
 
@@ -211,6 +212,97 @@ func TestRecoverPanicReturnsJSONErrorAndLogsRequestID(t *testing.T) {
 	}
 	if strings.Contains(buffer.String(), "boom") {
 		t.Fatalf("panic log leaked panic value: %s", buffer.String())
+	}
+}
+
+func TestVersionHandlerReturnsRuntimeMetadata(t *testing.T) {
+	t.Parallel()
+
+	cfg := testVersionConfig()
+	handler := versionHandler(cfg)
+
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/version", nil)
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusOK)
+	}
+	if got := recorder.Header().Get("Content-Type"); got != "application/json" {
+		t.Fatalf("Content-Type = %q, want application/json", got)
+	}
+
+	var response versionResponse
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v", err)
+	}
+	if response.Version != "v3.0.0" {
+		t.Fatalf("Version = %q, want v3.0.0", response.Version)
+	}
+	if response.Commit != "abcdef123456" {
+		t.Fatalf("Commit = %q, want abcdef123456", response.Commit)
+	}
+	if response.Environment != "production" {
+		t.Fatalf("Environment = %q, want production", response.Environment)
+	}
+	if response.BuildTime == nil || *response.BuildTime != "2026-06-05T20:00:00Z" {
+		t.Fatalf("BuildTime = %v, want configured build time", response.BuildTime)
+	}
+}
+
+func TestVersionHandlerReturnsNullBuildTimeWhenMissing(t *testing.T) {
+	t.Parallel()
+
+	cfg := testVersionConfig()
+	cfg.BuildTime = ""
+	handler := versionHandler(cfg)
+
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/version", nil)
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, request)
+
+	var response map[string]any
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v", err)
+	}
+	if _, ok := response["build_time"]; !ok {
+		t.Fatal("build_time field missing")
+	}
+	if response["build_time"] != nil {
+		t.Fatalf("build_time = %v, want null", response["build_time"])
+	}
+}
+
+func TestLogServerStartingIncludesVersionMetadataWithoutSecrets(t *testing.T) {
+	t.Parallel()
+
+	var buffer bytes.Buffer
+	logger := newLogger("production", &buffer)
+	cfg := testVersionConfig()
+	cfg.DatabaseURL = "postgres://user:super-secret-password@postgres:5432/tasks"
+	cfg.CSRFSecret = "super-secret-csrf-value"
+
+	logServerStarting(logger, ":8080", cfg)
+
+	fields := decodeJSONLogLine(t, buffer.String())
+	if got := fields["version"]; got != "v3.0.0" {
+		t.Fatalf("version = %v, want v3.0.0", got)
+	}
+	if got := fields["commit"]; got != "abcdef123456" {
+		t.Fatalf("commit = %v, want abcdef123456", got)
+	}
+	if got := fields["build_time"]; got != "2026-06-05T20:00:00Z" {
+		t.Fatalf("build_time = %v, want configured build time", got)
+	}
+	if got := fields["env"]; got != "production" {
+		t.Fatalf("env = %v, want production", got)
+	}
+
+	rawLog := buffer.String()
+	for _, secret := range []string{"super-secret-password", "super-secret-csrf-value"} {
+		if strings.Contains(rawLog, secret) {
+			t.Fatalf("startup log leaked secret %q: %s", secret, rawLog)
+		}
 	}
 }
 
@@ -510,4 +602,16 @@ func decodeJSONLogLine(t *testing.T, rawLog string) map[string]any {
 		t.Fatalf("json.Unmarshal() error = %v", err)
 	}
 	return fields
+}
+
+func testVersionConfig() config.Config {
+	return config.Config{
+		AppEnv:      config.EnvProduction,
+		Port:        "8080",
+		DatabaseURL: "postgres://team_task_tracker:team_task_tracker@postgres:5432/team_task_tracker?sslmode=disable",
+		CSRFSecret:  "0123456789abcdef0123456789abcdef",
+		AppVersion:  "v3.0.0",
+		BuildCommit: "abcdef123456",
+		BuildTime:   "2026-06-05T20:00:00Z",
+	}
 }
