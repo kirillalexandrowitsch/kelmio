@@ -2,7 +2,11 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
+	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
@@ -27,12 +31,13 @@ import (
 )
 
 const maxRequestBodyBytes int64 = 1 << 20
+const requestIDHeader = "X-Request-ID"
+
+type requestIDContextKey struct{}
 
 func main() {
 	cfg := config.MustLoad()
-	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
-		Level: slog.LevelInfo,
-	}))
+	logger := newLogger(cfg.AppEnv, os.Stdout)
 
 	dbCtx, dbCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer dbCancel()
@@ -87,7 +92,7 @@ func main() {
 
 	server := &http.Server{
 		Addr:         ":" + cfg.Port,
-		Handler:      requestLogger(logger, securityHeaders(requestBodyLimit(maxRequestBodyBytes, cors(cfg.TrustedOrigins, csrfProtection(csrfManager, mux))))),
+		Handler:      requestID(requestLogger(logger, recoverPanic(logger, securityHeaders(requestBodyLimit(maxRequestBodyBytes, cors(cfg.TrustedOrigins, csrfProtection(csrfManager, mux))))))),
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 10 * time.Second,
 		IdleTimeout:  120 * time.Second,
@@ -121,6 +126,15 @@ func main() {
 	}
 }
 
+func newLogger(appEnv string, output io.Writer) *slog.Logger {
+	options := &slog.HandlerOptions{Level: slog.LevelInfo}
+	if appEnv == config.EnvProduction {
+		return slog.New(slog.NewJSONHandler(output, options))
+	}
+
+	return slog.New(slog.NewTextHandler(output, options))
+}
+
 func healthHandler(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
@@ -150,14 +164,143 @@ func readinessHandler(db interface {
 func requestLogger(logger *slog.Logger, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
-		next.ServeHTTP(w, r)
+		recorder := newStatusRecorder(w)
+
+		next.ServeHTTP(recorder, r)
 		logger.Info(
 			"http request",
+			"request_id", requestIDFromContext(r.Context()),
 			"method", r.Method,
 			"path", r.URL.Path,
+			"status", recorder.Status(),
 			"duration_ms", time.Since(start).Milliseconds(),
+			"response_bytes", recorder.BytesWritten(),
 		)
 	})
+}
+
+func requestID(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestID := r.Header.Get(requestIDHeader)
+		if !isValidRequestID(requestID) {
+			requestID = newRequestID()
+		}
+
+		w.Header().Set(requestIDHeader, requestID)
+		ctx := context.WithValue(r.Context(), requestIDContextKey{}, requestID)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+func recoverPanic(logger *slog.Logger, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			if recovered := recover(); recovered != nil {
+				logger.Error(
+					"http request panic",
+					"request_id", requestIDFromContext(r.Context()),
+					"method", r.Method,
+					"path", r.URL.Path,
+					"panic_type", fmt.Sprintf("%T", recovered),
+				)
+
+				if !responseHasStarted(w) {
+					writeAPIError(w, http.StatusInternalServerError, "internal_server_error", "internal server error")
+				}
+			}
+		}()
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+func requestIDFromContext(ctx context.Context) string {
+	requestID, ok := ctx.Value(requestIDContextKey{}).(string)
+	if !ok {
+		return ""
+	}
+	return requestID
+}
+
+func isValidRequestID(value string) bool {
+	if len(value) < 8 || len(value) > 128 {
+		return false
+	}
+	for i := 0; i < len(value); i++ {
+		char := value[i]
+		if char >= 'a' && char <= 'z' {
+			continue
+		}
+		if char >= 'A' && char <= 'Z' {
+			continue
+		}
+		if char >= '0' && char <= '9' {
+			continue
+		}
+		if char == '.' || char == '_' || char == '-' {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
+func newRequestID() string {
+	var value [16]byte
+	if _, err := rand.Read(value[:]); err != nil {
+		return strings.ReplaceAll(time.Now().UTC().Format("20060102150405.000000000"), ".", "")
+	}
+
+	return hex.EncodeToString(value[:])
+}
+
+type statusRecorder struct {
+	http.ResponseWriter
+	status int
+	bytes  int
+}
+
+func newStatusRecorder(w http.ResponseWriter) *statusRecorder {
+	return &statusRecorder{ResponseWriter: w}
+}
+
+func (r *statusRecorder) WriteHeader(status int) {
+	if r.status != 0 {
+		return
+	}
+
+	r.status = status
+	r.ResponseWriter.WriteHeader(status)
+}
+
+func (r *statusRecorder) Write(data []byte) (int, error) {
+	if r.status == 0 {
+		r.WriteHeader(http.StatusOK)
+	}
+
+	written, err := r.ResponseWriter.Write(data)
+	r.bytes += written
+	return written, err
+}
+
+func (r *statusRecorder) Status() int {
+	if r.status == 0 {
+		return http.StatusOK
+	}
+	return r.status
+}
+
+func (r *statusRecorder) BytesWritten() int {
+	return r.bytes
+}
+
+func (r *statusRecorder) Written() bool {
+	return r.status != 0
+}
+
+func responseHasStarted(w http.ResponseWriter) bool {
+	recorder, ok := w.(interface{ Written() bool })
+	return ok && recorder.Written()
 }
 
 func securityHeaders(next http.Handler) http.Handler {
@@ -244,7 +387,7 @@ func cors(trustedOrigins []string, next http.Handler) http.Handler {
 		if _, ok := allowedOrigins[origin]; origin != "" && ok {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 			w.Header().Set("Access-Control-Allow-Credentials", "true")
-			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, "+csrf.HeaderName)
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, "+csrf.HeaderName+", "+requestIDHeader)
 			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, PUT, DELETE, OPTIONS")
 			w.Header().Add("Vary", "Origin")
 		}
