@@ -16,6 +16,7 @@ import (
 	"team-task-tracker/backend/internal/auth"
 	"team-task-tracker/backend/internal/database"
 	"team-task-tracker/backend/internal/migrations"
+	"team-task-tracker/backend/internal/pagination"
 )
 
 func TestNotificationServiceIntegration(t *testing.T) {
@@ -50,6 +51,31 @@ func TestNotificationServiceIntegration(t *testing.T) {
 	}
 	if hasDuplicateCommentNotification(assigneeNotifications, seed.commentID) {
 		t.Fatalf("assignee received duplicate comment notification: %#v", assigneeNotifications)
+	}
+
+	firstPage, nextCursor, err := service.ListPage(ctx, db, seed.assignee, pagination.Params{Limit: 1})
+	if err != nil {
+		t.Fatalf("list first assignee notification page: %v", err)
+	}
+	if len(firstPage) != 1 {
+		t.Fatalf("first assignee notification page len = %d, want 1", len(firstPage))
+	}
+	if nextCursor == nil {
+		t.Fatal("expected assignee notification next cursor")
+	}
+	nextOffset, err := pagination.DecodeCursor(*nextCursor)
+	if err != nil {
+		t.Fatalf("decode assignee notification next cursor: %v", err)
+	}
+	secondPage, _, err := service.ListPage(ctx, db, seed.assignee, pagination.Params{Limit: 1, Offset: nextOffset})
+	if err != nil {
+		t.Fatalf("list second assignee notification page: %v", err)
+	}
+	if len(secondPage) != 1 {
+		t.Fatalf("second assignee notification page len = %d, want 1", len(secondPage))
+	}
+	if firstPage[0].ID == secondPage[0].ID {
+		t.Fatalf("notification %s appeared on both pages", firstPage[0].ID)
 	}
 
 	reporterNotifications, err := service.List(ctx, db, seed.reporter)

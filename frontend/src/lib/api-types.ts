@@ -275,6 +275,7 @@ export type ListLabelsResponse = {
 
 export type ListIssuesResponse = {
   issues: Issue[];
+  next_cursor?: string | null;
 };
 
 export type ListIssueCommentsResponse = {
@@ -283,6 +284,7 @@ export type ListIssueCommentsResponse = {
 
 export type ListIssueActivityResponse = {
   activity: IssueActivity[];
+  next_cursor: string | null;
 };
 
 export type ListIssueLinksResponse = {
@@ -299,6 +301,7 @@ export type ListSavedFiltersResponse = {
 
 export type ListNotificationsResponse = {
   notifications: AppNotification[];
+  next_cursor: string | null;
 };
 
 export type UnreadNotificationsCountResponse = {
@@ -315,6 +318,11 @@ export type IssueFilters = {
   assigneeId?: string;
   labelId?: string;
   due?: IssueDueFilter;
+};
+
+export type PaginationParams = {
+  limit?: number;
+  cursor?: string;
 };
 
 export type SprintFilters = {

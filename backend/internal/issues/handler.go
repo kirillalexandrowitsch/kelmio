@@ -19,6 +19,7 @@ import (
 
 	"team-task-tracker/backend/internal/auth"
 	"team-task-tracker/backend/internal/notifications"
+	"team-task-tracker/backend/internal/pagination"
 )
 
 var validIssueTypes = map[string]bool{
@@ -154,6 +155,11 @@ type listIssuesResponse struct {
 	Issues []issueResponse `json:"issues"`
 }
 
+type paginatedListIssuesResponse struct {
+	Issues     []issueResponse `json:"issues"`
+	NextCursor *string         `json:"next_cursor"`
+}
+
 type issueCommentResponse struct {
 	ID                string    `json:"id"`
 	IssueID           string    `json:"issue_id"`
@@ -179,7 +185,8 @@ type issueActivityResponse struct {
 }
 
 type listActivityResponse struct {
-	Activity []issueActivityResponse `json:"activity"`
+	Activity   []issueActivityResponse `json:"activity"`
+	NextCursor *string                 `json:"next_cursor"`
 }
 
 type issueLinkIssueResponse struct {
@@ -277,16 +284,22 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	page, err := pagination.Parse(r.URL.Query(), 100)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
-	issues, err := h.listIssues(ctx, user.WorkspaceID, r.URL.Query())
+	issues, nextCursor, err := h.listIssuesPage(ctx, user.WorkspaceID, r.URL.Query(), page)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "internal_error", "could not list issues")
 		return
 	}
 
-	writeJSON(w, http.StatusOK, listIssuesResponse{Issues: issues})
+	writeJSON(w, http.StatusOK, paginatedListIssuesResponse{Issues: issues, NextCursor: nextCursor})
 }
 
 func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
@@ -1118,6 +1131,12 @@ func (h *Handler) listActivity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	page, err := pagination.Parse(r.URL.Query(), 100)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
 	issueID, err := normalizeIssueID(r.PathValue("id"))
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
@@ -1137,16 +1156,21 @@ func (h *Handler) listActivity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	activity, err := h.listIssueActivity(ctx, user.WorkspaceID, issueID)
+	activity, nextCursor, err := h.listIssueActivityPage(ctx, user.WorkspaceID, issueID, page)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "internal_error", "could not list activity")
 		return
 	}
 
-	writeJSON(w, http.StatusOK, listActivityResponse{Activity: activity})
+	writeJSON(w, http.StatusOK, listActivityResponse{Activity: activity, NextCursor: nextCursor})
 }
 
 func (h *Handler) listIssues(ctx context.Context, workspaceID string, query map[string][]string) ([]issueResponse, error) {
+	issues, _, err := h.listIssuesPage(ctx, workspaceID, query, pagination.Default(100))
+	return issues, err
+}
+
+func (h *Handler) listIssuesPage(ctx context.Context, workspaceID string, query map[string][]string, page pagination.Params) ([]issueResponse, *string, error) {
 	args := []any{workspaceID}
 	conditions := []string{
 		"p.workspace_id = $1",
@@ -1209,6 +1233,9 @@ func (h *Handler) listIssues(ctx context.Context, workspaceID string, query map[
 	}
 
 	orderClause := issueListOrderClause(firstQueryValue(query, "sort"))
+	args = append(args, page.Limit+1, page.Offset)
+	limitPlaceholder := len(args) - 1
+	offsetPlaceholder := len(args)
 	sql := fmt.Sprintf(`
 		SELECT
 			i.id::text,
@@ -1249,12 +1276,12 @@ func (h *Handler) listIssues(ctx context.Context, workspaceID string, query map[
 		JOIN projects p ON p.id = i.project_id
 		WHERE %s
 		ORDER BY %s
-		LIMIT 100
-	`, strings.Join(conditions, " AND "), orderClause)
+		LIMIT $%d OFFSET $%d
+	`, strings.Join(conditions, " AND "), orderClause, limitPlaceholder, offsetPlaceholder)
 
 	rows, err := h.db.Query(ctx, sql, args...)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer rows.Close()
 
@@ -1262,17 +1289,17 @@ func (h *Handler) listIssues(ctx context.Context, workspaceID string, query map[
 	for rows.Next() {
 		issue, err := scanIssue(rows)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		issues = append(issues, issue)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return issues, nil
+	return pagination.Window(issues, page)
 }
 
 var errInvalidAssignee = errors.New("invalid assignee")
@@ -2554,6 +2581,11 @@ func (h *Handler) deleteIssueComment(ctx context.Context, user auth.CurrentUser,
 }
 
 func (h *Handler) listIssueActivity(ctx context.Context, workspaceID string, issueID string) ([]issueActivityResponse, error) {
+	activity, _, err := h.listIssueActivityPage(ctx, workspaceID, issueID, pagination.Default(100))
+	return activity, err
+}
+
+func (h *Handler) listIssueActivityPage(ctx context.Context, workspaceID string, issueID string, page pagination.Params) ([]issueActivityResponse, *string, error) {
 	rows, err := h.db.Query(ctx, `
 		SELECT
 			al.id::text,
@@ -2572,11 +2604,11 @@ func (h *Handler) listIssueActivity(ctx context.Context, workspaceID string, iss
 		AND p.workspace_id = $2
 		AND p.archived_at IS NULL
 		AND i.archived_at IS NULL
-	ORDER BY al.created_at DESC
-		LIMIT 100
-	`, issueID, workspaceID)
+	ORDER BY al.created_at DESC, al.id DESC
+		LIMIT $3 OFFSET $4
+	`, issueID, workspaceID, page.Limit+1, page.Offset)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer rows.Close()
 
@@ -2584,17 +2616,17 @@ func (h *Handler) listIssueActivity(ctx context.Context, workspaceID string, iss
 	for rows.Next() {
 		entry, err := scanIssueActivity(rows)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		activity = append(activity, entry)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return activity, nil
+	return pagination.Window(activity, page)
 }
 
 func (h *Handler) requireUser(w http.ResponseWriter, r *http.Request) (auth.CurrentUser, bool) {
@@ -2972,9 +3004,9 @@ func issueListOrderClause(sortValue string) string {
 	case "created_asc":
 		return "i.created_at ASC, i.id ASC"
 	case "priority_desc":
-		return "CASE i.priority WHEN 'critical' THEN 4 WHEN 'high' THEN 3 WHEN 'medium' THEN 2 WHEN 'low' THEN 1 ELSE 0 END DESC, i.created_at DESC"
+		return "CASE i.priority WHEN 'critical' THEN 4 WHEN 'high' THEN 3 WHEN 'medium' THEN 2 WHEN 'low' THEN 1 ELSE 0 END DESC, i.created_at DESC, i.id DESC"
 	case "due_date_asc":
-		return "i.due_date ASC NULLS LAST, i.created_at DESC"
+		return "i.due_date ASC NULLS LAST, i.created_at DESC, i.id DESC"
 	default:
 		return "i.created_at DESC, i.id DESC"
 	}

@@ -283,6 +283,12 @@ api_post "/api/v1/issues/$EPIC_ID/links" "{\"target_issue_id\":\"$BLOCKER_ID\",\
 api_get "/api/v1/issues/$BLOCKER_ID/links" | json_value "data.links.some((link) => link.link_type === \"blocks\" && link.target_issue.id === \"$CHILD_ID\")" >/dev/null
 api_get "/api/v1/issues/$EPIC_ID/links" | json_value "data.links.some((link) => link.link_type === \"relates\" && link.target_issue.id === \"$BLOCKER_ID\")" >/dev/null
 
+printf 'Checking V3 issue pagination\n'
+ISSUE_PAGE_ONE="$(api_get "/api/v1/issues?project_id=$PROJECT_ID&limit=1")"
+ISSUE_PAGE_ONE_ID="$(printf '%s' "$ISSUE_PAGE_ONE" | json_value 'data.issues.length === 1 && data.issues[0].id')"
+ISSUE_NEXT_CURSOR="$(printf '%s' "$ISSUE_PAGE_ONE" | json_value 'typeof data.next_cursor === "string" && data.next_cursor.length > 0 && data.next_cursor')"
+api_get "/api/v1/issues?project_id=$PROJECT_ID&limit=1&cursor=$ISSUE_NEXT_CURSOR" | json_value "data.issues.length === 1 && data.issues[0].id !== \"$ISSUE_PAGE_ONE_ID\" && Object.prototype.hasOwnProperty.call(data, \"next_cursor\")" >/dev/null
+
 printf 'Checking V2 sprints\n'
 SPRINT_ID="$(api_post "/api/v1/sprints" "{\"project_id\":\"$PROJECT_ID\",\"name\":\"Smoke Sprint $RUN_ID\",\"goal\":\"Created by API smoke test.\",\"start_date\":\"\",\"end_date\":\"\"}" | json_value 'data.id')"
 api_post "/api/v1/sprints/$SPRINT_ID/issues" "{\"issue_id\":\"$ISSUE_ID\"}" | json_value 'data.issue_count >= 1' >/dev/null

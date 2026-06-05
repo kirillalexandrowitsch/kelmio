@@ -197,6 +197,33 @@ func TestPostgresMigrationsCreateCoreSchema(t *testing.T) {
 		t.Fatal("expected team_invites.token_hash to exist")
 	}
 
+	expectedIndexes := []string{
+		"idx_issues_project_created_id",
+		"idx_issues_project_due_created_id",
+		"idx_issues_project_priority_created_id",
+		"idx_issues_sprint_status_created_id",
+		"idx_notifications_workspace_user_created_id",
+		"idx_notifications_unread_created_id",
+		"idx_activity_log_issue_created_id",
+		"idx_issue_labels_label_issue",
+	}
+	for _, indexName := range expectedIndexes {
+		var exists bool
+		if err := db.QueryRow(ctx, `
+			SELECT EXISTS (
+				SELECT 1
+				FROM pg_indexes
+				WHERE schemaname = $1
+					AND indexname = $2
+			)
+		`, schemaName, indexName).Scan(&exists); err != nil {
+			t.Fatalf("check index %s: %v", indexName, err)
+		}
+		if !exists {
+			t.Fatalf("expected index %s to exist", indexName)
+		}
+	}
+
 	var userID string
 	if err := db.QueryRow(ctx, `
 		INSERT INTO users (email, username, password_hash, display_name)

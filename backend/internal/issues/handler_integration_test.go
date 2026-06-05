@@ -16,6 +16,7 @@ import (
 	"team-task-tracker/backend/internal/auth"
 	"team-task-tracker/backend/internal/database"
 	"team-task-tracker/backend/internal/migrations"
+	"team-task-tracker/backend/internal/pagination"
 )
 
 func TestIssueHierarchyIntegration(t *testing.T) {
@@ -306,6 +307,101 @@ func TestIssueListSprintFiltersIntegration(t *testing.T) {
 	}
 }
 
+func TestIssuePaginationIntegration(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	db := newIssueIntegrationDB(t, ctx)
+	handler := NewHandler(db, nil)
+
+	user, projectID := seedIssueIntegrationWorkspace(t, ctx, db)
+
+	createdIDs := make([]string, 0, 3)
+	for index := 0; index < 3; index++ {
+		issue, err := handler.createIssue(ctx, user, normalizedCreateIssue{
+			ProjectID: projectID,
+			Title:     fmt.Sprintf("Paginated issue %d", index),
+			IssueType: "task",
+			Status:    "todo",
+			Priority:  "medium",
+		})
+		if err != nil {
+			t.Fatalf("create paginated issue %d: %v", index, err)
+		}
+		createdIDs = append(createdIDs, issue.ID)
+	}
+
+	firstPage, nextCursor, err := handler.listIssuesPage(ctx, user.WorkspaceID, map[string][]string{
+		"project_id": {projectID},
+		"sort":       {"created_asc"},
+	}, pagination.Params{Limit: 2})
+	if err != nil {
+		t.Fatalf("list first issue page: %v", err)
+	}
+	if len(firstPage) != 2 {
+		t.Fatalf("first issue page len = %d, want 2", len(firstPage))
+	}
+	if nextCursor == nil {
+		t.Fatal("expected issue next cursor")
+	}
+
+	nextOffset, err := pagination.DecodeCursor(*nextCursor)
+	if err != nil {
+		t.Fatalf("decode issue next cursor: %v", err)
+	}
+	secondPage, secondNextCursor, err := handler.listIssuesPage(ctx, user.WorkspaceID, map[string][]string{
+		"project_id": {projectID},
+		"sort":       {"created_asc"},
+	}, pagination.Params{Limit: 2, Offset: nextOffset})
+	if err != nil {
+		t.Fatalf("list second issue page: %v", err)
+	}
+	if len(secondPage) != 1 {
+		t.Fatalf("second issue page len = %d, want 1", len(secondPage))
+	}
+	if secondNextCursor != nil {
+		t.Fatalf("second issue next cursor = %q, want nil", *secondNextCursor)
+	}
+	if hasIssueID(firstPage, secondPage[0].ID) {
+		t.Fatalf("issue %s appeared on both pages", secondPage[0].ID)
+	}
+
+	for index := 0; index < 3; index++ {
+		if _, err := db.Exec(ctx, `
+			INSERT INTO activity_log (entity_type, entity_id, action, actor_id, payload)
+			VALUES ('issue', $1, 'status_changed', $2, $3::jsonb)
+		`, createdIDs[0], user.ID, fmt.Sprintf(`{"index":"%d"}`, index)); err != nil {
+			t.Fatalf("insert activity %d: %v", index, err)
+		}
+	}
+
+	firstActivityPage, activityNextCursor, err := handler.listIssueActivityPage(ctx, user.WorkspaceID, createdIDs[0], pagination.Params{Limit: 2})
+	if err != nil {
+		t.Fatalf("list first activity page: %v", err)
+	}
+	if len(firstActivityPage) != 2 {
+		t.Fatalf("first activity page len = %d, want 2", len(firstActivityPage))
+	}
+	if activityNextCursor == nil {
+		t.Fatal("expected activity next cursor")
+	}
+
+	activityNextOffset, err := pagination.DecodeCursor(*activityNextCursor)
+	if err != nil {
+		t.Fatalf("decode activity next cursor: %v", err)
+	}
+	secondActivityPage, _, err := handler.listIssueActivityPage(ctx, user.WorkspaceID, createdIDs[0], pagination.Params{Limit: 2, Offset: activityNextOffset})
+	if err != nil {
+		t.Fatalf("list second activity page: %v", err)
+	}
+	if len(secondActivityPage) == 0 {
+		t.Fatal("expected second activity page")
+	}
+	if hasActivityID(firstActivityPage, secondActivityPage[0].ID) {
+		t.Fatalf("activity %s appeared on both pages", secondActivityPage[0].ID)
+	}
+}
+
 func newIssueIntegrationDB(t *testing.T, ctx context.Context) *pgxpool.Pool {
 	t.Helper()
 
@@ -437,6 +533,16 @@ func hasIssueLinkID(links []issueLinkResponse, linkID string) bool {
 func hasActivityAction(activity []issueActivityResponse, action string) bool {
 	for _, entry := range activity {
 		if entry.Action == action {
+			return true
+		}
+	}
+
+	return false
+}
+
+func hasActivityID(activity []issueActivityResponse, activityID string) bool {
+	for _, entry := range activity {
+		if entry.ID == activityID {
 			return true
 		}
 	}

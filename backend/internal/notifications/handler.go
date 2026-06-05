@@ -17,6 +17,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"team-task-tracker/backend/internal/auth"
+	"team-task-tracker/backend/internal/pagination"
 )
 
 const (
@@ -75,6 +76,7 @@ type SprintContext struct {
 
 type listNotificationsResponse struct {
 	Notifications []Notification `json:"notifications"`
+	NextCursor    *string        `json:"next_cursor"`
 }
 
 type unreadCountResponse struct {
@@ -120,16 +122,22 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	page, err := pagination.Parse(r.URL.Query(), 50)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
-	notifications, err := h.service.List(ctx, h.db, user)
+	notifications, nextCursor, err := h.service.ListPage(ctx, h.db, user, page)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "internal_error", "could not list notifications")
 		return
 	}
 
-	writeJSON(w, http.StatusOK, listNotificationsResponse{Notifications: notifications})
+	writeJSON(w, http.StatusOK, listNotificationsResponse{Notifications: notifications, NextCursor: nextCursor})
 }
 
 func (h *Handler) unreadCount(w http.ResponseWriter, r *http.Request) {
@@ -197,6 +205,11 @@ func (h *Handler) markAllRead(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Service) List(ctx context.Context, db DBTX, user auth.CurrentUser) ([]Notification, error) {
+	notifications, _, err := s.ListPage(ctx, db, user, pagination.Default(50))
+	return notifications, err
+}
+
+func (s *Service) ListPage(ctx context.Context, db DBTX, user auth.CurrentUser, page pagination.Params) ([]Notification, *string, error) {
 	rows, err := db.Query(ctx, `
 		SELECT
 			n.id::text,
@@ -217,10 +230,10 @@ func (s *Service) List(ctx context.Context, db DBTX, user auth.CurrentUser) ([]N
 		WHERE n.workspace_id = $1
 			AND n.user_id = $2
 		ORDER BY n.created_at DESC, n.id DESC
-		LIMIT 50
-	`, user.WorkspaceID, user.ID)
+		LIMIT $3 OFFSET $4
+	`, user.WorkspaceID, user.ID, page.Limit+1, page.Offset)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer rows.Close()
 
@@ -228,16 +241,16 @@ func (s *Service) List(ctx context.Context, db DBTX, user auth.CurrentUser) ([]N
 	for rows.Next() {
 		notification, err := scanNotification(rows)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		notifications = append(notifications, notification)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return notifications, nil
+	return pagination.Window(notifications, page)
 }
 
 func (s *Service) UnreadCount(ctx context.Context, db DBTX, user auth.CurrentUser) (int, error) {

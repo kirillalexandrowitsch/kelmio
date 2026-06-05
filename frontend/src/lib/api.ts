@@ -32,6 +32,7 @@ import {
   type ListSprintsResponse,
   type ListTeamInvitesResponse,
   type ListTeamMembersResponse,
+  type PaginationParams,
   type Project,
   type RuntimeVersion,
   type SavedFilter,
@@ -53,6 +54,7 @@ import {
   isCSRFError,
   requestNeedsCSRF,
 } from "./csrf";
+import { appendPaginationParams } from "./pagination";
 export type {
   AcceptInviteResponse,
   AcceptTeamInviteInput,
@@ -75,6 +77,7 @@ export type {
   IssueType,
   Label,
   NotificationType,
+  PaginationParams,
   Project,
   RuntimeVersion,
   SavedFilter,
@@ -302,8 +305,14 @@ export async function deleteSavedFilter(savedFilterId: string) {
   );
 }
 
-export async function listNotifications() {
-  return request<ListNotificationsResponse>("/api/v1/notifications");
+export async function listNotifications(pagination: PaginationParams = {}) {
+  const params = new URLSearchParams();
+  appendPaginationParams(params, pagination);
+
+  const query = params.toString();
+  return request<ListNotificationsResponse>(
+    `/api/v1/notifications${query ? `?${query}` : ""}`,
+  );
 }
 
 export async function getUnreadNotificationsCount() {
@@ -327,7 +336,10 @@ export async function markAllNotificationsRead() {
   });
 }
 
-export async function listIssues(filters: IssueFilters = {}) {
+export async function listIssues(
+  filters: IssueFilters = {},
+  pagination: PaginationParams = {},
+) {
   const params = new URLSearchParams();
   if (filters.query) {
     params.set("q", filters.query);
@@ -356,6 +368,7 @@ export async function listIssues(filters: IssueFilters = {}) {
   if (filters.due) {
     params.set("due", filters.due);
   }
+  appendPaginationParams(params, pagination);
 
   const query = params.toString();
   return request<ListIssuesResponse>(`/api/v1/issues${query ? `?${query}` : ""}`);
@@ -371,9 +384,16 @@ export async function listIssueComments(issueId: string) {
   );
 }
 
-export async function listIssueActivity(issueId: string) {
+export async function listIssueActivity(
+  issueId: string,
+  pagination: PaginationParams = {},
+) {
+  const params = new URLSearchParams();
+  appendPaginationParams(params, pagination);
+
+  const query = params.toString();
   return request<ListIssueActivityResponse>(
-    `/api/v1/issues/${encodeURIComponent(issueId)}/activity`,
+    `/api/v1/issues/${encodeURIComponent(issueId)}/activity${query ? `?${query}` : ""}`,
   );
 }
 

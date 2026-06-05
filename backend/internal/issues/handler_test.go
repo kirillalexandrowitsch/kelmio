@@ -737,12 +737,12 @@ func TestIssueListOrderClause(t *testing.T) {
 		{
 			name:      "priority desc",
 			sortValue: "priority_desc",
-			want:      "CASE i.priority WHEN 'critical' THEN 4 WHEN 'high' THEN 3 WHEN 'medium' THEN 2 WHEN 'low' THEN 1 ELSE 0 END DESC, i.created_at DESC",
+			want:      "CASE i.priority WHEN 'critical' THEN 4 WHEN 'high' THEN 3 WHEN 'medium' THEN 2 WHEN 'low' THEN 1 ELSE 0 END DESC, i.created_at DESC, i.id DESC",
 		},
 		{
 			name:      "due date asc",
 			sortValue: "due_date_asc",
-			want:      "i.due_date ASC NULLS LAST, i.created_at DESC",
+			want:      "i.due_date ASC NULLS LAST, i.created_at DESC, i.id DESC",
 		},
 		{
 			name:      "invalid fallback",
