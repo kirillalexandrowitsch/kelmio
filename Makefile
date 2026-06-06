@@ -1,6 +1,6 @@
 SHELL := /bin/sh
 
-.PHONY: help doctor dev down logs ps db-up wait-db migrate-up seed setup-db backup restore restore-check backend-dev backend-test backend-integration-test frontend-install frontend-dev frontend-build frontend-test frontend-e2e-install frontend-e2e smoke-api verify
+.PHONY: help doctor dev down logs ps db-up wait-db migrate-up seed setup-db backup restore restore-check backend-dev backend-test backend-integration-test frontend-install frontend-dev frontend-build frontend-test frontend-e2e-install frontend-e2e smoke-api smoke-production prod-config-check prod-compose-check verify
 
 help:
 	@printf '%s\n' 'Available commands:'
@@ -27,6 +27,9 @@ help:
 	@printf '%s\n' '  make frontend-e2e-install Install Playwright browser dependencies'
 	@printf '%s\n' '  make frontend-e2e     Run browser e2e smoke against localhost frontend'
 	@printf '%s\n' '  make smoke-api        Run API smoke test against localhost backend'
+	@printf '%s\n' '  make smoke-production Run production-sensitive API smoke'
+	@printf '%s\n' '  make prod-config-check Validate production backend config rules'
+	@printf '%s\n' '  make prod-compose-check Validate production Compose and Caddy config'
 	@printf '%s\n' '  make verify           Run local non-destructive verification checks'
 
 doctor:
@@ -99,8 +102,19 @@ frontend-e2e:
 smoke-api:
 	./scripts/smoke-api.sh
 
+smoke-production:
+	./scripts/smoke-production.sh
+
+prod-config-check:
+	cd backend && GOCACHE="$${GOCACHE:-$${TMPDIR:-/tmp}/team-task-tracker-gocache}" go test ./internal/config -run Production
+
+prod-compose-check:
+	docker compose --env-file deploy/production.env.example -f docker-compose.prod.yml config >/dev/null
+	docker run --rm -v "$(CURDIR)/deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2-alpine caddy validate --config /etc/caddy/Caddyfile
+
 verify:
 	sh -n scripts/smoke-api.sh
+	sh -n scripts/smoke-production.sh
 	sh -n scripts/doctor.sh
 	sh -n scripts/backup-db.sh
 	sh -n scripts/restore-db.sh

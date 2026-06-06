@@ -54,6 +54,16 @@ test("V3 invite UI: admin creates invite and recipient accepts it", async ({
       await page.request.get(`${apiBaseURL}/api/v1/auth/me`),
     );
     memberId = me.user.id;
+
+    await logoutViaApi(page);
+    await login(page);
+    await openNav(page, "Team");
+
+    const memberRow = page.locator(".team-member-row").filter({
+      hasText: email,
+    });
+    await expect(memberRow).toContainText(displayName);
+    await expect(memberRow).toContainText(`@${username}`);
   } finally {
     if (memberId) {
       await logoutViaApi(page).catch(() => undefined);
@@ -79,9 +89,16 @@ test("V3 invite UI: admin revokes a pending invite", async ({ page }) => {
     hasText: email,
   });
   await expect(inviteCard).toContainText("Pending");
+  const inviteLink = await inviteCard
+    .getByLabel(`Invite link for ${email}`)
+    .inputValue();
   await inviteCard.getByRole("button", { name: "Revoke" }).click();
   await expect(inviteCard).toContainText("Revoked");
   await expect(inviteCard.getByRole("button", { name: "Revoke" })).toHaveCount(0);
+
+  await logoutViaApi(page);
+  await page.goto(inviteLink);
+  await expect(page.getByRole("alert")).toContainText("invite was revoked");
 });
 
 async function login(page: Page, loginValue = adminLogin, password = adminPassword) {
