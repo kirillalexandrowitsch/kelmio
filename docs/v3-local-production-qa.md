@@ -15,6 +15,18 @@ make prod-compose-check
 
 `make prod-compose-check` validates `docker-compose.prod.yml` with the safe placeholder values from `deploy/production.env.example` and validates the Caddyfile.
 
+## Isolated Clean-Room Production QA
+
+Run the complete production-like stack check without touching development data:
+
+```sh
+make prod-stack-qa
+```
+
+This command creates a temporary Compose project with isolated volumes and credentials, uses a PostgreSQL password containing URL-special characters, builds the production images, applies migrations, bootstraps the first admin, verifies repeated-bootstrap refusal, starts Caddy with internal TLS on configurable non-default ports, runs the production hardening smoke, creates a backup, and verifies restore into a temporary PostgreSQL container.
+
+The script always removes its temporary stack, volumes, credentials, and backup artifacts on exit.
+
 ## Localhost Hardening Smoke
 
 Start and prepare the development stack:
@@ -68,6 +80,7 @@ With the localhost stack running:
 
 ```sh
 make setup-db
+make prod-stack-qa
 make smoke-production
 make smoke-api
 make frontend-e2e
@@ -81,6 +94,7 @@ The browser suite includes the V1/V2 regression flows and the V3 invite create, 
 ## Safety Notes
 
 - `make smoke-production` does not create projects, issues, members, invites, labels, saved filters, or notifications.
+- `make prod-stack-qa` uses an isolated Compose project and does not read or modify the development PostgreSQL volume.
 - It creates one temporary authenticated session and deletes it through a valid CSRF-protected logout.
 - It consumes login attempts only for a unique nonexistent login identifier.
 - The HTTPS mode must target an instance where using the configured admin account for QA is acceptable.

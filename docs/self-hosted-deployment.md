@@ -25,11 +25,15 @@ cp deploy/production.env.example deploy/production.env
 `deploy/production.env` is ignored by Git. Replace every placeholder before starting production:
 
 - set `PUBLIC_APP_HOST`, `PUBLIC_APP_URL`, and `TRUSTED_ORIGINS` to the same real HTTPS origin;
-- use a private PostgreSQL password;
+- use a private PostgreSQL password; arbitrary strong passwords with URL-special characters are supported;
 - keep `SESSION_COOKIE_SECURE=true`;
 - use a private `CSRF_SECRET` of at least 32 characters;
 - set a strong one-time `BOOTSTRAP_ADMIN_PASSWORD`;
 - set `APP_VERSION`, `BUILD_COMMIT`, and `BUILD_TIME` for deployment diagnostics.
+
+By default, the backend safely constructs its connection URL from `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, and `POSTGRES_SSLMODE`. An explicit non-empty `DATABASE_URL` overrides those values and must contain a PostgreSQL host and database name without a URL fragment.
+
+The public Caddy ports default to `80` and `443`. Set `PRODUCTION_HTTP_PORT` and `PRODUCTION_HTTPS_PORT` only when the host needs different published ports, such as isolated production-like QA.
 
 Validate the real private configuration and Caddyfile:
 
@@ -154,4 +158,4 @@ Request logs intentionally exclude query strings, headers, cookies, bodies, pass
 
 ## Production QA
 
-Use [v3-local-production-qa.md](v3-local-production-qa.md) for config validation, localhost hardening smoke, real HTTPS checks, and the full V1/V2/V3 regression baseline.
+Before the first real deployment, run `make prod-stack-qa` to verify an isolated clean-room stack. Use [v3-local-production-qa.md](v3-local-production-qa.md) for config validation, localhost hardening smoke, real HTTPS checks, and the full V1/V2/V3 regression baseline.

@@ -8,6 +8,8 @@ V2 превратила MVP в более сильный инструмент п
 
 Цель V3: подготовить проект к реальному self-hosted использованию небольшой командой, не ломая localhost-first основу и не превращая продукт в SaaS раньше времени.
 
+Статус на 6 июня 2026 года: V3 полностью завершена. Все плановые фазы, Definition of Done и финальный V1/V2/V3 QA закрыты.
+
 Ключевой принцип V3: не добавлять новые Jira-like фичи ради масштаба, а сделать текущий функционал безопасным, поддерживаемым и готовым к запуску на собственном сервере.
 
 V3 должна ответить на вопросы:
@@ -215,7 +217,7 @@ V3 добавляет endpoints без удаления V1/V2 endpoints.
 
 ### CSRF
 
-- `GET /api/v1/auth/csrf`
+- `GET /api/v1/auth/csrf-token`
 
 Правила:
 
@@ -459,6 +461,7 @@ git diff --check
 ```sh
 make prod-config-check
 make prod-compose-check
+make prod-stack-qa
 make backup
 make restore-check
 ```
@@ -538,10 +541,18 @@ V3 считается завершенной, когда:
 
 Количество коммитов может измениться, но порядок должен оставаться примерно таким: сначала planning, затем production foundation, затем security, затем onboarding/ops, затем performance, CI, docs и final QA.
 
-## 14. Decision For Next Step
+## 14. Final V3 QA Result
 
-Следующий практический шаг после этого плана:
+V3 полностью завершена 6 июня 2026 года.
 
-начать Phase 1 с production config validation.
+Финальный audit подтвердил:
 
-Причина: до Docker production runtime, Caddy, CSRF и deployment docs нужно сначала четко определить, какие settings считаются безопасными в development и production. Если начать с Docker или proxy раньше config validation, можно получить production контур, который технически запускается, но допускает небезопасные defaults.
+- два последовательных idempotent `make setup-db`;
+- полный V1/V2/V3 automated baseline;
+- production config, Compose и production image validation;
+- isolated clean-room production stack с special-character PostgreSQL password, migrations, bootstrap, internal TLS, hardening smoke, backup и restore-check;
+- API smoke, backend integration tests и все Playwright e2e сценарии;
+- manual localhost audit для admin/member navigation, V2 planning flows, invites, notifications и runtime metadata;
+- отсутствие известных V3 blocker bugs.
+
+Следующий этап проекта должен начинаться с отдельного V4 planning документа, без расширения завершенного V3 scope.

@@ -1,6 +1,6 @@
 SHELL := /bin/sh
 
-.PHONY: help doctor dev down logs ps db-up wait-db migrate-up seed setup-db backup restore restore-check backend-dev backend-test backend-integration-test frontend-install frontend-dev frontend-build frontend-test frontend-e2e-install frontend-e2e smoke-api smoke-production prod-config-check prod-compose-check verify
+.PHONY: help doctor dev down logs ps db-up wait-db migrate-up seed setup-db backup restore restore-check backend-dev backend-test backend-integration-test frontend-install frontend-dev frontend-build frontend-test frontend-e2e-install frontend-e2e smoke-api smoke-production prod-config-check prod-compose-check prod-stack-qa verify
 
 help:
 	@printf '%s\n' 'Available commands:'
@@ -30,6 +30,7 @@ help:
 	@printf '%s\n' '  make smoke-production Run production-sensitive API smoke'
 	@printf '%s\n' '  make prod-config-check Validate production backend config rules'
 	@printf '%s\n' '  make prod-compose-check Validate production Compose and Caddy config'
+	@printf '%s\n' '  make prod-stack-qa     Run isolated clean-room production stack QA'
 	@printf '%s\n' '  make verify           Run local non-destructive verification checks'
 
 doctor:
@@ -112,9 +113,13 @@ prod-compose-check:
 	docker compose --env-file "$${ENV_FILE:-deploy/production.env.example}" -f docker-compose.prod.yml config >/dev/null
 	docker run --rm -v "$(CURDIR)/deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2-alpine caddy validate --config /etc/caddy/Caddyfile
 
+prod-stack-qa:
+	sh scripts/qa-production-stack.sh
+
 verify:
 	sh -n scripts/smoke-api.sh
 	sh -n scripts/smoke-production.sh
+	sh -n scripts/qa-production-stack.sh
 	sh -n scripts/doctor.sh
 	sh -n scripts/backup-db.sh
 	sh -n scripts/restore-db.sh

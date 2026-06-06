@@ -1,6 +1,7 @@
 package config
 
 import (
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -133,6 +134,82 @@ func TestLoadValidProductionConfig(t *testing.T) {
 	}
 }
 
+func TestLoadProductionBuildsEncodedDatabaseURLFromPostgresEnv(t *testing.T) {
+	setValidProductionEnv(t)
+	t.Setenv("DATABASE_URL", "")
+	t.Setenv("POSTGRES_HOST", "postgres")
+	t.Setenv("POSTGRES_PORT", "5432")
+	t.Setenv("POSTGRES_DB", "team_task_tracker")
+	t.Setenv("POSTGRES_USER", "team_task_tracker")
+	t.Setenv("POSTGRES_PASSWORD", "strong:pass@word# value")
+	t.Setenv("POSTGRES_SSLMODE", "disable")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	parsed, err := url.Parse(cfg.DatabaseURL)
+	if err != nil {
+		t.Fatalf("parse DatabaseURL: %v", err)
+	}
+	if parsed.Hostname() != "postgres" || parsed.Path != "/team_task_tracker" {
+		t.Fatalf("DatabaseURL = %q", cfg.DatabaseURL)
+	}
+	password, ok := parsed.User.Password()
+	if !ok || password != "strong:pass@word# value" {
+		t.Fatalf("DatabaseURL password = %q, ok = %t", password, ok)
+	}
+	if parsed.Fragment != "" {
+		t.Fatalf("DatabaseURL fragment = %q, want empty", parsed.Fragment)
+	}
+}
+
+func TestLoadDatabaseURLOverrideTakesPriority(t *testing.T) {
+	clearConfigEnv(t)
+	t.Setenv("DATABASE_URL", "postgres://override:password@database.example:5432/override_db?sslmode=require")
+	t.Setenv("POSTGRES_HOST", "ignored")
+	t.Setenv("POSTGRES_DB", "ignored")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.DatabaseURL != "postgres://override:password@database.example:5432/override_db?sslmode=require" {
+		t.Fatalf("DatabaseURL = %q", cfg.DatabaseURL)
+	}
+}
+
+func TestLoadProductionRequiresDatabaseHost(t *testing.T) {
+	setValidProductionEnv(t)
+	t.Setenv("DATABASE_URL", "")
+
+	_, err := Load()
+	if err == nil || !strings.Contains(err.Error(), "DATABASE_URL must include a database host") {
+		t.Fatalf("Load() error = %v, want missing database host", err)
+	}
+}
+
+func TestLoadRejectsDatabaseURLWithoutDatabaseName(t *testing.T) {
+	clearConfigEnv(t)
+	t.Setenv("DATABASE_URL", "postgres://user:password@postgres:5432?sslmode=disable")
+
+	_, err := Load()
+	if err == nil || !strings.Contains(err.Error(), "DATABASE_URL must include a database name") {
+		t.Fatalf("Load() error = %v, want missing database name", err)
+	}
+}
+
+func TestLoadRejectsDatabaseURLFragment(t *testing.T) {
+	clearConfigEnv(t)
+	t.Setenv("DATABASE_URL", "postgres://user:password@postgres:5432/team_task_tracker?sslmode=disable#fragment")
+
+	_, err := Load()
+	if err == nil || !strings.Contains(err.Error(), "DATABASE_URL must not include a fragment") {
+		t.Fatalf("Load() error = %v, want fragment rejection", err)
+	}
+}
+
 func TestLoadRejectsInvalidPort(t *testing.T) {
 	clearConfigEnv(t)
 	t.Setenv("BACKEND_PORT", "70000")
@@ -179,6 +256,12 @@ func clearConfigEnv(t *testing.T) {
 		"APP_VERSION",
 		"BUILD_COMMIT",
 		"BUILD_TIME",
+		"POSTGRES_HOST",
+		"POSTGRES_PORT",
+		"POSTGRES_DB",
+		"POSTGRES_USER",
+		"POSTGRES_PASSWORD",
+		"POSTGRES_SSLMODE",
 	} {
 		t.Setenv(key, "")
 	}

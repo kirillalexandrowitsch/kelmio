@@ -2,7 +2,7 @@
 
 Free self-hosted team task tracker for small teams, built with Go, React + TypeScript, PostgreSQL, and Docker.
 
-Current status: V3 feature implementation is complete. The final V3 QA polish step from [docs/v3-plan.md](docs/v3-plan.md) remains before V3 is declared fully completed.
+Current status: V3 is fully completed for localhost development and production-ready self-hosted use by a small team.
 
 ## Features
 
@@ -70,6 +70,7 @@ make logs
 make setup-db
 make smoke-api
 make smoke-production
+make prod-stack-qa
 make frontend-e2e
 make verify
 GOCACHE=/private/tmp/team-task-tracker-gocache make backend-integration-test
@@ -84,6 +85,8 @@ Use the production deployment guide:
 - [V3 local and production QA](docs/v3-local-production-qa.md)
 
 The production flow uses `docker-compose.prod.yml`, a private ignored `deploy/production.env`, Caddy HTTPS, explicit migrations, and a one-time first-admin bootstrap. The bootstrap refuses to run when workspace or user data already exists.
+
+The backend accepts an explicit `DATABASE_URL` override. When it is absent, the production stack passes separate `POSTGRES_*` values and the backend safely constructs the PostgreSQL URL, including URL-encoding arbitrary strong passwords.
 
 Minimum production security requirements:
 
@@ -100,6 +103,7 @@ Baseline checks:
 ```sh
 make prod-config-check
 make prod-compose-check
+make prod-stack-qa
 make smoke-production
 make smoke-api
 make frontend-e2e
@@ -108,7 +112,7 @@ GOCACHE=/private/tmp/team-task-tracker-gocache make backend-integration-test
 git diff --check
 ```
 
-`make smoke-api` covers V1/V2 business flows and V3 pagination/version regression. `make smoke-production` covers request IDs, security headers, CORS, cookies, CSRF, request size limits, and login rate limiting. Playwright covers V1/V2 flows plus V3 invite onboarding.
+`make prod-stack-qa` creates and removes an isolated production Compose stack with a special-character PostgreSQL password, migrations, first-admin bootstrap, internal TLS, hardening smoke, backup, and restore-check. `make smoke-api` covers V1/V2 business flows and V3 pagination/version regression. `make smoke-production` covers request IDs, security headers, CORS, cookies, CSRF, request size limits, and login rate limiting. Playwright covers V1/V2 flows plus V3 invite onboarding.
 
 ## Operations And Observability
 
@@ -120,4 +124,4 @@ git diff --check
 
 ## V3 Completion Status
 
-V3 implementation phases through production smoke/e2e and deployment documentation are complete. The remaining planned step is `17. final V3 QA polish`: run the full automated and manual localhost/production-like audit, fix any blocker or polish defects, then explicitly mark V3 fully completed.
+V3 is fully completed. On June 6, 2026, the final QA passed the complete V1/V2/V3 automated baseline, two consecutive idempotent database setups, production config and Compose validation, isolated production-stack TLS/security/bootstrap/backup/restore QA, API smoke, backend integration tests, all Playwright e2e scenarios, production image builds, and manual admin/member localhost checks. No known V3 blocker bugs remain.

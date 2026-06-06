@@ -8,6 +8,7 @@ ADMIN_PASSWORD="${ADMIN_PASSWORD:-admin12345}"
 RATE_LIMIT_LOGIN_PER_MINUTE="${RATE_LIMIT_LOGIN_PER_MINUTE:-10}"
 EXPECT_SECURE_COOKIE="${EXPECT_SECURE_COOKIE:-false}"
 EXPECT_HSTS="${EXPECT_HSTS:-false}"
+CURL_INSECURE="${CURL_INSECURE:-false}"
 
 API_BASE_URL="${API_BASE_URL%/}"
 COOKIE_JAR="$(mktemp "${TMPDIR:-/tmp}/team-task-tracker-production-smoke-cookies.XXXXXX")"
@@ -28,6 +29,14 @@ cleanup() {
 	rm -f "$COOKIE_JAR" "$HEADERS_FILE" "$BODY_FILE" "$LARGE_BODY_FILE"
 }
 trap cleanup EXIT
+
+curl() {
+	if [ "$CURL_INSECURE" = "true" ]; then
+		command curl -k "$@"
+	else
+		command curl "$@"
+	fi
+}
 
 fail() {
 	printf '%s\n' "$1" >&2
@@ -122,6 +131,11 @@ require_command curl
 require_command dd
 require_command node
 require_command tr
+
+case "$CURL_INSECURE" in
+	true | false) ;;
+	*) fail "CURL_INSECURE must be true or false" ;;
+esac
 
 printf 'Checking production-sensitive API smoke at %s\n' "$API_BASE_URL"
 

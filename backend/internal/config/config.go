@@ -107,10 +107,40 @@ func env(key string, fallback string) string {
 }
 
 func databaseURL(appEnv string) string {
-	if appEnv == EnvProduction {
-		return env("DATABASE_URL", "")
+	if value := strings.TrimSpace(os.Getenv("DATABASE_URL")); value != "" {
+		return value
 	}
-	return env("DATABASE_URL", "postgres://team_task_tracker:team_task_tracker@localhost:15432/team_task_tracker?sslmode=disable")
+
+	host := "localhost"
+	port := "15432"
+	database := "team_task_tracker"
+	user := "team_task_tracker"
+	password := "team_task_tracker"
+	if appEnv == EnvProduction {
+		host = ""
+		port = "5432"
+		database = ""
+		user = ""
+		password = ""
+	}
+
+	host = env("POSTGRES_HOST", host)
+	port = env("POSTGRES_PORT", port)
+	database = env("POSTGRES_DB", database)
+	user = env("POSTGRES_USER", user)
+	if value, ok := os.LookupEnv("POSTGRES_PASSWORD"); ok {
+		password = value
+	}
+	sslMode := env("POSTGRES_SSLMODE", "disable")
+
+	connectionURL := &url.URL{
+		Scheme:   "postgres",
+		User:     url.UserPassword(user, password),
+		Host:     net.JoinHostPort(host, port),
+		Path:     "/" + database,
+		RawQuery: url.Values{"sslmode": []string{sslMode}}.Encode(),
+	}
+	return connectionURL.String()
 }
 
 func publicAppURL(appEnv string) string {
@@ -205,6 +235,15 @@ func validateDatabaseURL(databaseURL string) error {
 	}
 	if parsed.Scheme != "postgres" && parsed.Scheme != "postgresql" {
 		return errors.New("DATABASE_URL must use postgres or postgresql scheme")
+	}
+	if parsed.Hostname() == "" {
+		return errors.New("DATABASE_URL must include a database host")
+	}
+	if strings.Trim(parsed.EscapedPath(), "/") == "" {
+		return errors.New("DATABASE_URL must include a database name")
+	}
+	if parsed.Fragment != "" {
+		return errors.New("DATABASE_URL must not include a fragment")
 	}
 	return nil
 }
