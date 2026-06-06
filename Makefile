@@ -109,7 +109,7 @@ prod-config-check:
 	cd backend && GOCACHE="$${GOCACHE:-$${TMPDIR:-/tmp}/team-task-tracker-gocache}" go test ./internal/config -run Production
 
 prod-compose-check:
-	docker compose --env-file deploy/production.env.example -f docker-compose.prod.yml config >/dev/null
+	docker compose --env-file "$${ENV_FILE:-deploy/production.env.example}" -f docker-compose.prod.yml config >/dev/null
 	docker run --rm -v "$(CURDIR)/deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2-alpine caddy validate --config /etc/caddy/Caddyfile
 
 verify:
