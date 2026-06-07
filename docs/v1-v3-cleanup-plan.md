@@ -91,5 +91,18 @@ The cleanup is complete when:
 
 ## 6. Current Status
 
-Cleanup is in progress. V4 planning must not start until the Definition of Done above
-is fully verified and this status is updated to completed.
+Cleanup completed on June 7, 2026.
+
+Final verification passed:
+
+- two consecutive idempotent database setups;
+- Vitest helper/component tests, frontend build, and all Playwright e2e scenarios;
+- backend unit/integration tests, `go test -race`, and `go vet`;
+- API and production-sensitive smoke suites;
+- production Compose/Caddy validation, production image builds, and isolated
+  production-stack TLS/bootstrap/backup/restore QA;
+- dependency audit with zero known vulnerabilities;
+- clean documentation and Git diff checks.
+
+No known V1-V3 blocker bugs remain. V4 planning may begin after the cleanup commits
+are published and the GitHub Actions checks are green.

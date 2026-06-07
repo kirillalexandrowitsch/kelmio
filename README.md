@@ -2,7 +2,7 @@
 
 Free self-hosted team task tracker for small teams, built with Go, React + TypeScript, PostgreSQL, and Docker.
 
-Current status: V3 is fully completed for localhost development and production-ready self-hosted use by a small team.
+Current status: V1, V2, V3, and the post-V3 maintainability cleanup are fully completed. The project is ready for V4 planning.
 
 ## Features
 
@@ -19,6 +19,7 @@ V1, V2, and V3 scope and decisions are documented in:
 - [docs/mvp-plan.md](docs/mvp-plan.md)
 - [docs/v2-plan.md](docs/v2-plan.md)
 - [docs/v3-plan.md](docs/v3-plan.md)
+- [docs/v1-v3-cleanup-plan.md](docs/v1-v3-cleanup-plan.md)
 
 ## Stack
 
@@ -26,7 +27,7 @@ V1, V2, and V3 scope and decisions are documented in:
 - Frontend: React + TypeScript, Vite
 - Database: PostgreSQL 16
 - Infrastructure: Docker Compose, Caddy for production HTTPS
-- Tests: Go unit/integration tests, API smoke, production hardening smoke, Playwright e2e, GitHub Actions
+- Tests: Go unit/integration/race tests, Vitest/React Testing Library, API and production hardening smoke, Playwright e2e, fast and full GitHub Actions workflows
 
 ## Local Development
 
@@ -114,6 +115,8 @@ git diff --check
 
 `make prod-stack-qa` creates and removes an isolated production Compose stack with a special-character PostgreSQL password, migrations, first-admin bootstrap, internal TLS, hardening smoke, backup, and restore-check. `make smoke-api` covers V1/V2 business flows and V3 pagination/version regression. `make smoke-production` covers request IDs, security headers, CORS, cookies, CSRF, request size limits, and login rate limiting. Playwright covers V1/V2 flows plus V3 invite onboarding.
 
+The fast GitHub Actions workflow runs on every push and pull request. The separate Full QA workflow can be started manually and also runs weekly; it covers the complete development, integration, browser, and isolated production-stack baseline.
+
 ## Operations And Observability
 
 - Every backend response includes `X-Request-ID`; use it to correlate an incident with backend logs.
@@ -122,6 +125,6 @@ git diff --check
 - The login limiter is in-memory and single-node; it resets after backend restart and is not synchronized between backend instances.
 - Backups contain sensitive application data and must be stored privately outside Git.
 
-## V3 Completion Status
+## V1-V3 Completion Status
 
-V3 is fully completed. On June 6, 2026, the final QA passed the complete V1/V2/V3 automated baseline, two consecutive idempotent database setups, production config and Compose validation, isolated production-stack TLS/security/bootstrap/backup/restore QA, API smoke, backend integration tests, all Playwright e2e scenarios, production image builds, and manual admin/member localhost checks. No known V3 blocker bugs remain.
+V1, V2, and V3 are fully completed. On June 7, 2026, the post-V3 cleanup audit again passed the complete automated baseline, two consecutive idempotent database setups, frontend component tests, production config and Compose validation, isolated production-stack TLS/security/bootstrap/backup/restore QA, API smoke, backend integration and race tests, all Playwright e2e scenarios, production image builds, static checks, and dependency audit. No known V1-V3 blocker bugs remain.

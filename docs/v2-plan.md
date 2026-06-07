@@ -452,8 +452,16 @@ V2 считается завершенной, когда:
 
 Количество коммитов может измениться, но порядок должен оставаться примерно таким: сначала foundation, затем domain, затем UI, затем tests/docs.
 
-## 14. Decision For Next Step
+## 14. Final V2 Result
 
-Следующий практический шаг после этого плана:
+V2 полностью завершена и сохранена как стабильный planning/collaboration baseline.
 
-начать Phase 1 с route-level navigation и аккуратного разбиения frontend-кода, потому что V2 добавит много новых экранов. Если сначала добавить sprints/hierarchy поверх текущего большого `App.tsx`, frontend быстро станет сложным и дорогим для поддержки.
+Итоговый audit подтвердил:
+
+- route-level navigation, hierarchy, subtasks и issue links;
+- sprint lifecycle, active board, story points и dashboard summary;
+- saved filters и in-app notifications;
+- расширенные demo data, API smoke и все V2 Playwright сценарии;
+- отсутствие известных V2 blocker bugs после V1-V3 cleanup audit.
+
+V3 production hardening и последующий cleanup сохранили V2 поведение без breaking changes.
