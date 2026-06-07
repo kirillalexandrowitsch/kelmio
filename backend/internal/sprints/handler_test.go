@@ -174,3 +174,24 @@ func TestNormalizeOptionalID(t *testing.T) {
 		t.Fatalf("optional id = %q, want %q", got, testSprintID)
 	}
 }
+
+func TestNormalizeOptionalIDRejectsInvalidValue(t *testing.T) {
+	t.Parallel()
+
+	if _, err := normalizeOptionalID("not-a-uuid", "project_id"); err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestValidateSprintDetailsAcceptsBoundaries(t *testing.T) {
+	t.Parallel()
+
+	if err := validateSprintDetails(
+		strings.Repeat("n", 120),
+		strings.Repeat("g", 1000),
+		"2026-06-07",
+		"2026-06-07",
+	); err != nil {
+		t.Fatalf("validate boundary sprint details: %v", err)
+	}
+}
