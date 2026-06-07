@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "vitest";
 
 import { activityDescription, activityTitle } from "./activity-view.ts";
 import { type IssueActivity, type TeamMember } from "./api-types.ts";
