@@ -1,0 +1,79 @@
+name: Full QA
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "30 3 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: full-qa-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  full-qa:
+    name: V1 V2 V3 full QA
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "25"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Install Playwright browser
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Start development stack
+        run: docker compose up -d --build
+
+      - name: Verify idempotent database setup
+        run: |
+          make setup-db
+          make setup-db
+
+      - name: Run production-sensitive smoke
+        run: make smoke-production
+
+      - name: Run API smoke
+        run: make smoke-api
+
+      - name: Run backend integration tests
+        run: make backend-integration-test
+
+      - name: Run browser e2e
+        run: make frontend-e2e
+
+      - name: Validate production configuration
+        run: |
+          make prod-config-check
+          make prod-compose-check
+
+      - name: Run isolated production stack QA
+        run: make prod-stack-qa
+
+      - name: Run repository verification
+        run: make verify
+
+      - name: Clean up Docker resources
+        if: always()
+        run: docker compose down -v --remove-orphans
