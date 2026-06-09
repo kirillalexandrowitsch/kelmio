@@ -29,6 +29,7 @@ import (
 	"team-task-tracker/backend/internal/savedfilters"
 	"team-task-tracker/backend/internal/sprints"
 	"team-task-tracker/backend/internal/team"
+	"team-task-tracker/backend/internal/workflows"
 )
 
 const maxRequestBodyBytes int64 = 1 << 20
@@ -70,6 +71,9 @@ func main() {
 
 	projectsHandler := projects.NewHandler(db, authHandler)
 	projectsHandler.RegisterRoutes(mux)
+
+	workflowsHandler := workflows.NewHandler(db, authHandler)
+	workflowsHandler.RegisterRoutes(mux)
 
 	issuesHandler := issues.NewHandler(db, authHandler, notificationService)
 	issuesHandler.RegisterRoutes(mux)
