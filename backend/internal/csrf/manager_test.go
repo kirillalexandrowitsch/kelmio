@@ -28,11 +28,11 @@ func TestManagerRejectsTamperedToken(t *testing.T) {
 		t.Fatalf("Generate() error = %v", err)
 	}
 
-	replacement := "x"
-	if strings.HasSuffix(token, replacement) {
-		replacement = "y"
+	replacement := "A"
+	if strings.HasPrefix(token, replacement) {
+		replacement = "B"
 	}
-	tampered := token[:len(token)-1] + replacement
+	tampered := replacement + token[1:]
 	if manager.Valid("session-token", tampered) {
 		t.Fatal("Valid() = true, want false")
 	}

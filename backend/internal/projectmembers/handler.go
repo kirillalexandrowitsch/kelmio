@@ -15,7 +15,6 @@ import (
 	"team-task-tracker/backend/internal/projectaccess"
 )
 
-var errForbidden = errors.New("project member management forbidden")
 var errWorkspaceMemberNotFound = errors.New("workspace member not found")
 var errProjectMemberNotFound = errors.New("project member not found")
 var errProjectRequiresLead = errors.New("project requires lead")
@@ -151,21 +150,15 @@ func (h *Handler) requireUser(w http.ResponseWriter, r *http.Request) (auth.Curr
 }
 
 func (h *Handler) requireManager(ctx context.Context, db projectaccess.Querier, user auth.CurrentUser, projectID string) error {
-	access, err := projectaccess.Resolve(ctx, db, user, projectID)
-	if err != nil {
-		return err
-	}
-	if !access.CanManage {
-		return errForbidden
-	}
-	return nil
+	_, err := projectaccess.RequireManage(ctx, db, user, projectID)
+	return err
 }
 
 func (h *Handler) writeStoreError(w http.ResponseWriter, err error, fallback string) {
 	switch {
 	case errors.Is(err, pgx.ErrNoRows):
 		writeError(w, http.StatusNotFound, "project_not_found", "project was not found")
-	case errors.Is(err, errForbidden):
+	case errors.Is(err, projectaccess.ErrForbidden):
 		writeError(w, http.StatusForbidden, "forbidden", "project lead or workspace admin role is required")
 	case errors.Is(err, errWorkspaceMemberNotFound):
 		writeError(w, http.StatusNotFound, "workspace_member_not_found", "active workspace member was not found")

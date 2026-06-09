@@ -26,17 +26,28 @@ func TestNotificationServiceIntegration(t *testing.T) {
 	db := newNotificationIntegrationDB(t, ctx)
 	service := NewService()
 	seed := seedNotificationIntegrationWorkspace(t, ctx, db)
+	outsider := insertNotificationUser(t, ctx, db, seed.workspaceID, "outsider_user", true)
 
 	if err := service.NotifyIssueAssigned(ctx, db, seed.workspaceID, seed.actor.ID, seed.issue, seed.assignee.ID); err != nil {
 		t.Fatalf("notify assignment: %v", err)
 	}
+	if err := service.NotifyIssueAssigned(ctx, db, seed.workspaceID, seed.actor.ID, seed.issue, outsider.ID); err != nil {
+		t.Fatalf("filter outsider assignment: %v", err)
+	}
 
-	if err := service.NotifyIssueComment(ctx, db, seed.workspaceID, seed.actor.ID, seed.issue.ID, seed.commentID, "Please check @mentioned_user and @assignee_user"); err != nil {
+	if err := service.NotifyIssueComment(ctx, db, seed.workspaceID, seed.actor.ID, seed.issue.ID, seed.commentID, "Please check @mentioned_user, @assignee_user, and @outsider_user"); err != nil {
 		t.Fatalf("notify comment: %v", err)
 	}
 
 	if err := service.NotifySprintEvent(ctx, db, seed.workspaceID, seed.actor.ID, seed.sprint, TypeSprintStarted); err != nil {
 		t.Fatalf("notify sprint started: %v", err)
+	}
+	outsiderNotifications, err := service.List(ctx, db, outsider)
+	if err != nil {
+		t.Fatalf("list outsider notifications: %v", err)
+	}
+	if len(outsiderNotifications) != 0 {
+		t.Fatalf("outsider notifications = %#v, want none", outsiderNotifications)
 	}
 
 	assigneeNotifications, err := service.List(ctx, db, seed.assignee)
@@ -123,6 +134,56 @@ func TestNotificationServiceIntegration(t *testing.T) {
 	}
 	if unreadCount != 0 {
 		t.Fatalf("assignee unread count after mark all = %d, want 0", unreadCount)
+	}
+	if err := service.NotifyIssueAssigned(ctx, db, seed.workspaceID, seed.actor.ID, seed.issue, seed.assignee.ID); err != nil {
+		t.Fatalf("create notification before access removal: %v", err)
+	}
+	var hiddenUnreadID string
+	if err := db.QueryRow(ctx, `
+		SELECT id::text
+		FROM notifications
+		WHERE workspace_id = $1
+			AND user_id = $2
+			AND read_at IS NULL
+		ORDER BY created_at DESC, id DESC
+		LIMIT 1
+	`, seed.workspaceID, seed.assignee.ID).Scan(&hiddenUnreadID); err != nil {
+		t.Fatalf("load unread notification before access removal: %v", err)
+	}
+
+	if _, err := db.Exec(ctx, `
+		DELETE FROM project_members
+		WHERE project_id = $1
+			AND user_id = $2
+	`, seed.issue.ProjectID, seed.assignee.ID); err != nil {
+		t.Fatalf("remove assignee project access: %v", err)
+	}
+	hiddenNotifications, err := service.List(ctx, db, seed.assignee)
+	if err != nil {
+		t.Fatalf("list hidden assignee notifications: %v", err)
+	}
+	if len(hiddenNotifications) != 0 {
+		t.Fatalf("notifications after access removal = %#v, want none", hiddenNotifications)
+	}
+	unreadCount, err = service.UnreadCount(ctx, db, seed.assignee)
+	if err != nil {
+		t.Fatalf("hidden assignee unread count: %v", err)
+	}
+	if unreadCount != 0 {
+		t.Fatalf("hidden assignee unread count = %d, want 0", unreadCount)
+	}
+	if _, err := service.MarkRead(ctx, db, seed.assignee, assigneeNotifications[0].ID); !errors.Is(err, pgx.ErrNoRows) {
+		t.Fatalf("mark hidden notification read error = %v, want %v", err, pgx.ErrNoRows)
+	}
+	if err := service.MarkAllRead(ctx, db, seed.assignee); err != nil {
+		t.Fatalf("mark hidden notifications read: %v", err)
+	}
+	var hiddenReadAt *time.Time
+	if err := db.QueryRow(ctx, `SELECT read_at FROM notifications WHERE id = $1`, hiddenUnreadID).Scan(&hiddenReadAt); err != nil {
+		t.Fatalf("load hidden notification read state: %v", err)
+	}
+	if hiddenReadAt != nil {
+		t.Fatalf("hidden notification read_at = %v, want nil", hiddenReadAt)
 	}
 }
 
@@ -259,6 +320,7 @@ func seedNotificationIntegrationWorkspace(t *testing.T, ctx context.Context, db 
 		commentID:   commentID,
 		issue: IssueContext{
 			ID:         issueID,
+			ProjectID:  projectID,
 			IssueKey:   "NTF-1",
 			Title:      "Notification issue",
 			ReporterID: reporter.ID,
@@ -266,6 +328,7 @@ func seedNotificationIntegrationWorkspace(t *testing.T, ctx context.Context, db 
 		},
 		sprint: SprintContext{
 			ID:         sprintID,
+			ProjectID:  projectID,
 			Name:       "Notification Sprint",
 			ProjectKey: "NTF",
 		},

@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"team-task-tracker/backend/internal/auth"
+	"team-task-tracker/backend/internal/projectaccess"
 )
 
 var errStatusKeyExists = errors.New("workflow status key exists")
@@ -129,7 +130,7 @@ func (h *Handler) get(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
-	workflow, err := h.getWorkflow(ctx, user.WorkspaceID, projectID)
+	workflow, err := h.getWorkflow(ctx, user.WorkspaceID, projectID, user)
 	if err != nil {
 		h.writeStoreError(w, err, "could not load workflow")
 		return
@@ -138,7 +139,7 @@ func (h *Handler) get(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) createStatus(w http.ResponseWriter, r *http.Request) {
-	user, ok := h.requireAdmin(w, r)
+	user, ok := h.requireUser(w, r)
 	if !ok {
 		return
 	}
@@ -158,7 +159,7 @@ func (h *Handler) createStatus(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
-	status, err := h.createWorkflowStatus(ctx, user.WorkspaceID, projectID, input)
+	status, err := h.createWorkflowStatus(ctx, user.WorkspaceID, projectID, input, user)
 	if err != nil {
 		h.writeStoreError(w, err, "could not create workflow status")
 		return
@@ -167,7 +168,7 @@ func (h *Handler) createStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) updateStatus(w http.ResponseWriter, r *http.Request) {
-	user, ok := h.requireAdmin(w, r)
+	user, ok := h.requireUser(w, r)
 	if !ok {
 		return
 	}
@@ -191,7 +192,7 @@ func (h *Handler) updateStatus(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
-	status, err := h.updateWorkflowStatus(ctx, user.WorkspaceID, projectID, statusID, input)
+	status, err := h.updateWorkflowStatus(ctx, user.WorkspaceID, projectID, statusID, input, user)
 	if err != nil {
 		h.writeStoreError(w, err, "could not update workflow status")
 		return
@@ -200,7 +201,7 @@ func (h *Handler) updateStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) reorderStatuses(w http.ResponseWriter, r *http.Request) {
-	user, ok := h.requireAdmin(w, r)
+	user, ok := h.requireUser(w, r)
 	if !ok {
 		return
 	}
@@ -220,11 +221,11 @@ func (h *Handler) reorderStatuses(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
-	if err := h.reorderWorkflowStatuses(ctx, user.WorkspaceID, projectID, statusIDs); err != nil {
+	if err := h.reorderWorkflowStatuses(ctx, user.WorkspaceID, projectID, statusIDs, user); err != nil {
 		h.writeStoreError(w, err, "could not reorder workflow statuses")
 		return
 	}
-	workflow, err := h.getWorkflow(ctx, user.WorkspaceID, projectID)
+	workflow, err := h.getWorkflow(ctx, user.WorkspaceID, projectID, user)
 	if err != nil {
 		h.writeStoreError(w, err, "could not load workflow")
 		return
@@ -233,7 +234,7 @@ func (h *Handler) reorderStatuses(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) archiveStatus(w http.ResponseWriter, r *http.Request) {
-	user, ok := h.requireAdmin(w, r)
+	user, ok := h.requireUser(w, r)
 	if !ok {
 		return
 	}
@@ -270,7 +271,7 @@ func (h *Handler) archiveStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) replaceTransitions(w http.ResponseWriter, r *http.Request) {
-	user, ok := h.requireAdmin(w, r)
+	user, ok := h.requireUser(w, r)
 	if !ok {
 		return
 	}
@@ -290,11 +291,11 @@ func (h *Handler) replaceTransitions(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
-	if err := h.replaceWorkflowTransitions(ctx, user.WorkspaceID, projectID, transitions); err != nil {
+	if err := h.replaceWorkflowTransitions(ctx, user.WorkspaceID, projectID, transitions, user); err != nil {
 		h.writeStoreError(w, err, "could not replace workflow transitions")
 		return
 	}
-	workflow, err := h.getWorkflow(ctx, user.WorkspaceID, projectID)
+	workflow, err := h.getWorkflow(ctx, user.WorkspaceID, projectID, user)
 	if err != nil {
 		h.writeStoreError(w, err, "could not load workflow")
 		return
@@ -315,22 +316,12 @@ func (h *Handler) requireUser(w http.ResponseWriter, r *http.Request) (auth.Curr
 	return user, true
 }
 
-func (h *Handler) requireAdmin(w http.ResponseWriter, r *http.Request) (auth.CurrentUser, bool) {
-	user, ok := h.requireUser(w, r)
-	if !ok {
-		return auth.CurrentUser{}, false
-	}
-	if user.Role != "admin" {
-		writeError(w, http.StatusForbidden, "forbidden", "admin role is required")
-		return auth.CurrentUser{}, false
-	}
-	return user, true
-}
-
 func (h *Handler) writeStoreError(w http.ResponseWriter, err error, fallback string) {
 	switch {
 	case errors.Is(err, pgx.ErrNoRows):
 		writeError(w, http.StatusNotFound, "project_not_found", "project was not found")
+	case errors.Is(err, projectaccess.ErrForbidden):
+		writeError(w, http.StatusForbidden, "forbidden", "project lead or workspace admin role is required")
 	case errors.Is(err, errStatusNotFound):
 		writeError(w, http.StatusNotFound, "workflow_status_not_found", "workflow status was not found")
 	case errors.Is(err, errStatusArchived):

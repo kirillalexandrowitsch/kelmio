@@ -137,6 +137,7 @@ func scanSprint(row rowScanner) (sprintResponse, error) {
 func notificationSprintContext(sprint sprintResponse) notifications.SprintContext {
 	return notifications.SprintContext{
 		ID:         sprint.ID,
+		ProjectID:  sprint.ProjectID,
 		Name:       sprint.Name,
 		ProjectKey: sprint.ProjectKey,
 	}

@@ -14,6 +14,7 @@ import (
 
 	"team-task-tracker/backend/internal/auth"
 	"team-task-tracker/backend/internal/notifications"
+	"team-task-tracker/backend/internal/projectaccess"
 )
 
 var uuidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
@@ -140,7 +141,7 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
-	sprints, err := h.listSprints(ctx, user.WorkspaceID, projectID, status)
+	sprints, err := h.listSprints(ctx, user.WorkspaceID, projectID, status, user)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "internal_error", "could not list sprints")
 		return
@@ -172,6 +173,9 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 
 	sprint, err := h.createSprint(ctx, user, input)
 	if err != nil {
+		if h.writeProjectAccessError(w, err) {
+			return
+		}
 		if errors.Is(err, pgx.ErrNoRows) {
 			writeError(w, http.StatusNotFound, "project_not_found", "project was not found")
 			return
@@ -199,7 +203,7 @@ func (h *Handler) get(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
-	sprint, err := h.getSprint(ctx, user.WorkspaceID, sprintID)
+	sprint, err := h.getSprint(ctx, user.WorkspaceID, sprintID, user)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			writeError(w, http.StatusNotFound, "sprint_not_found", "sprint was not found")
@@ -240,8 +244,11 @@ func (h *Handler) update(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
-	sprint, err := h.updateSprint(ctx, user.WorkspaceID, sprintID, input)
+	sprint, err := h.updateSprint(ctx, user.WorkspaceID, sprintID, input, user)
 	if err != nil {
+		if h.writeProjectAccessError(w, err) {
+			return
+		}
 		if errors.Is(err, pgx.ErrNoRows) {
 			writeError(w, http.StatusNotFound, "sprint_not_found", "sprint was not found")
 			return
@@ -275,6 +282,9 @@ func (h *Handler) start(w http.ResponseWriter, r *http.Request) {
 
 	sprint, err := h.startSprint(ctx, user, sprintID)
 	if err != nil {
+		if h.writeProjectAccessError(w, err) {
+			return
+		}
 		if errors.Is(err, pgx.ErrNoRows) {
 			writeError(w, http.StatusNotFound, "sprint_not_found", "sprint was not found")
 			return
@@ -312,6 +322,9 @@ func (h *Handler) complete(w http.ResponseWriter, r *http.Request) {
 
 	sprint, err := h.completeSprint(ctx, user, sprintID)
 	if err != nil {
+		if h.writeProjectAccessError(w, err) {
+			return
+		}
 		if errors.Is(err, pgx.ErrNoRows) {
 			writeError(w, http.StatusNotFound, "sprint_not_found", "sprint was not found")
 			return
@@ -357,6 +370,9 @@ func (h *Handler) addIssue(w http.ResponseWriter, r *http.Request) {
 
 	sprint, err := h.addIssueToSprint(ctx, user, sprintID, issueID)
 	if err != nil {
+		if h.writeProjectAccessError(w, err) {
+			return
+		}
 		if errors.Is(err, pgx.ErrNoRows) {
 			writeError(w, http.StatusNotFound, "sprint_or_issue_not_found", "sprint or issue was not found")
 			return
@@ -399,6 +415,9 @@ func (h *Handler) removeIssue(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	if err := h.removeIssueFromSprint(ctx, user, sprintID, issueID); err != nil {
+		if h.writeProjectAccessError(w, err) {
+			return
+		}
 		if errors.Is(err, pgx.ErrNoRows) {
 			writeError(w, http.StatusNotFound, "sprint_issue_not_found", "sprint issue was not found")
 			return
@@ -415,16 +434,26 @@ func (h *Handler) removeIssue(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (h *Handler) listSprints(ctx context.Context, workspaceID string, projectID string, status string) ([]sprintResponse, error) {
+func (h *Handler) listSprints(ctx context.Context, workspaceID string, projectID string, status string, users ...auth.CurrentUser) ([]sprintResponse, error) {
 	args := []any{workspaceID}
 	conditions := []string{
 		"s.workspace_id = $1",
 		"p.archived_at IS NULL",
 	}
+	if len(users) > 0 {
+		args = append(args, users[0].Role == "admin", users[0].ID)
+		conditions = append(conditions, fmt.Sprintf(`
+			($%d::boolean OR EXISTS (
+				SELECT 1 FROM project_members project_member
+				WHERE project_member.project_id = p.id
+					AND project_member.user_id = $%d
+			))
+		`, len(args)-1, len(args)))
+	}
 
 	if projectID != "" {
 		args = append(args, projectID)
-		conditions = append(conditions, "s.project_id = $2")
+		conditions = append(conditions, fmt.Sprintf("s.project_id = $%d", len(args)))
 	}
 	if status != "" {
 		args = append(args, status)
@@ -515,7 +544,16 @@ func (h *Handler) listSprints(ctx context.Context, workspaceID string, projectID
 }
 
 func (h *Handler) createSprint(ctx context.Context, user auth.CurrentUser, input normalizedCreateSprint) (sprintResponse, error) {
-	sprint, err := scanSprint(h.db.QueryRow(ctx, `
+	tx, err := h.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return sprintResponse{}, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	if _, err := projectaccess.RequireWriteForUpdate(ctx, tx, user, input.ProjectID); err != nil {
+		return sprintResponse{}, err
+	}
+	sprint, err := scanSprint(tx.QueryRow(ctx, `
 		WITH target_project AS (
 			SELECT id, workspace_id
 			FROM projects
@@ -562,15 +600,23 @@ func (h *Handler) createSprint(ctx context.Context, user auth.CurrentUser, input
 	if err != nil {
 		return sprintResponse{}, err
 	}
+	if err := tx.Commit(ctx); err != nil {
+		return sprintResponse{}, err
+	}
 
 	return sprint, nil
 }
 
-func (h *Handler) getSprint(ctx context.Context, workspaceID string, sprintID string) (sprintResponse, error) {
+func (h *Handler) getSprint(ctx context.Context, workspaceID string, sprintID string, users ...auth.CurrentUser) (sprintResponse, error) {
+	if len(users) > 0 {
+		if _, err := projectaccess.RequireSprintRead(ctx, h.db, users[0], sprintID); err != nil {
+			return sprintResponse{}, err
+		}
+	}
 	return getSprintForUpdate(ctx, h.db, workspaceID, sprintID, false)
 }
 
-func (h *Handler) updateSprint(ctx context.Context, workspaceID string, sprintID string, input normalizedUpdateSprint) (sprintResponse, error) {
+func (h *Handler) updateSprint(ctx context.Context, workspaceID string, sprintID string, input normalizedUpdateSprint, users ...auth.CurrentUser) (sprintResponse, error) {
 	tx, err := h.db.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return sprintResponse{}, err
@@ -579,6 +625,11 @@ func (h *Handler) updateSprint(ctx context.Context, workspaceID string, sprintID
 		_ = tx.Rollback(ctx)
 	}()
 
+	if len(users) > 0 {
+		if _, err := projectaccess.RequireSprintWrite(ctx, tx, users[0], sprintID); err != nil {
+			return sprintResponse{}, err
+		}
+	}
 	current, err := getSprintForUpdate(ctx, tx, workspaceID, sprintID, true)
 	if err != nil {
 		return sprintResponse{}, err
@@ -666,6 +717,9 @@ func (h *Handler) startSprint(ctx context.Context, user auth.CurrentUser, sprint
 		_ = tx.Rollback(ctx)
 	}()
 
+	if _, err := projectaccess.RequireSprintWrite(ctx, tx, user, sprintID); err != nil {
+		return sprintResponse{}, err
+	}
 	current, err := getSprintForUpdate(ctx, tx, user.WorkspaceID, sprintID, true)
 	if err != nil {
 		return sprintResponse{}, err
@@ -760,6 +814,9 @@ func (h *Handler) completeSprint(ctx context.Context, user auth.CurrentUser, spr
 		_ = tx.Rollback(ctx)
 	}()
 
+	if _, err := projectaccess.RequireSprintWrite(ctx, tx, user, sprintID); err != nil {
+		return sprintResponse{}, err
+	}
 	current, err := getSprintForUpdate(ctx, tx, user.WorkspaceID, sprintID, true)
 	if err != nil {
 		return sprintResponse{}, err
@@ -851,6 +908,12 @@ func (h *Handler) addIssueToSprint(ctx context.Context, user auth.CurrentUser, s
 		_ = tx.Rollback(ctx)
 	}()
 
+	if _, err := projectaccess.RequireSprintWrite(ctx, tx, user, sprintID); err != nil {
+		return sprintResponse{}, err
+	}
+	if _, err := projectaccess.RequireIssueWrite(ctx, tx, user, issueID); err != nil {
+		return sprintResponse{}, err
+	}
 	sprint, err := getSprintForUpdate(ctx, tx, user.WorkspaceID, sprintID, true)
 	if err != nil {
 		return sprintResponse{}, err
@@ -915,6 +978,12 @@ func (h *Handler) removeIssueFromSprint(ctx context.Context, user auth.CurrentUs
 		_ = tx.Rollback(ctx)
 	}()
 
+	if _, err := projectaccess.RequireSprintWrite(ctx, tx, user, sprintID); err != nil {
+		return err
+	}
+	if _, err := projectaccess.RequireIssueWrite(ctx, tx, user, issueID); err != nil {
+		return err
+	}
 	sprint, err := getSprintForUpdate(ctx, tx, user.WorkspaceID, sprintID, true)
 	if err != nil {
 		return err

@@ -312,6 +312,7 @@ printf 'Checking V2 notifications\n'
 SMOKE_MEMBER_USERNAME="smoke_member_$RUN_ID"
 SMOKE_MEMBER_PASSWORD="smoke12345"
 SMOKE_MEMBER_ID="$(api_post "/api/v1/team/members" "{\"email\":\"$SMOKE_MEMBER_USERNAME@example.com\",\"username\":\"$SMOKE_MEMBER_USERNAME\",\"display_name\":\"Smoke Member $RUN_ID\",\"password\":\"$SMOKE_MEMBER_PASSWORD\",\"role\":\"member\"}" | json_value 'data.id')"
+api_put "/api/v1/projects/$PROJECT_ID/members/$SMOKE_MEMBER_ID" '{"role":"contributor"}' | json_value 'data.role === "contributor"' >/dev/null
 api_post "/api/v1/issues/$BLOCKER_ID/assign" "{\"assignee_id\":\"$SMOKE_MEMBER_ID\"}" | json_value "data.assignee_id === \"$SMOKE_MEMBER_ID\"" >/dev/null
 api_post "/api/v1/issues/$BLOCKER_ID/comments" "{\"body\":\"@$SMOKE_MEMBER_USERNAME Please check this smoke notification.\"}" | json_value "data.body.includes(\"@$SMOKE_MEMBER_USERNAME\")" >/dev/null
 

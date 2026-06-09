@@ -15,6 +15,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"team-task-tracker/backend/internal/auth"
+	"team-task-tracker/backend/internal/projectaccess"
 )
 
 var projectKeyPattern = regexp.MustCompile(`^[A-Z][A-Z0-9]{1,9}$`)
@@ -44,6 +45,9 @@ type projectResponse struct {
 	CreatedBy   string     `json:"created_by"`
 	CreatedAt   time.Time  `json:"created_at"`
 	ArchivedAt  *time.Time `json:"archived_at"`
+	ProjectRole string     `json:"project_role"`
+	CanWrite    bool       `json:"can_write"`
+	CanManage   bool       `json:"can_manage"`
 }
 
 type listProjectsResponse struct {
@@ -76,18 +80,25 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 
 	rows, err := h.db.Query(ctx, `
 		SELECT
-			id::text,
-			key,
-			name,
-			description,
-			created_by::text,
-			created_at,
-			archived_at
-		FROM projects
-		WHERE workspace_id = $1
-			AND archived_at IS NULL
-		ORDER BY created_at DESC
-	`, user.WorkspaceID)
+			project.id::text,
+			project.key,
+			project.name,
+			project.description,
+			project.created_by::text,
+			project.created_at,
+			project.archived_at,
+			COALESCE(project_member.role, ''),
+			($2::boolean OR project_member.role IN ('lead', 'contributor')),
+			($2::boolean OR project_member.role = 'lead')
+		FROM projects project
+		LEFT JOIN project_members project_member
+			ON project_member.project_id = project.id
+			AND project_member.user_id = $3
+		WHERE project.workspace_id = $1
+			AND project.archived_at IS NULL
+			AND ($2::boolean OR project_member.user_id IS NOT NULL)
+		ORDER BY project.created_at DESC
+	`, user.WorkspaceID, user.Role == "admin", user.ID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "internal_error", "could not list projects")
 		return
@@ -105,6 +116,9 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 			&project.CreatedBy,
 			&project.CreatedAt,
 			&project.ArchivedAt,
+			&project.ProjectRole,
+			&project.CanWrite,
+			&project.CanManage,
 		); err != nil {
 			writeError(w, http.StatusInternalServerError, "internal_error", "could not read project")
 			return
@@ -181,6 +195,9 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "internal_error", "could not create project")
 		return
 	}
+	project.ProjectRole = "lead"
+	project.CanWrite = true
+	project.CanManage = true
 
 	writeJSON(w, http.StatusCreated, project)
 }
@@ -200,6 +217,15 @@ func (h *Handler) get(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
+	access, err := projectaccess.RequireRead(ctx, h.db, user, projectID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "project_not_found", "project was not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "internal_error", "could not load project access")
+		return
+	}
 	project, err := h.getProject(ctx, user.WorkspaceID, projectID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -210,6 +236,7 @@ func (h *Handler) get(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "internal_error", "could not load project")
 		return
 	}
+	applyProjectAccess(&project, access)
 
 	writeJSON(w, http.StatusOK, project)
 }
@@ -257,8 +284,20 @@ func (h *Handler) update(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "internal_error", "could not update project")
 		return
 	}
+	access, err := projectaccess.RequireRead(ctx, h.db, user, projectID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "internal_error", "could not load project access")
+		return
+	}
+	applyProjectAccess(&project, access)
 
 	writeJSON(w, http.StatusOK, project)
+}
+
+func applyProjectAccess(project *projectResponse, access projectaccess.Access) {
+	project.ProjectRole = access.ProjectRole
+	project.CanWrite = access.CanWrite
+	project.CanManage = access.CanManage
 }
 
 func (h *Handler) archive(w http.ResponseWriter, r *http.Request) {

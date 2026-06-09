@@ -59,6 +59,7 @@ func scanIssue(row rowScanner) (issueResponse, error) {
 func notificationIssueContext(issue issueResponse) notifications.IssueContext {
 	return notifications.IssueContext{
 		ID:         issue.ID,
+		ProjectID:  issue.ProjectID,
 		IssueKey:   issue.IssueKey,
 		Title:      issue.Title,
 		ReporterID: issue.ReporterID,

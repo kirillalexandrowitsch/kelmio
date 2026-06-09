@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"regexp"
@@ -62,6 +63,7 @@ type Notification struct {
 
 type IssueContext struct {
 	ID         string
+	ProjectID  string
 	IssueKey   string
 	Title      string
 	ReporterID string
@@ -70,6 +72,7 @@ type IssueContext struct {
 
 type SprintContext struct {
 	ID         string
+	ProjectID  string
 	Name       string
 	ProjectKey string
 }
@@ -210,6 +213,7 @@ func (s *Service) List(ctx context.Context, db DBTX, user auth.CurrentUser) ([]N
 }
 
 func (s *Service) ListPage(ctx context.Context, db DBTX, user auth.CurrentUser, page pagination.Params) ([]Notification, *string, error) {
+	accessCondition := notificationAccessCondition("$2", "$3")
 	rows, err := db.Query(ctx, `
 		SELECT
 			n.id::text,
@@ -229,9 +233,10 @@ func (s *Service) ListPage(ctx context.Context, db DBTX, user auth.CurrentUser, 
 		LEFT JOIN issues i ON i.id = n.issue_id
 		WHERE n.workspace_id = $1
 			AND n.user_id = $2
+			AND `+accessCondition+`
 		ORDER BY n.created_at DESC, n.id DESC
-		LIMIT $3 OFFSET $4
-	`, user.WorkspaceID, user.ID, page.Limit+1, page.Offset)
+		LIMIT $4 OFFSET $5
+	`, user.WorkspaceID, user.ID, user.Role == "admin", page.Limit+1, page.Offset)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -257,22 +262,24 @@ func (s *Service) UnreadCount(ctx context.Context, db DBTX, user auth.CurrentUse
 	var count int
 	err := db.QueryRow(ctx, `
 		SELECT COUNT(*)::int
-		FROM notifications
-		WHERE workspace_id = $1
-			AND user_id = $2
-			AND read_at IS NULL
-	`, user.WorkspaceID, user.ID).Scan(&count)
+		FROM notifications n
+		WHERE n.workspace_id = $1
+			AND n.user_id = $2
+			AND n.read_at IS NULL
+			AND `+notificationAccessCondition("$2", "$3")+`
+	`, user.WorkspaceID, user.ID, user.Role == "admin").Scan(&count)
 	return count, err
 }
 
 func (s *Service) MarkRead(ctx context.Context, db DBTX, user auth.CurrentUser, notificationID string) (Notification, error) {
 	return scanNotification(db.QueryRow(ctx, `
 		WITH updated AS (
-			UPDATE notifications
+			UPDATE notifications n
 			SET read_at = COALESCE(read_at, now())
-			WHERE id = $1
-				AND workspace_id = $2
-				AND user_id = $3
+			WHERE n.id = $1
+				AND n.workspace_id = $2
+				AND n.user_id = $3
+				AND `+notificationAccessCondition("$3", "$4")+`
 			RETURNING *
 		)
 		SELECT
@@ -291,22 +298,30 @@ func (s *Service) MarkRead(ctx context.Context, db DBTX, user auth.CurrentUser, 
 		FROM updated
 		LEFT JOIN users actor ON actor.id = updated.actor_id
 		LEFT JOIN issues i ON i.id = updated.issue_id
-	`, notificationID, user.WorkspaceID, user.ID))
+	`, notificationID, user.WorkspaceID, user.ID, user.Role == "admin"))
 }
 
 func (s *Service) MarkAllRead(ctx context.Context, db DBTX, user auth.CurrentUser) error {
 	_, err := db.Exec(ctx, `
-		UPDATE notifications
+		UPDATE notifications n
 		SET read_at = COALESCE(read_at, now())
-		WHERE workspace_id = $1
-			AND user_id = $2
-			AND read_at IS NULL
-	`, user.WorkspaceID, user.ID)
+		WHERE n.workspace_id = $1
+			AND n.user_id = $2
+			AND n.read_at IS NULL
+			AND `+notificationAccessCondition("$2", "$3")+`
+	`, user.WorkspaceID, user.ID, user.Role == "admin")
 	return err
 }
 
 func (s *Service) NotifyIssueAssigned(ctx context.Context, db DBTX, workspaceID string, actorID string, issue IssueContext, assigneeID string) error {
 	if assigneeID == "" || assigneeID == actorID {
+		return nil
+	}
+	canRead, err := userCanReadProject(ctx, db, workspaceID, issue.ProjectID, assigneeID)
+	if err != nil {
+		return err
+	}
+	if !canRead {
 		return nil
 	}
 
@@ -328,13 +343,20 @@ func (s *Service) NotifyIssueComment(ctx context.Context, db DBTX, workspaceID s
 		return err
 	}
 
-	mentionedUserIDs, err := mentionedWorkspaceUserIDs(ctx, db, workspaceID, body)
+	mentionedUserIDs, err := mentionedWorkspaceUserIDs(ctx, db, workspaceID, issue.ProjectID, body)
 	if err != nil {
 		return err
 	}
 
 	recipients := commentNotificationRecipients(actorID, issue.ReporterID, issue.AssigneeID, mentionedUserIDs)
 	for _, recipient := range recipients {
+		canRead, err := userCanReadProject(ctx, db, workspaceID, issue.ProjectID, recipient.UserID)
+		if err != nil {
+			return err
+		}
+		if !canRead {
+			continue
+		}
 		payload := issuePayload(issue, map[string]string{
 			"comment_id": commentID,
 			"preview":    commentPreview(body),
@@ -371,8 +393,17 @@ func (s *Service) NotifySprintEvent(ctx context.Context, db DBTX, workspaceID st
 		WHERE wm.workspace_id = $1
 			AND u.is_active = true
 			AND u.id <> $2
+			AND (
+				wm.role = 'admin'
+				OR EXISTS (
+					SELECT 1
+					FROM project_members project_member
+					WHERE project_member.project_id = $3
+						AND project_member.user_id = wm.user_id
+				)
+			)
 		ORDER BY u.id
-	`, workspaceID, actorID)
+	`, workspaceID, actorID, sprint.ProjectID)
 	if err != nil {
 		return err
 	}
@@ -395,6 +426,7 @@ func (s *Service) NotifySprintEvent(ctx context.Context, db DBTX, workspaceID st
 	payload := map[string]string{
 		"sprint_id":   sprint.ID,
 		"sprint_name": sprint.Name,
+		"project_id":  sprint.ProjectID,
 		"project_key": sprint.ProjectKey,
 	}
 	if notificationType == TypeSprintStarted {
@@ -498,7 +530,7 @@ func commentNotificationRecipients(actorID string, reporterID string, assigneeID
 	return recipients
 }
 
-func mentionedWorkspaceUserIDs(ctx context.Context, db DBTX, workspaceID string, body string) ([]string, error) {
+func mentionedWorkspaceUserIDs(ctx context.Context, db DBTX, workspaceID string, projectID string, body string) ([]string, error) {
 	usernames := mentionUsernames(body)
 	if len(usernames) == 0 {
 		return nil, nil
@@ -511,8 +543,17 @@ func mentionedWorkspaceUserIDs(ctx context.Context, db DBTX, workspaceID string,
 		WHERE wm.workspace_id = $1
 			AND u.is_active = true
 			AND lower(u.username) = ANY($2)
+			AND (
+				wm.role = 'admin'
+				OR EXISTS (
+					SELECT 1
+					FROM project_members project_member
+					WHERE project_member.project_id = $3
+						AND project_member.user_id = wm.user_id
+				)
+			)
 		ORDER BY u.id
-	`, workspaceID, usernames)
+	`, workspaceID, usernames, projectID)
 	if err != nil {
 		return nil, err
 	}
@@ -536,6 +577,7 @@ func issueContext(ctx context.Context, db DBTX, workspaceID string, issueID stri
 	if err := db.QueryRow(ctx, `
 		SELECT
 			i.id::text,
+			i.project_id::text,
 			i.issue_key,
 			i.title,
 			i.reporter_id::text,
@@ -548,6 +590,7 @@ func issueContext(ctx context.Context, db DBTX, workspaceID string, issueID stri
 			AND i.archived_at IS NULL
 	`, issueID, workspaceID).Scan(
 		&issue.ID,
+		&issue.ProjectID,
 		&issue.IssueKey,
 		&issue.Title,
 		&issue.ReporterID,
@@ -564,6 +607,7 @@ func issueContext(ctx context.Context, db DBTX, workspaceID string, issueID stri
 
 func issuePayload(issue IssueContext, values map[string]string) map[string]string {
 	payload := map[string]string{
+		"project_id":  issue.ProjectID,
 		"issue_key":   issue.IssueKey,
 		"issue_title": issue.Title,
 	}
@@ -571,6 +615,72 @@ func issuePayload(issue IssueContext, values map[string]string) map[string]strin
 		payload[key] = value
 	}
 	return payload
+}
+
+func notificationAccessCondition(userPlaceholder string, adminPlaceholder string) string {
+	return fmt.Sprintf(`
+		(
+			%s::boolean
+			OR (
+				n.issue_id IS NOT NULL
+				AND EXISTS (
+					SELECT 1
+					FROM issues access_issue
+					JOIN projects access_project ON access_project.id = access_issue.project_id
+					JOIN project_members access_member ON access_member.project_id = access_project.id
+					WHERE access_issue.id = n.issue_id
+						AND access_issue.archived_at IS NULL
+						AND access_project.archived_at IS NULL
+						AND access_member.user_id = %s
+				)
+			)
+			OR (
+				n.notification_type IN ('sprint_started', 'sprint_completed')
+				AND EXISTS (
+					SELECT 1
+					FROM projects access_project
+					JOIN project_members access_member ON access_member.project_id = access_project.id
+					WHERE access_project.workspace_id = n.workspace_id
+						AND access_project.archived_at IS NULL
+						AND access_member.user_id = %s
+						AND (
+							access_project.id::text = n.payload->>'project_id'
+							OR access_project.key = n.payload->>'project_key'
+						)
+				)
+			)
+		)
+	`, adminPlaceholder, userPlaceholder, userPlaceholder)
+}
+
+func userCanReadProject(
+	ctx context.Context,
+	db DBTX,
+	workspaceID string,
+	projectID string,
+	userID string,
+) (bool, error) {
+	var canRead bool
+	err := db.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1
+			FROM projects project
+			JOIN workspace_members workspace_member
+				ON workspace_member.workspace_id = project.workspace_id
+				AND workspace_member.user_id = $3
+			JOIN users app_user
+				ON app_user.id = workspace_member.user_id
+				AND app_user.is_active = true
+			LEFT JOIN project_members project_member
+				ON project_member.project_id = project.id
+				AND project_member.user_id = workspace_member.user_id
+			WHERE project.id = $2
+				AND project.workspace_id = $1
+				AND project.archived_at IS NULL
+				AND (workspace_member.role = 'admin' OR project_member.user_id IS NOT NULL)
+		)
+	`, workspaceID, projectID, userID).Scan(&canRead)
+	return canRead, err
 }
 
 func commentPreview(body string) string {

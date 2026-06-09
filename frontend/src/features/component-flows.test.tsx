@@ -27,6 +27,9 @@ const project: Project = {
   created_by: "admin-1",
   created_at: "2026-06-07T00:00:00Z",
   archived_at: null,
+  project_role: "lead",
+  can_write: true,
+  can_manage: true,
 };
 
 const admin: CurrentUser = {

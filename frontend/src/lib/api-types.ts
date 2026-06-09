@@ -32,6 +32,9 @@ export type Project = {
   created_by: string;
   created_at: string;
   archived_at: string | null;
+  project_role: "lead" | "contributor" | "viewer" | "";
+  can_write: boolean;
+  can_manage: boolean;
 };
 
 export type TeamMember = {

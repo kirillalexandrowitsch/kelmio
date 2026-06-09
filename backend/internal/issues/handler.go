@@ -16,6 +16,7 @@ import (
 	"team-task-tracker/backend/internal/auth"
 	"team-task-tracker/backend/internal/notifications"
 	"team-task-tracker/backend/internal/pagination"
+	"team-task-tracker/backend/internal/projectaccess"
 )
 
 var validIssueTypes = map[string]bool{
@@ -289,7 +290,7 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
-	issues, nextCursor, err := h.listIssuesPage(ctx, user.WorkspaceID, r.URL.Query(), page)
+	issues, nextCursor, err := h.listIssuesPage(ctx, user.WorkspaceID, r.URL.Query(), page, user)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "internal_error", "could not list issues")
 		return
@@ -321,6 +322,9 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 
 	issue, err := h.createIssue(ctx, user, input)
 	if err != nil {
+		if h.writeProjectAccessError(w, err) {
+			return
+		}
 		if errors.Is(err, pgx.ErrNoRows) {
 			writeError(w, http.StatusNotFound, "project_not_found", "project was not found")
 			return
@@ -360,7 +364,7 @@ func (h *Handler) get(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
-	issue, err := h.getIssue(ctx, user.WorkspaceID, issueID)
+	issue, err := h.getIssue(ctx, user.WorkspaceID, issueID, user)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			writeError(w, http.StatusNotFound, "issue_not_found", "issue was not found")
@@ -403,6 +407,9 @@ func (h *Handler) update(w http.ResponseWriter, r *http.Request) {
 
 	issue, err := h.updateIssue(ctx, user, issueID, input)
 	if err != nil {
+		if h.writeProjectAccessError(w, err) {
+			return
+		}
 		if errors.Is(err, pgx.ErrNoRows) {
 			writeError(w, http.StatusNotFound, "issue_not_found", "issue was not found")
 			return
@@ -438,7 +445,7 @@ func (h *Handler) listChildren(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
-	if _, err := h.getIssue(ctx, user.WorkspaceID, issueID); err != nil {
+	if _, err := h.getIssue(ctx, user.WorkspaceID, issueID, user); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			writeError(w, http.StatusNotFound, "issue_not_found", "issue was not found")
 			return
@@ -448,7 +455,7 @@ func (h *Handler) listChildren(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	children, err := h.listIssueChildren(ctx, user.WorkspaceID, issueID)
+	children, err := h.listIssueChildren(ctx, user.WorkspaceID, issueID, user)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "internal_error", "could not list child issues")
 		return
@@ -478,7 +485,7 @@ func (h *Handler) createSubtask(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
-	parent, err := h.getIssue(ctx, user.WorkspaceID, parentIssueID)
+	parent, err := h.getIssue(ctx, user.WorkspaceID, parentIssueID, user)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			writeError(w, http.StatusNotFound, "issue_not_found", "parent issue was not found")
@@ -497,6 +504,9 @@ func (h *Handler) createSubtask(w http.ResponseWriter, r *http.Request) {
 
 	issue, err := h.createIssue(ctx, user, input)
 	if err != nil {
+		if h.writeProjectAccessError(w, err) {
+			return
+		}
 		if errors.Is(err, pgx.ErrNoRows) {
 			writeError(w, http.StatusNotFound, "issue_not_found", "parent issue was not found")
 			return
@@ -550,6 +560,9 @@ func (h *Handler) setParent(w http.ResponseWriter, r *http.Request) {
 
 	issue, err := h.setIssueParent(ctx, user, issueID, parentIssueID)
 	if err != nil {
+		if h.writeProjectAccessError(w, err) {
+			return
+		}
 		if errors.Is(err, pgx.ErrNoRows) {
 			writeError(w, http.StatusNotFound, "issue_not_found", "issue was not found")
 			return
@@ -593,7 +606,7 @@ func (h *Handler) listLinks(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
-	if _, err := h.getIssue(ctx, user.WorkspaceID, issueID); err != nil {
+	if _, err := h.getIssue(ctx, user.WorkspaceID, issueID, user); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			writeError(w, http.StatusNotFound, "issue_not_found", "issue was not found")
 			return
@@ -603,7 +616,7 @@ func (h *Handler) listLinks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	links, err := h.listIssueLinks(ctx, user.WorkspaceID, issueID)
+	links, err := h.listIssueLinks(ctx, user.WorkspaceID, issueID, user)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "internal_error", "could not list issue links")
 		return
@@ -641,6 +654,9 @@ func (h *Handler) createLink(w http.ResponseWriter, r *http.Request) {
 
 	link, err := h.createIssueLink(ctx, user, issueID, input)
 	if err != nil {
+		if h.writeProjectAccessError(w, err) {
+			return
+		}
 		if errors.Is(err, pgx.ErrNoRows) {
 			writeError(w, http.StatusNotFound, "issue_not_found", "issue was not found")
 			return
@@ -686,7 +702,7 @@ func (h *Handler) deleteLink(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
-	if _, err := h.getIssue(ctx, user.WorkspaceID, issueID); err != nil {
+	if _, err := h.getIssue(ctx, user.WorkspaceID, issueID, user); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			writeError(w, http.StatusNotFound, "issue_not_found", "issue was not found")
 			return
@@ -697,6 +713,9 @@ func (h *Handler) deleteLink(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.deleteIssueLink(ctx, user, issueID, linkID); err != nil {
+		if h.writeProjectAccessError(w, err) {
+			return
+		}
 		if errors.Is(err, pgx.ErrNoRows) {
 			writeError(w, http.StatusNotFound, "link_not_found", "issue link was not found")
 			return
@@ -738,6 +757,9 @@ func (h *Handler) transition(w http.ResponseWriter, r *http.Request) {
 
 	issue, err := h.transitionIssueStatus(ctx, user, issueID, status)
 	if err != nil {
+		if h.writeProjectAccessError(w, err) {
+			return
+		}
 		if errors.Is(err, pgx.ErrNoRows) {
 			writeError(w, http.StatusNotFound, "issue_not_found", "issue was not found")
 			return
@@ -779,6 +801,9 @@ func (h *Handler) assign(w http.ResponseWriter, r *http.Request) {
 
 	issue, err := h.assignIssue(ctx, user, issueID, assigneeID)
 	if err != nil {
+		if h.writeProjectAccessError(w, err) {
+			return
+		}
 		if errors.Is(err, pgx.ErrNoRows) {
 			writeError(w, http.StatusNotFound, "issue_not_found", "issue was not found")
 			return
@@ -824,6 +849,9 @@ func (h *Handler) setLabels(w http.ResponseWriter, r *http.Request) {
 
 	issue, err := h.setIssueLabels(ctx, user, issueID, labelIDs)
 	if err != nil {
+		if h.writeProjectAccessError(w, err) {
+			return
+		}
 		if errors.Is(err, pgx.ErrNoRows) {
 			writeError(w, http.StatusNotFound, "issue_not_found", "issue was not found")
 			return
@@ -856,6 +884,9 @@ func (h *Handler) archive(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	if err := h.archiveIssue(ctx, user, issueID); err != nil {
+		if h.writeProjectAccessError(w, err) {
+			return
+		}
 		if errors.Is(err, pgx.ErrNoRows) {
 			writeError(w, http.StatusNotFound, "issue_not_found", "issue was not found")
 			return
@@ -883,6 +914,14 @@ func (h *Handler) listComments(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
+	if _, err := h.getIssue(ctx, user.WorkspaceID, issueID, user); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "issue_not_found", "issue was not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "internal_error", "could not load issue")
+		return
+	}
 	comments, err := h.listIssueComments(ctx, user.WorkspaceID, issueID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "internal_error", "could not list comments")
@@ -921,6 +960,9 @@ func (h *Handler) createComment(w http.ResponseWriter, r *http.Request) {
 
 	comment, err := h.createIssueComment(ctx, user, issueID, body)
 	if err != nil {
+		if h.writeProjectAccessError(w, err) {
+			return
+		}
 		if errors.Is(err, pgx.ErrNoRows) {
 			writeError(w, http.StatusNotFound, "issue_not_found", "issue was not found")
 			return
@@ -968,6 +1010,9 @@ func (h *Handler) updateComment(w http.ResponseWriter, r *http.Request) {
 
 	comment, err := h.updateIssueComment(ctx, user, issueID, commentID, body)
 	if err != nil {
+		if h.writeProjectAccessError(w, err) {
+			return
+		}
 		if errors.Is(err, pgx.ErrNoRows) {
 			writeError(w, http.StatusNotFound, "comment_not_found", "comment was not found")
 			return
@@ -1006,6 +1051,9 @@ func (h *Handler) deleteComment(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	if err := h.deleteIssueComment(ctx, user, issueID, commentID); err != nil {
+		if h.writeProjectAccessError(w, err) {
+			return
+		}
 		if errors.Is(err, pgx.ErrNoRows) {
 			writeError(w, http.StatusNotFound, "comment_not_found", "comment was not found")
 			return
@@ -1062,6 +1110,9 @@ func (h *Handler) updateCommentByID(w http.ResponseWriter, r *http.Request) {
 
 	comment, err := h.updateIssueComment(ctx, user, issueID, commentID, body)
 	if err != nil {
+		if h.writeProjectAccessError(w, err) {
+			return
+		}
 		if errors.Is(err, pgx.ErrNoRows) {
 			writeError(w, http.StatusNotFound, "comment_not_found", "comment was not found")
 			return
@@ -1105,6 +1156,9 @@ func (h *Handler) deleteCommentByID(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.deleteIssueComment(ctx, user, issueID, commentID); err != nil {
+		if h.writeProjectAccessError(w, err) {
+			return
+		}
 		if errors.Is(err, pgx.ErrNoRows) {
 			writeError(w, http.StatusNotFound, "comment_not_found", "comment was not found")
 			return
@@ -1142,7 +1196,7 @@ func (h *Handler) listActivity(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
-	if _, err := h.getIssue(ctx, user.WorkspaceID, issueID); err != nil {
+	if _, err := h.getIssue(ctx, user.WorkspaceID, issueID, user); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			writeError(w, http.StatusNotFound, "issue_not_found", "issue was not found")
 			return
@@ -1166,12 +1220,40 @@ func (h *Handler) listIssues(ctx context.Context, workspaceID string, query map[
 	return issues, err
 }
 
-func (h *Handler) listIssuesPage(ctx context.Context, workspaceID string, query map[string][]string, page pagination.Params) ([]issueResponse, *string, error) {
+func (h *Handler) listIssuesPage(ctx context.Context, workspaceID string, query map[string][]string, page pagination.Params, users ...auth.CurrentUser) ([]issueResponse, *string, error) {
 	args := []any{workspaceID}
 	conditions := []string{
 		"p.workspace_id = $1",
 		"p.archived_at IS NULL",
 		"i.archived_at IS NULL",
+	}
+	parentIssueIDColumn := "i.parent_issue_id::text"
+	if len(users) > 0 {
+		args = append(args, users[0].Role == "admin", users[0].ID)
+		conditions = append(conditions, fmt.Sprintf(`
+			($%d::boolean OR EXISTS (
+				SELECT 1
+				FROM project_members project_member
+				WHERE project_member.project_id = p.id
+					AND project_member.user_id = $%d
+			))
+		`, len(args)-1, len(args)))
+		parentIssueIDColumn = fmt.Sprintf(`
+			CASE
+				WHEN i.parent_issue_id IS NULL THEN NULL
+				WHEN $%d::boolean OR EXISTS (
+					SELECT 1
+					FROM issues parent_issue
+					JOIN projects parent_project ON parent_project.id = parent_issue.project_id
+					JOIN project_members parent_member ON parent_member.project_id = parent_project.id
+						AND parent_member.user_id = $%d
+					WHERE parent_issue.id = i.parent_issue_id
+						AND parent_issue.archived_at IS NULL
+						AND parent_project.archived_at IS NULL
+				) THEN i.parent_issue_id::text
+				ELSE NULL
+			END
+		`, len(args)-1, len(args))
 	}
 
 	addFilter := func(column string, value string) {
@@ -1247,7 +1329,7 @@ func (h *Handler) listIssuesPage(ctx context.Context, workspaceID string, query 
 			i.story_points,
 			i.reporter_id::text,
 			i.assignee_id::text,
-			i.parent_issue_id::text,
+			%s,
 			i.sprint_id::text,
 			i.due_date::text,
 			i.created_at,
@@ -1273,7 +1355,7 @@ func (h *Handler) listIssuesPage(ctx context.Context, workspaceID string, query 
 		WHERE %s
 		ORDER BY %s
 		LIMIT $%d OFFSET $%d
-	`, strings.Join(conditions, " AND "), orderClause, limitPlaceholder, offsetPlaceholder)
+	`, parentIssueIDColumn, strings.Join(conditions, " AND "), orderClause, limitPlaceholder, offsetPlaceholder)
 
 	rows, err := h.db.Query(ctx, sql, args...)
 	if err != nil {
@@ -1308,8 +1390,13 @@ var errInvalidIssueLinkTarget = errors.New("invalid issue link target")
 var errIssueLinkSelf = errors.New("issue link self")
 var errIssueLinkDuplicate = errors.New("issue link duplicate")
 
-func (h *Handler) getIssue(ctx context.Context, workspaceID string, issueID string) (issueResponse, error) {
-	return scanIssue(h.db.QueryRow(ctx, `
+func (h *Handler) getIssue(ctx context.Context, workspaceID string, issueID string, users ...auth.CurrentUser) (issueResponse, error) {
+	if len(users) > 0 {
+		if _, err := projectaccess.RequireIssueRead(ctx, h.db, users[0], issueID); err != nil {
+			return issueResponse{}, err
+		}
+	}
+	issue, err := scanIssue(h.db.QueryRow(ctx, `
 		SELECT
 			i.id::text,
 			i.project_id::text,
@@ -1352,6 +1439,17 @@ func (h *Handler) getIssue(ctx context.Context, workspaceID string, issueID stri
 		AND p.archived_at IS NULL
 		AND i.archived_at IS NULL
 	`, issueID, workspaceID))
+	if err != nil || len(users) == 0 || issue.ParentIssueID == nil {
+		return issue, err
+	}
+	if _, err := projectaccess.RequireIssueRead(ctx, h.db, users[0], *issue.ParentIssueID); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			issue.ParentIssueID = nil
+			return issue, nil
+		}
+		return issueResponse{}, err
+	}
+	return issue, nil
 }
 
 func (h *Handler) createIssue(ctx context.Context, user auth.CurrentUser, input normalizedCreateIssue) (issueResponse, error) {
@@ -1363,6 +1461,9 @@ func (h *Handler) createIssue(ctx context.Context, user auth.CurrentUser, input 
 		_ = tx.Rollback(ctx)
 	}()
 
+	if _, err := projectaccess.RequireWriteForUpdate(ctx, tx, user, input.ProjectID); err != nil {
+		return issueResponse{}, err
+	}
 	var projectKey string
 	if err := tx.QueryRow(ctx, `
 		SELECT key
@@ -1375,7 +1476,7 @@ func (h *Handler) createIssue(ctx context.Context, user auth.CurrentUser, input 
 		return issueResponse{}, err
 	}
 
-	if err := verifyActiveWorkspaceMember(ctx, tx, user.WorkspaceID, input.AssigneeID); err != nil {
+	if err := verifyActiveProjectMember(ctx, tx, user, input.ProjectID, input.AssigneeID); err != nil {
 		return issueResponse{}, err
 	}
 
@@ -1383,7 +1484,7 @@ func (h *Handler) createIssue(ctx context.Context, user auth.CurrentUser, input 
 		return issueResponse{}, err
 	}
 
-	if err := verifyIssueParent(ctx, tx, user.WorkspaceID, "", input.ParentIssueID); err != nil {
+	if err := verifyIssueParent(ctx, tx, user, "", input.ParentIssueID); err != nil {
 		return issueResponse{}, err
 	}
 
@@ -1499,6 +1600,9 @@ func (h *Handler) updateIssue(ctx context.Context, user auth.CurrentUser, issueI
 		_ = tx.Rollback(ctx)
 	}()
 
+	if _, err := projectaccess.RequireIssueWrite(ctx, tx, user, issueID); err != nil {
+		return issueResponse{}, err
+	}
 	previous, err := scanIssue(tx.QueryRow(ctx, `
 		SELECT
 			i.id::text,
@@ -1630,7 +1734,20 @@ func (h *Handler) updateIssue(ctx context.Context, user auth.CurrentUser, issueI
 	return issue, nil
 }
 
-func (h *Handler) listIssueChildren(ctx context.Context, workspaceID string, issueID string) ([]issueResponse, error) {
+func (h *Handler) listIssueChildren(ctx context.Context, workspaceID string, issueID string, users ...auth.CurrentUser) ([]issueResponse, error) {
+	args := []any{issueID, workspaceID}
+	accessCondition := ""
+	if len(users) > 0 {
+		args = append(args, users[0].Role == "admin", users[0].ID)
+		accessCondition = `
+			AND ($3::boolean OR EXISTS (
+				SELECT 1
+				FROM project_members project_member
+				WHERE project_member.project_id = p.id
+					AND project_member.user_id = $4
+			))
+		`
+	}
 	rows, err := h.db.Query(ctx, `
 		SELECT
 			i.id::text,
@@ -1673,9 +1790,10 @@ func (h *Handler) listIssueChildren(ctx context.Context, workspaceID string, iss
 			AND p.workspace_id = $2
 			AND p.archived_at IS NULL
 			AND i.archived_at IS NULL
+			`+accessCondition+`
 		ORDER BY i.number ASC
 		LIMIT 100
-	`, issueID, workspaceID)
+	`, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -1707,6 +1825,9 @@ func (h *Handler) setIssueParent(ctx context.Context, user auth.CurrentUser, iss
 		_ = tx.Rollback(ctx)
 	}()
 
+	if _, err := projectaccess.RequireIssueWrite(ctx, tx, user, issueID); err != nil {
+		return issueResponse{}, err
+	}
 	previous, err := scanIssue(tx.QueryRow(ctx, `
 		SELECT
 			i.id::text,
@@ -1770,7 +1891,7 @@ func (h *Handler) setIssueParent(ctx context.Context, user auth.CurrentUser, iss
 		return previous, nil
 	}
 
-	if err := verifyIssueParent(ctx, tx, user.WorkspaceID, issueID, parentIssueID); err != nil {
+	if err := verifyIssueParent(ctx, tx, user, issueID, parentIssueID); err != nil {
 		return issueResponse{}, err
 	}
 
@@ -1843,7 +1964,26 @@ func (h *Handler) setIssueParent(ctx context.Context, user auth.CurrentUser, iss
 	return issue, nil
 }
 
-func (h *Handler) listIssueLinks(ctx context.Context, workspaceID string, issueID string) ([]issueLinkResponse, error) {
+func (h *Handler) listIssueLinks(ctx context.Context, workspaceID string, issueID string, users ...auth.CurrentUser) ([]issueLinkResponse, error) {
+	args := []any{issueID, workspaceID}
+	accessCondition := ""
+	if len(users) > 0 {
+		args = append(args, users[0].Role == "admin", users[0].ID)
+		accessCondition = `
+			AND ($3::boolean OR (
+				EXISTS (
+					SELECT 1 FROM project_members source_member
+					WHERE source_member.project_id = source_project.id
+						AND source_member.user_id = $4
+				)
+				AND EXISTS (
+					SELECT 1 FROM project_members target_member
+					WHERE target_member.project_id = target_project.id
+						AND target_member.user_id = $4
+				)
+			))
+		`
+	}
 	rows, err := h.db.Query(ctx, `
 		SELECT
 			il.id::text,
@@ -1876,9 +2016,10 @@ func (h *Handler) listIssueLinks(ctx context.Context, workspaceID string, issueI
 			AND target_project.archived_at IS NULL
 			AND source_issue.archived_at IS NULL
 			AND target_issue.archived_at IS NULL
+			`+accessCondition+`
 		ORDER BY il.created_at DESC, il.id DESC
 		LIMIT 100
-	`, issueID, workspaceID)
+	`, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -1914,6 +2055,15 @@ func (h *Handler) createIssueLink(ctx context.Context, user auth.CurrentUser, so
 		_ = tx.Rollback(ctx)
 	}()
 
+	if _, err := projectaccess.RequireIssueWrite(ctx, tx, user, sourceIssueID); err != nil {
+		return issueLinkResponse{}, err
+	}
+	if _, err := projectaccess.RequireIssueWrite(ctx, tx, user, input.TargetIssueID); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return issueLinkResponse{}, errInvalidIssueLinkTarget
+		}
+		return issueLinkResponse{}, err
+	}
 	if _, err := getIssueInTx(ctx, tx, user.WorkspaceID, sourceIssueID); err != nil {
 		return issueLinkResponse{}, err
 	}
@@ -1969,8 +2119,18 @@ func (h *Handler) deleteIssueLink(ctx context.Context, user auth.CurrentUser, is
 		_ = tx.Rollback(ctx)
 	}()
 
+	if _, err := projectaccess.RequireIssueWrite(ctx, tx, user, issueID); err != nil {
+		return err
+	}
 	link, err := getIssueLinkForIssueInTx(ctx, tx, user.WorkspaceID, issueID, linkID)
 	if err != nil {
+		return err
+	}
+	otherIssueID := link.SourceIssueID
+	if otherIssueID == issueID {
+		otherIssueID = link.TargetIssueID
+	}
+	if _, err := projectaccess.RequireIssueWrite(ctx, tx, user, otherIssueID); err != nil {
 		return err
 	}
 
@@ -1997,6 +2157,9 @@ func (h *Handler) transitionIssueStatus(ctx context.Context, user auth.CurrentUs
 		_ = tx.Rollback(ctx)
 	}()
 
+	if _, err := projectaccess.RequireIssueWrite(ctx, tx, user, issueID); err != nil {
+		return issueResponse{}, err
+	}
 	var previousStatus string
 	if err := tx.QueryRow(ctx, `
 		SELECT i.status
@@ -2086,6 +2249,10 @@ func (h *Handler) assignIssue(ctx context.Context, user auth.CurrentUser, issueI
 		_ = tx.Rollback(ctx)
 	}()
 
+	access, err := projectaccess.RequireIssueWrite(ctx, tx, user, issueID)
+	if err != nil {
+		return issueResponse{}, err
+	}
 	var previousAssigneeID pgtype.Text
 	if err := tx.QueryRow(ctx, `
 		SELECT i.assignee_id::text
@@ -2100,7 +2267,7 @@ func (h *Handler) assignIssue(ctx context.Context, user auth.CurrentUser, issueI
 		return issueResponse{}, err
 	}
 
-	if err := verifyActiveWorkspaceMember(ctx, tx, user.WorkspaceID, assigneeID); err != nil {
+	if err := verifyActiveProjectMember(ctx, tx, user, access.ProjectID, assigneeID); err != nil {
 		return issueResponse{}, err
 	}
 
@@ -2191,6 +2358,9 @@ func (h *Handler) setIssueLabels(ctx context.Context, user auth.CurrentUser, iss
 		_ = tx.Rollback(ctx)
 	}()
 
+	if _, err := projectaccess.RequireIssueWrite(ctx, tx, user, issueID); err != nil {
+		return issueResponse{}, err
+	}
 	var lockedIssueID string
 	if err := tx.QueryRow(ctx, `
 		SELECT i.id::text
@@ -2315,6 +2485,9 @@ func (h *Handler) archiveIssue(ctx context.Context, user auth.CurrentUser, issue
 		_ = tx.Rollback(ctx)
 	}()
 
+	if _, err := projectaccess.RequireIssueWrite(ctx, tx, user, issueID); err != nil {
+		return err
+	}
 	var archivedIssueID string
 	var issueKey string
 	if err := tx.QueryRow(ctx, `
@@ -2393,6 +2566,9 @@ func (h *Handler) createIssueComment(ctx context.Context, user auth.CurrentUser,
 		_ = tx.Rollback(ctx)
 	}()
 
+	if _, err := projectaccess.RequireIssueWrite(ctx, tx, user, issueID); err != nil {
+		return issueCommentResponse{}, err
+	}
 	comment, err := scanIssueComment(tx.QueryRow(ctx, `
 		WITH target_issue AS (
 			SELECT i.id
@@ -2471,6 +2647,9 @@ func (h *Handler) updateIssueComment(ctx context.Context, user auth.CurrentUser,
 		_ = tx.Rollback(ctx)
 	}()
 
+	if _, err := projectaccess.RequireIssueWrite(ctx, tx, user, issueID); err != nil {
+		return issueCommentResponse{}, err
+	}
 	var authorID string
 	if err := tx.QueryRow(ctx, `
 		SELECT c.author_id::text
@@ -2534,6 +2713,9 @@ func (h *Handler) deleteIssueComment(ctx context.Context, user auth.CurrentUser,
 		_ = tx.Rollback(ctx)
 	}()
 
+	if _, err := projectaccess.RequireIssueWrite(ctx, tx, user, issueID); err != nil {
+		return err
+	}
 	var authorID string
 	var body string
 	if err := tx.QueryRow(ctx, `
@@ -2638,4 +2820,12 @@ func (h *Handler) requireUser(w http.ResponseWriter, r *http.Request) (auth.Curr
 	}
 
 	return user, true
+}
+
+func (h *Handler) writeProjectAccessError(w http.ResponseWriter, err error) bool {
+	if !errors.Is(err, projectaccess.ErrForbidden) {
+		return false
+	}
+	writeError(w, http.StatusForbidden, "forbidden", "project write access is required")
+	return true
 }

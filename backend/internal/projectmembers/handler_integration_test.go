@@ -213,8 +213,8 @@ func TestProjectMemberHTTPPermissionsIntegration(t *testing.T) {
 		t.Fatalf("admin delete status = %d, want 204: %s", response.Code, response.Body.String())
 	}
 	response = performProjectMemberRequest(mux, http.MethodGet, "/api/v1/projects/"+users.ProjectID+"/members", "", viewerCookies)
-	if response.Code != http.StatusForbidden {
-		t.Fatalf("nonmember list status = %d, want 403: %s", response.Code, response.Body.String())
+	if response.Code != http.StatusNotFound {
+		t.Fatalf("nonmember list status = %d, want 404: %s", response.Code, response.Body.String())
 	}
 	if _, err := db.Exec(ctx, `UPDATE projects SET archived_at = now() WHERE id = $1`, users.ProjectID); err != nil {
 		t.Fatalf("archive project: %v", err)

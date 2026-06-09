@@ -247,6 +247,15 @@ test("V2 browser smoke: notifications", async ({ page }) => {
       `V2 Notifications ${runId}`,
     );
     projectId = project.id;
+    await expectOk(
+      await page.request.put(
+        `${apiBaseURL}/api/v1/projects/${project.id}/members/${member.id}`,
+        {
+          headers: await csrfHeaders(page),
+          data: { role: "contributor" },
+        },
+      ),
+    );
     const issue = await createIssueViaApi(page, {
       project_id: project.id,
       title: `V2 notification issue ${runId}`,

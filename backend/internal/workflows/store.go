@@ -10,14 +10,19 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 
 	"team-task-tracker/backend/internal/auth"
+	"team-task-tracker/backend/internal/projectaccess"
 )
 
 type rowScanner interface {
 	Scan(dest ...any) error
 }
 
-func (h *Handler) getWorkflow(ctx context.Context, workspaceID string, projectID string) (workflowResponse, error) {
-	if err := h.requireActiveProject(ctx, h.db, workspaceID, projectID, false); err != nil {
+func (h *Handler) getWorkflow(ctx context.Context, workspaceID string, projectID string, users ...auth.CurrentUser) (workflowResponse, error) {
+	if len(users) > 0 {
+		if _, err := projectaccess.RequireRead(ctx, h.db, users[0], projectID); err != nil {
+			return workflowResponse{}, err
+		}
+	} else if err := h.requireActiveProject(ctx, h.db, workspaceID, projectID, false); err != nil {
 		return workflowResponse{}, err
 	}
 
@@ -37,6 +42,7 @@ func (h *Handler) createWorkflowStatus(
 	workspaceID string,
 	projectID string,
 	input normalizedCreateStatus,
+	users ...auth.CurrentUser,
 ) (statusResponse, error) {
 	tx, err := h.db.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
@@ -44,7 +50,7 @@ func (h *Handler) createWorkflowStatus(
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
-	if err := h.requireActiveProject(ctx, tx, workspaceID, projectID, true); err != nil {
+	if err := h.requireManageProject(ctx, tx, workspaceID, projectID, users); err != nil {
 		return statusResponse{}, err
 	}
 
@@ -93,6 +99,7 @@ func (h *Handler) updateWorkflowStatus(
 	projectID string,
 	statusID string,
 	input normalizedUpdateStatus,
+	users ...auth.CurrentUser,
 ) (statusResponse, error) {
 	tx, err := h.db.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
@@ -100,7 +107,7 @@ func (h *Handler) updateWorkflowStatus(
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
-	if err := h.requireActiveProject(ctx, tx, workspaceID, projectID, true); err != nil {
+	if err := h.requireManageProject(ctx, tx, workspaceID, projectID, users); err != nil {
 		return statusResponse{}, err
 	}
 	current, err := getStatusForUpdate(ctx, tx, projectID, statusID)
@@ -154,6 +161,7 @@ func (h *Handler) reorderWorkflowStatuses(
 	workspaceID string,
 	projectID string,
 	statusIDs []string,
+	users ...auth.CurrentUser,
 ) error {
 	tx, err := h.db.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
@@ -161,7 +169,7 @@ func (h *Handler) reorderWorkflowStatuses(
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
-	if err := h.requireActiveProject(ctx, tx, workspaceID, projectID, true); err != nil {
+	if err := h.requireManageProject(ctx, tx, workspaceID, projectID, users); err != nil {
 		return err
 	}
 	activeIDs, err := activeStatusIDsForUpdate(ctx, tx, projectID)
@@ -203,7 +211,7 @@ func (h *Handler) archiveWorkflowStatus(
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
-	if err := h.requireActiveProject(ctx, tx, user.WorkspaceID, projectID, true); err != nil {
+	if _, err := projectaccess.RequireManageForUpdate(ctx, tx, user, projectID); err != nil {
 		return statusResponse{}, err
 	}
 	status, err := getStatusForUpdate(ctx, tx, projectID, statusID)
@@ -305,6 +313,7 @@ func (h *Handler) replaceWorkflowTransitions(
 	workspaceID string,
 	projectID string,
 	transitions []normalizedTransition,
+	users ...auth.CurrentUser,
 ) error {
 	tx, err := h.db.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
@@ -312,7 +321,7 @@ func (h *Handler) replaceWorkflowTransitions(
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
-	if err := h.requireActiveProject(ctx, tx, workspaceID, projectID, true); err != nil {
+	if err := h.requireManageProject(ctx, tx, workspaceID, projectID, users); err != nil {
 		return err
 	}
 	activeIDs, err := activeStatusIDsForUpdate(ctx, tx, projectID)
@@ -343,6 +352,20 @@ func (h *Handler) replaceWorkflowTransitions(
 		}
 	}
 	return tx.Commit(ctx)
+}
+
+func (h *Handler) requireManageProject(
+	ctx context.Context,
+	querier projectaccess.Querier,
+	workspaceID string,
+	projectID string,
+	users []auth.CurrentUser,
+) error {
+	if len(users) > 0 {
+		_, err := projectaccess.RequireManageForUpdate(ctx, querier, users[0], projectID)
+		return err
+	}
+	return h.requireActiveProject(ctx, querier, workspaceID, projectID, true)
 }
 
 func (h *Handler) requireActiveProject(

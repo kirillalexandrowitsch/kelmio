@@ -6,6 +6,9 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+
+	"team-task-tracker/backend/internal/auth"
+	"team-task-tracker/backend/internal/projectaccess"
 )
 
 func listIssueLabelIDs(ctx context.Context, tx pgx.Tx, issueID string) ([]string, error) {
@@ -83,12 +86,56 @@ func verifyActiveWorkspaceMember(ctx context.Context, tx pgx.Tx, workspaceID str
 	return nil
 }
 
-func verifyIssueParent(ctx context.Context, tx pgx.Tx, workspaceID string, issueID string, parentIssueID string) error {
+func verifyActiveProjectMember(
+	ctx context.Context,
+	tx pgx.Tx,
+	user auth.CurrentUser,
+	projectID string,
+	userID string,
+) error {
+	if userID == "" {
+		return nil
+	}
+
+	var exists bool
+	if err := tx.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1
+			FROM projects project
+			JOIN workspace_members workspace_member
+				ON workspace_member.workspace_id = project.workspace_id
+				AND workspace_member.user_id = $2
+			JOIN users app_user
+				ON app_user.id = workspace_member.user_id
+				AND app_user.is_active = true
+			LEFT JOIN project_members project_member
+				ON project_member.project_id = project.id
+				AND project_member.user_id = workspace_member.user_id
+			WHERE project.id = $1
+				AND project.workspace_id = $3
+				AND (workspace_member.role = 'admin' OR project_member.user_id IS NOT NULL)
+		)
+	`, projectID, userID, user.WorkspaceID).Scan(&exists); err != nil {
+		return err
+	}
+	if !exists {
+		return errInvalidAssignee
+	}
+	return nil
+}
+
+func verifyIssueParent(ctx context.Context, tx pgx.Tx, user auth.CurrentUser, issueID string, parentIssueID string) error {
 	if parentIssueID == "" {
 		return nil
 	}
 	if issueID != "" && parentIssueID == issueID {
 		return errIssueParentCycle
+	}
+	if _, err := projectaccess.RequireIssueWrite(ctx, tx, user, parentIssueID); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return errInvalidIssueParent
+		}
+		return err
 	}
 
 	var parentExists bool
@@ -102,7 +149,7 @@ func verifyIssueParent(ctx context.Context, tx pgx.Tx, workspaceID string, issue
 				AND p.archived_at IS NULL
 				AND i.archived_at IS NULL
 		)
-	`, parentIssueID, workspaceID).Scan(&parentExists); err != nil {
+	`, parentIssueID, user.WorkspaceID).Scan(&parentExists); err != nil {
 		return err
 	}
 	if !parentExists {
@@ -139,7 +186,7 @@ func verifyIssueParent(ctx context.Context, tx pgx.Tx, workspaceID string, issue
 			FROM ancestors
 			WHERE id = $3
 		)
-	`, parentIssueID, workspaceID, issueID).Scan(&createsCycle); err != nil {
+	`, parentIssueID, user.WorkspaceID, issueID).Scan(&createsCycle); err != nil {
 		return err
 	}
 	if createsCycle {

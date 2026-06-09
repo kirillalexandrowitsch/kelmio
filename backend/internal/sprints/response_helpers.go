@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"team-task-tracker/backend/internal/auth"
+	"team-task-tracker/backend/internal/projectaccess"
 )
 
 func nullableText(value pgtype.Text) *string {
@@ -77,4 +78,12 @@ func writeError(w http.ResponseWriter, status int, code string, message string) 
 			"message": message,
 		},
 	})
+}
+
+func (h *Handler) writeProjectAccessError(w http.ResponseWriter, err error) bool {
+	if !errors.Is(err, projectaccess.ErrForbidden) {
+		return false
+	}
+	writeError(w, http.StatusForbidden, "forbidden", "project write access is required")
+	return true
 }
