@@ -24,6 +24,7 @@ import (
 	"team-task-tracker/backend/internal/issues"
 	"team-task-tracker/backend/internal/labels"
 	"team-task-tracker/backend/internal/notifications"
+	"team-task-tracker/backend/internal/projectmembers"
 	"team-task-tracker/backend/internal/projects"
 	"team-task-tracker/backend/internal/ratelimit"
 	"team-task-tracker/backend/internal/savedfilters"
@@ -71,6 +72,9 @@ func main() {
 
 	projectsHandler := projects.NewHandler(db, authHandler)
 	projectsHandler.RegisterRoutes(mux)
+
+	projectMembersHandler := projectmembers.NewHandler(db, authHandler)
+	projectMembersHandler.RegisterRoutes(mux)
 
 	workflowsHandler := workflows.NewHandler(db, authHandler)
 	workflowsHandler.RegisterRoutes(mux)
