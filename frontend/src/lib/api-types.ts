@@ -37,6 +37,21 @@ export type Project = {
   can_manage: boolean;
 };
 
+export type ProjectRole = "lead" | "contributor" | "viewer";
+
+export type ProjectMember = {
+  project_id: string;
+  user_id: string;
+  email: string;
+  username: string;
+  display_name: string;
+  role: ProjectRole;
+  workspace_role: TeamMember["role"];
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
 export type TeamMember = {
   id: string;
   email: string;
@@ -240,6 +255,10 @@ export type ListProjectsResponse = {
   projects: Project[];
 };
 
+export type ListProjectMembersResponse = {
+  members: ProjectMember[];
+};
+
 export type ListTeamMembersResponse = {
   members: TeamMember[];
 };
@@ -352,6 +371,10 @@ export type CreateProjectInput = {
 export type UpdateProjectInput = {
   name: string;
   description: string;
+};
+
+export type UpdateProjectMemberInput = {
+  role: ProjectRole;
 };
 
 export type CreateIssueInput = {

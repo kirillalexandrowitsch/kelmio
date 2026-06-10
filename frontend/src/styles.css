@@ -726,7 +726,7 @@ h1 {
 
 .projects-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 340px;
+  grid-template-columns: minmax(0, 1fr) minmax(380px, 460px);
   gap: 12px;
 }
 
@@ -801,6 +801,196 @@ h1 {
   color: #4e5c54;
   font-size: 14px;
   line-height: 1.55;
+}
+
+.project-detail-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 4px;
+  border: 1px solid #dfe7e1;
+  border-radius: 10px;
+  background: #f5f8f5;
+}
+
+.project-detail-tabs button {
+  flex: 1;
+  min-height: 34px;
+  border: 0;
+  border-radius: 7px;
+  color: #657268;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.project-detail-tabs button.active {
+  color: #17211b;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(23, 33, 27, 0.12);
+}
+
+.project-access-note {
+  display: grid;
+  gap: 5px;
+  padding: 11px 12px;
+  border: 1px solid #dfe7e1;
+  border-radius: 8px;
+  color: #4e5c54;
+  background: #f5f8f5;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.project-access-note strong {
+  color: #17211b;
+}
+
+.project-members-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.project-members-header,
+.project-member-add-form,
+.project-member-controls,
+.project-member-badges {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.project-members-header {
+  justify-content: space-between;
+}
+
+.project-members-header h3,
+.project-members-header p,
+.project-member-card h4,
+.project-member-card p {
+  margin: 0;
+}
+
+.project-members-header h3 {
+  font-size: 15px;
+}
+
+.project-members-header p,
+.project-member-identity > p,
+.project-member-note,
+.project-members-availability {
+  color: #657268;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.project-members-header p {
+  margin-top: 4px;
+}
+
+.project-member-add-form {
+  align-items: end;
+  padding: 10px;
+  border: 1px solid #dfe7e1;
+  border-radius: 9px;
+  background: #f8faf8;
+}
+
+.project-member-add-form label,
+.project-member-controls label {
+  display: grid;
+  flex: 1;
+  gap: 5px;
+}
+
+.project-member-add-form label > span,
+.project-member-controls label > span {
+  color: #657268;
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.project-member-add-form select,
+.project-member-controls select {
+  width: 100%;
+  min-height: 34px;
+  padding: 7px 8px;
+  border: 1px solid #c8d1cb;
+  border-radius: 7px;
+  color: #17211b;
+  background: #ffffff;
+  font-size: 12px;
+}
+
+.project-member-add-form button {
+  min-height: 34px;
+  white-space: nowrap;
+}
+
+.project-members-availability {
+  margin: -3px 0 0;
+}
+
+.project-member-list {
+  display: grid;
+  gap: 8px;
+}
+
+.project-member-card {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 9px;
+  padding: 10px;
+  border: 1px solid #edf0ed;
+  border-radius: 9px;
+  background: #fbfcfb;
+}
+
+.project-member-card .member-avatar {
+  width: 34px;
+  height: 34px;
+}
+
+.project-member-identity {
+  min-width: 0;
+}
+
+.project-member-identity h4 {
+  font-size: 13px;
+}
+
+.project-member-identity > p {
+  margin-top: 2px;
+  overflow-wrap: anywhere;
+}
+
+.project-member-badges {
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+.project-member-badges .member-role {
+  padding: 4px 6px;
+  font-size: 10px;
+}
+
+.member-role-inactive {
+  border-color: #e1c7c2;
+  color: #93483e;
+  background: #fff8f6;
+}
+
+.project-member-controls {
+  grid-column: 1 / -1;
+  align-items: end;
+}
+
+.project-member-note {
+  grid-column: 1 / -1;
+  padding: 7px 8px;
+  border-left: 3px solid #9eb5a5;
+  background: #f5f8f5;
 }
 
 .project-detail-stats {
@@ -2870,7 +3060,9 @@ h1 {
   .saved-filter-card,
   .saved-filter-rename,
   .notification-card,
-  .notification-dropdown-item {
+  .notification-dropdown-item,
+  .project-member-add-form,
+  .project-member-controls {
     align-items: stretch;
     flex-direction: column;
   }

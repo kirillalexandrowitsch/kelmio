@@ -27,6 +27,7 @@ import {
   type ListIssuesResponse,
   type ListLabelsResponse,
   type ListNotificationsResponse,
+  type ListProjectMembersResponse,
   type ListProjectsResponse,
   type ListSavedFiltersResponse,
   type ListSprintsResponse,
@@ -34,6 +35,8 @@ import {
   type ListTeamMembersResponse,
   type PaginationParams,
   type Project,
+  type ProjectMember,
+  type ProjectRole,
   type RuntimeVersion,
   type SavedFilter,
   type Sprint,
@@ -44,6 +47,7 @@ import {
   type UnreadNotificationsCountResponse,
   type UpdateIssueInput,
   type UpdateProjectInput,
+  type UpdateProjectMemberInput,
   type UpdateSavedFilterInput,
   type UpdateSprintInput,
   type UpdateTeamMemberInput,
@@ -79,6 +83,8 @@ export type {
   NotificationType,
   PaginationParams,
   Project,
+  ProjectMember,
+  ProjectRole,
   RuntimeVersion,
   SavedFilter,
   SavedIssueFilters,
@@ -93,6 +99,7 @@ export type {
   CreateSprintInput,
   CreateSubtaskInput,
   UpdateIssueInput,
+  UpdateProjectMemberInput,
   UpdateSavedFilterInput,
   UpdateSprintInput,
 } from "./api-types";
@@ -183,6 +190,39 @@ export async function archiveProject(projectId: string) {
   await request<void>(`/api/v1/projects/${encodeURIComponent(projectId)}/archive`, {
     method: "POST",
   });
+}
+
+export async function listProjectMembers(projectId: string) {
+  return request<ListProjectMembersResponse>(
+    `/api/v1/projects/${encodeURIComponent(projectId)}/members`,
+  );
+}
+
+export async function putProjectMember(
+  projectId: string,
+  userId: string,
+  input: UpdateProjectMemberInput,
+) {
+  return request<ProjectMember>(
+    `/api/v1/projects/${encodeURIComponent(projectId)}/members/${encodeURIComponent(
+      userId,
+    )}`,
+    {
+      method: "PUT",
+      body: JSON.stringify(input),
+    },
+  );
+}
+
+export async function deleteProjectMember(projectId: string, userId: string) {
+  await request<void>(
+    `/api/v1/projects/${encodeURIComponent(projectId)}/members/${encodeURIComponent(
+      userId,
+    )}`,
+    {
+      method: "DELETE",
+    },
+  );
 }
 
 export async function listTeamMembers() {

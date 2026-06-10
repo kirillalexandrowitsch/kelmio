@@ -8,12 +8,14 @@ import { SignInScreen } from "./auth/auth-screens";
 import { IssueCreateForm } from "./issues/issue-create-form";
 import { SavedFiltersPanel } from "./issues/saved-filters-panel";
 import { NotificationsSection } from "./notifications/notifications-section";
+import { ProjectsSection } from "./projects/projects-section";
 import { SprintsSection } from "./sprints/sprints-section";
 import { TeamSection } from "./team/team-section";
 import {
   type AppNotification,
   type CurrentUser,
   type Project,
+  type ProjectMember,
   type SavedFilter,
   type Sprint,
   type TeamMember,
@@ -57,6 +59,19 @@ const teamMember: TeamMember = {
   role: "member",
   is_active: true,
   joined_at: "2026-06-07T00:00:00Z",
+};
+
+const projectMember: ProjectMember = {
+  project_id: project.id,
+  user_id: teamMember.id,
+  email: teamMember.email,
+  username: teamMember.username,
+  display_name: teamMember.display_name,
+  role: "contributor",
+  workspace_role: teamMember.role,
+  is_active: true,
+  created_at: "2026-06-07T00:00:00Z",
+  updated_at: "2026-06-07T00:00:00Z",
 };
 
 const sprint: Sprint = {
@@ -328,6 +343,88 @@ test("notifications expose per-item and mark-all actions", async () => {
   assert.equal(onOpenIssue.mock.calls[0]?.[0], notification);
   assert.equal(onMarkRead.mock.calls[0]?.[0], notification);
   assert.equal(onMarkAllRead.mock.calls.length, 1);
+});
+
+function projectsProps(selectedProjectDetail: Project) {
+  return {
+    archivingProjectIds: [],
+    canCreateProject: true,
+    editProjectDescription: "",
+    editProjectName: "",
+    editingProjectId: "",
+    isActive: true,
+    isCreatingProject: false,
+    isLoadingProjectDetail: false,
+    isLoadingProjectMembers: false,
+    isLoadingProjects: false,
+    onAddProjectMember: vi.fn(preventSubmit),
+    onArchiveProject: vi.fn(),
+    onCancelEditingProject: vi.fn(),
+    onCreateProject: vi.fn(preventSubmit),
+    onEditProjectDescriptionChange: vi.fn(),
+    onEditProjectNameChange: vi.fn(),
+    onOpenProjectBoard: vi.fn(),
+    onProjectDescriptionChange: vi.fn(),
+    onProjectDetailTabChange: vi.fn(),
+    onProjectKeyChange: vi.fn(),
+    onProjectMemberRoleChange: vi.fn(),
+    onProjectMemberRoleSelectionChange: vi.fn(),
+    onProjectMemberUserChange: vi.fn(),
+    onProjectNameChange: vi.fn(),
+    onRemoveProjectMember: vi.fn(),
+    onSelectIssue: vi.fn(),
+    onSelectProjectDetail: vi.fn(),
+    onStartEditingProject: vi.fn(),
+    onUpdateProject: vi.fn(preventSubmit),
+    onViewProjectIssues: vi.fn(),
+    projectDescription: "",
+    projectDetailError: "",
+    projectDetailTab: "summary" as const,
+    projectFormError: "",
+    projectKey: "",
+    projectMembers: [projectMember],
+    projectMembersError: "",
+    projectName: "",
+    projects: [selectedProjectDetail],
+    projectsError: "",
+    removingProjectMemberIds: [],
+    role: "admin" as const,
+    selectedProjectDetail,
+    selectedProjectIssues: [],
+    selectedProjectMemberRole: "contributor" as const,
+    selectedProjectMemberUserId: "",
+    selectedProjectOpenIssues: [],
+    teamMembers: [teamMember],
+    updatingProjectIds: [],
+    updatingProjectMemberIds: [],
+  };
+}
+
+test("project details expose members tab only to project managers", async () => {
+  const user = userEvent.setup();
+  const managerProps = projectsProps(project);
+  const { rerender } = render(<ProjectsSection {...managerProps} />);
+
+  await user.click(screen.getByRole("tab", { name: "Members" }));
+  assert.equal(managerProps.onProjectDetailTabChange.mock.calls[0]?.[0], "members");
+
+  const viewerProject: Project = {
+    ...project,
+    project_role: "viewer",
+    can_write: false,
+    can_manage: false,
+  };
+  rerender(
+    <ProjectsSection
+      {...projectsProps(viewerProject)}
+      role="member"
+      selectedProjectDetail={viewerProject}
+    />,
+  );
+
+  assert.equal(screen.queryByRole("tab", { name: "Members" }), null);
+  assert.ok(screen.getByText("Viewer access"));
+  assert.ok(screen.getByText(/This project is read-only/));
 });
 
 function teamProps(currentUser: CurrentUser): ComponentProps<typeof TeamSection> {

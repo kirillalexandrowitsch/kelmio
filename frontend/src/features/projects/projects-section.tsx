@@ -1,9 +1,17 @@
 import { type FormEvent } from "react";
 
 import { FormError } from "../../components/form-feedback";
-import { type CurrentUser, type Issue, type Project } from "../../lib/api-types";
+import {
+  type CurrentUser,
+  type Issue,
+  type Project,
+  type ProjectMember,
+  type ProjectRole,
+  type TeamMember,
+} from "../../lib/api-types";
 import { PROJECT_PERMISSION_NOTE } from "../../lib/permissions";
 import { hasText } from "../../lib/validation";
+import { ProjectMembersPanel } from "./project-members-panel";
 
 type ProjectsSectionProps = {
   archivingProjectIds: string[];
@@ -14,6 +22,7 @@ type ProjectsSectionProps = {
   isActive: boolean;
   isCreatingProject: boolean;
   isLoadingProjectDetail: boolean;
+  isLoadingProjectMembers: boolean;
   isLoadingProjects: boolean;
   onArchiveProject: (project: Project) => void;
   onCancelEditingProject: () => void;
@@ -21,6 +30,12 @@ type ProjectsSectionProps = {
   onEditProjectDescriptionChange: (value: string) => void;
   onEditProjectNameChange: (value: string) => void;
   onOpenProjectBoard: (projectId: string) => void;
+  onAddProjectMember: (event: FormEvent<HTMLFormElement>) => void;
+  onProjectDetailTabChange: (tab: "summary" | "members") => void;
+  onProjectMemberRoleChange: (member: ProjectMember, role: ProjectRole) => void;
+  onProjectMemberRoleSelectionChange: (role: ProjectRole) => void;
+  onProjectMemberUserChange: (userId: string) => void;
+  onRemoveProjectMember: (member: ProjectMember) => void;
   onProjectDescriptionChange: (value: string) => void;
   onProjectKeyChange: (value: string) => void;
   onProjectNameChange: (value: string) => void;
@@ -30,16 +45,24 @@ type ProjectsSectionProps = {
   onUpdateProject: (event: FormEvent<HTMLFormElement>, project: Project) => void;
   onViewProjectIssues: (projectId: string) => void;
   projectDescription: string;
+  projectDetailTab: "summary" | "members";
   projectDetailError: string;
   projectFormError: string;
   projectKey: string;
   projectName: string;
   projects: Project[];
   projectsError: string;
+  projectMembers: ProjectMember[];
+  projectMembersError: string;
+  removingProjectMemberIds: string[];
   role: CurrentUser["workspace"]["role"];
+  selectedProjectMemberRole: ProjectRole;
+  selectedProjectMemberUserId: string;
   selectedProjectDetail: Project | null;
   selectedProjectIssues: Issue[];
   selectedProjectOpenIssues: Issue[];
+  teamMembers: TeamMember[];
+  updatingProjectMemberIds: string[];
   updatingProjectIds: string[];
 };
 
@@ -52,13 +75,20 @@ export function ProjectsSection({
   isActive,
   isCreatingProject,
   isLoadingProjectDetail,
+  isLoadingProjectMembers,
   isLoadingProjects,
+  onAddProjectMember,
   onArchiveProject,
   onCancelEditingProject,
   onCreateProject,
   onEditProjectDescriptionChange,
   onEditProjectNameChange,
   onOpenProjectBoard,
+  onProjectDetailTabChange,
+  onProjectMemberRoleChange,
+  onProjectMemberRoleSelectionChange,
+  onProjectMemberUserChange,
+  onRemoveProjectMember,
   onProjectDescriptionChange,
   onProjectKeyChange,
   onProjectNameChange,
@@ -68,16 +98,24 @@ export function ProjectsSection({
   onUpdateProject,
   onViewProjectIssues,
   projectDescription,
+  projectDetailTab,
   projectDetailError,
   projectFormError,
   projectKey,
   projectName,
   projects,
   projectsError,
+  projectMembers,
+  projectMembersError,
+  removingProjectMemberIds,
   role,
+  selectedProjectMemberRole,
+  selectedProjectMemberUserId,
   selectedProjectDetail,
   selectedProjectIssues,
   selectedProjectOpenIssues,
+  teamMembers,
+  updatingProjectMemberIds,
   updatingProjectIds,
 }: ProjectsSectionProps) {
   const isAdmin = role === "admin";
@@ -281,49 +319,109 @@ export function ProjectsSection({
                 {selectedProjectDetail.description || "No description"}
               </p>
 
-              <div className="project-detail-stats">
-                <article>
-                  <span>Visible issues</span>
-                  <strong>{selectedProjectIssues.length}</strong>
-                </article>
-                <article>
-                  <span>Open</span>
-                  <strong>{selectedProjectOpenIssues.length}</strong>
-                </article>
-              </div>
+              {selectedProjectDetail.can_manage ? (
+                <div className="project-detail-tabs" role="tablist" aria-label="Project details">
+                  <button
+                    aria-selected={projectDetailTab === "summary"}
+                    className={projectDetailTab === "summary" ? "active" : ""}
+                    onClick={() => onProjectDetailTabChange("summary")}
+                    role="tab"
+                    type="button"
+                  >
+                    Summary
+                  </button>
+                  <button
+                    aria-selected={projectDetailTab === "members"}
+                    className={projectDetailTab === "members" ? "active" : ""}
+                    onClick={() => onProjectDetailTabChange("members")}
+                    role="tab"
+                    type="button"
+                  >
+                    Members
+                  </button>
+                </div>
+              ) : null}
 
-              <div className="project-detail-actions">
-                <button
-                  className="small-button"
-                  onClick={() => onViewProjectIssues(selectedProjectDetail.id)}
-                  type="button"
-                >
-                  View project issues
-                </button>
-                <button
-                  className="small-button"
-                  onClick={() => onOpenProjectBoard(selectedProjectDetail.id)}
-                  type="button"
-                >
-                  Open project board
-                </button>
-              </div>
+              {projectDetailTab === "members" && selectedProjectDetail.can_manage ? (
+                <ProjectMembersPanel
+                  error={projectMembersError}
+                  isLoading={isLoadingProjectMembers}
+                  members={projectMembers}
+                  onAddMember={onAddProjectMember}
+                  onMemberRoleChange={onProjectMemberRoleChange}
+                  onRemoveMember={onRemoveProjectMember}
+                  onRoleChange={onProjectMemberRoleSelectionChange}
+                  onUserChange={onProjectMemberUserChange}
+                  removingMemberIds={removingProjectMemberIds}
+                  role={selectedProjectMemberRole}
+                  selectedUserId={selectedProjectMemberUserId}
+                  teamMembers={teamMembers}
+                  updatingMemberIds={updatingProjectMemberIds}
+                />
+              ) : (
+                <>
+                  {!selectedProjectDetail.can_manage ? (
+                    <aside className="project-access-note">
+                      <strong>
+                        {selectedProjectDetail.project_role === "viewer"
+                          ? "Viewer access"
+                          : "Project access"}
+                      </strong>
+                      <span>
+                        {selectedProjectDetail.can_write
+                          ? "You can work with project issues, comments, and sprints. Project access is managed by a lead or workspace admin."
+                          : "This project is read-only. Ask a project lead or workspace admin for access changes."}
+                      </span>
+                    </aside>
+                  ) : null}
 
-              {selectedProjectIssues.length > 0 ? (
-                <div className="project-detail-issues">
-                  {selectedProjectIssues.slice(0, 4).map((issue) => (
+                  <div className="project-detail-stats">
+                    <article>
+                      <span>Visible issues</span>
+                      <strong>{selectedProjectIssues.length}</strong>
+                    </article>
+                    <article>
+                      <span>Open</span>
+                      <strong>{selectedProjectOpenIssues.length}</strong>
+                    </article>
+                  </div>
+
+                  <div className="project-detail-actions">
                     <button
-                      key={issue.id}
-                      onClick={() => onSelectIssue(issue.id)}
+                      className="small-button"
+                      onClick={() => onViewProjectIssues(selectedProjectDetail.id)}
                       type="button"
                     >
-                      <span>{issue.issue_key}</span>
-                      <strong>{issue.title}</strong>
+                      View project issues
                     </button>
-                  ))}
-                </div>
-              ) : (
-                <div className="comments-empty">No visible issues for this project</div>
+                    <button
+                      className="small-button"
+                      onClick={() => onOpenProjectBoard(selectedProjectDetail.id)}
+                      type="button"
+                    >
+                      Open project board
+                    </button>
+                  </div>
+
+                  {selectedProjectIssues.length > 0 ? (
+                    <div className="project-detail-issues">
+                      {selectedProjectIssues.slice(0, 4).map((issue) => (
+                        <button
+                          key={issue.id}
+                          onClick={() => onSelectIssue(issue.id)}
+                          type="button"
+                        >
+                          <span>{issue.issue_key}</span>
+                          <strong>{issue.title}</strong>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="comments-empty">
+                      No visible issues for this project
+                    </div>
+                  )}
+                </>
               )}
             </>
           ) : (

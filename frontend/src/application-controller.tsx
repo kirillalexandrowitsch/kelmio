@@ -18,6 +18,8 @@ import {
   IssueType,
   Label,
   Project,
+  ProjectMember,
+  ProjectRole,
   RuntimeVersion,
   SavedFilter,
   Sprint,
@@ -42,6 +44,7 @@ import {
   deleteLabel,
   deleteIssueComment,
   deleteIssueLink,
+  deleteProjectMember,
   deleteSavedFilter,
   getIssue,
   getCurrentUser,
@@ -56,6 +59,7 @@ import {
   listIssues,
   listLabels,
   listNotifications,
+  listProjectMembers,
   listProjects,
   listSavedFilters,
   listSprints,
@@ -65,6 +69,7 @@ import {
   logout,
   markAllNotificationsRead,
   markNotificationRead,
+  putProjectMember,
   resetTeamMemberPassword,
   revokeTeamInvite,
   removeIssueFromSprint,
@@ -288,6 +293,22 @@ export function ApplicationController() {
     setProjectDetailError,
     isLoadingProjectDetail,
     setIsLoadingProjectDetail,
+    projectDetailTab,
+    setProjectDetailTab,
+    projectMembers,
+    setProjectMembers,
+    projectMembersError,
+    setProjectMembersError,
+    isLoadingProjectMembers,
+    setIsLoadingProjectMembers,
+    selectedProjectMemberUserId,
+    setSelectedProjectMemberUserId,
+    selectedProjectMemberRole,
+    setSelectedProjectMemberRole,
+    updatingProjectMemberIds,
+    setUpdatingProjectMemberIds,
+    removingProjectMemberIds,
+    setRemovingProjectMemberIds,
     projectKey,
     setProjectKey,
     projectName,
@@ -843,6 +864,31 @@ export function ApplicationController() {
       isMounted = false;
     };
   }, [user]);
+
+  useEffect(() => {
+    setProjectDetailTab("summary");
+    setProjectMembers([]);
+    setProjectMembersError("");
+    setIsLoadingProjectMembers(false);
+    setSelectedProjectMemberUserId("");
+    setSelectedProjectMemberRole("contributor");
+    setUpdatingProjectMemberIds([]);
+    setRemovingProjectMemberIds([]);
+  }, [selectedProjectDetail?.id]);
+
+  useEffect(() => {
+    if (selectedProjectDetail?.can_manage) {
+      return;
+    }
+    setProjectDetailTab("summary");
+    setProjectMembers([]);
+    setProjectMembersError("");
+    setIsLoadingProjectMembers(false);
+    setSelectedProjectMemberUserId("");
+    setSelectedProjectMemberRole("contributor");
+    setUpdatingProjectMemberIds([]);
+    setRemovingProjectMemberIds([]);
+  }, [selectedProjectDetail?.can_manage]);
 
   useEffect(() => {
     if (!user) {
@@ -1502,6 +1548,14 @@ export function ApplicationController() {
     setSelectedProjectDetail(null);
     setProjectDetailError("");
     setIsLoadingProjectDetail(false);
+    setProjectDetailTab("summary");
+    setProjectMembers([]);
+    setProjectMembersError("");
+    setIsLoadingProjectMembers(false);
+    setSelectedProjectMemberUserId("");
+    setSelectedProjectMemberRole("contributor");
+    setUpdatingProjectMemberIds([]);
+    setRemovingProjectMemberIds([]);
     setTeamMembersError("");
     setTeamMemberFormError("");
     setTeamMemberEmail("");
@@ -1783,6 +1837,190 @@ export function ApplicationController() {
     } finally {
       setIsLoadingProjectDetail(false);
     }
+  }
+
+  async function handleProjectDetailTabChange(tab: "summary" | "members") {
+    if (tab === "summary") {
+      setProjectDetailTab("summary");
+      return;
+    }
+    if (!selectedProjectDetail?.can_manage) {
+      setProjectDetailTab("summary");
+      return;
+    }
+
+    setProjectDetailTab("members");
+    setProjectMembersError("");
+    setIsLoadingProjectMembers(true);
+    try {
+      const response = await listProjectMembers(selectedProjectDetail.id);
+      setProjectMembers(response.members);
+    } catch (err) {
+      setProjectMembersError(
+        apiErrorMessage(err, "Could not load project members."),
+      );
+    } finally {
+      setIsLoadingProjectMembers(false);
+    }
+  }
+
+  async function handleAddProjectMember(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selectedProjectDetail?.can_manage || !selectedProjectMemberUserId) {
+      return;
+    }
+
+    const userId = selectedProjectMemberUserId;
+    setProjectMembersError("");
+    setUpdatingProjectMemberIds((currentIds) => [
+      ...currentIds.filter((id) => id !== userId),
+      userId,
+    ]);
+    try {
+      const member = await putProjectMember(
+        selectedProjectDetail.id,
+        userId,
+        { role: selectedProjectMemberRole },
+      );
+      setProjectMembers((currentMembers) => [...currentMembers, member]);
+      setSelectedProjectMemberUserId("");
+      setSelectedProjectMemberRole("contributor");
+      if (member.user_id === user?.id) {
+        await refreshProjectsAfterSelfMembershipChange(selectedProjectDetail.id);
+      }
+    } catch (err) {
+      setProjectMembersError(apiErrorMessage(err, "Could not add project member."));
+    } finally {
+      setUpdatingProjectMemberIds((currentIds) =>
+        currentIds.filter((id) => id !== userId),
+      );
+    }
+  }
+
+  async function handleProjectMemberRoleChange(
+    member: ProjectMember,
+    role: ProjectRole,
+  ) {
+    if (!selectedProjectDetail?.can_manage || member.role === role) {
+      return;
+    }
+
+    setProjectMembersError("");
+    setUpdatingProjectMemberIds((currentIds) => [
+      ...currentIds.filter((id) => id !== member.user_id),
+      member.user_id,
+    ]);
+    try {
+      const updatedMember = await putProjectMember(
+        selectedProjectDetail.id,
+        member.user_id,
+        { role },
+      );
+      setProjectMembers((currentMembers) =>
+        currentMembers.map((currentMember) =>
+          currentMember.user_id === updatedMember.user_id
+            ? updatedMember
+            : currentMember,
+        ),
+      );
+      if (member.user_id === user?.id) {
+        await refreshProjectsAfterSelfMembershipChange(selectedProjectDetail.id);
+      }
+    } catch (err) {
+      setProjectMembersError(
+        apiErrorMessage(err, "Could not update project member."),
+      );
+    } finally {
+      setUpdatingProjectMemberIds((currentIds) =>
+        currentIds.filter((id) => id !== member.user_id),
+      );
+    }
+  }
+
+  async function handleRemoveProjectMember(member: ProjectMember) {
+    if (!selectedProjectDetail?.can_manage) {
+      return;
+    }
+    const accessNote =
+      member.workspace_role === "admin"
+        ? " This workspace admin will keep full project access."
+        : "";
+    if (
+      !window.confirm(
+        `Remove ${member.display_name} from ${selectedProjectDetail.key}?${accessNote}`,
+      )
+    ) {
+      return;
+    }
+
+    setProjectMembersError("");
+    setRemovingProjectMemberIds((currentIds) => [
+      ...currentIds.filter((id) => id !== member.user_id),
+      member.user_id,
+    ]);
+    try {
+      await deleteProjectMember(selectedProjectDetail.id, member.user_id);
+      setProjectMembers((currentMembers) =>
+        currentMembers.filter(
+          (currentMember) => currentMember.user_id !== member.user_id,
+        ),
+      );
+      if (member.user_id === user?.id) {
+        await refreshProjectsAfterSelfMembershipChange(selectedProjectDetail.id);
+      }
+    } catch (err) {
+      setProjectMembersError(
+        apiErrorMessage(err, "Could not remove project member."),
+      );
+    } finally {
+      setRemovingProjectMemberIds((currentIds) =>
+        currentIds.filter((id) => id !== member.user_id),
+      );
+    }
+  }
+
+  async function refreshProjectsAfterSelfMembershipChange(projectId: string) {
+    const response = await listProjects();
+    setProjects(response.projects);
+    const refreshedProject =
+      response.projects.find((project) => project.id === projectId) ?? null;
+    if (refreshedProject) {
+      setSelectedProjectDetail(refreshedProject);
+      if (!refreshedProject.can_manage) {
+        setProjectDetailTab("summary");
+        setProjectMembers([]);
+      }
+      return;
+    }
+
+    const fallbackProject = response.projects[0] ?? null;
+    setSelectedProjectDetail(fallbackProject);
+    setProjectDetailTab("summary");
+    setProjectMembers([]);
+    setSelectedProjectId((currentId) =>
+      currentId === projectId ? fallbackProject?.id ?? "" : currentId,
+    );
+    setIssueFilterProjectId((currentId) =>
+      currentId === projectId ? "" : currentId,
+    );
+    setSprintProjectId((currentId) =>
+      currentId === projectId ? fallbackProject?.id ?? "" : currentId,
+    );
+    setSprintFilterProjectId((currentId) =>
+      currentId === projectId ? "" : currentId,
+    );
+    setIssues((currentIssues) =>
+      currentIssues.filter((issue) => issue.project_id !== projectId),
+    );
+    setSelectedIssue((currentIssue) =>
+      currentIssue?.project_id === projectId ? null : currentIssue,
+    );
+    setSprints((currentSprints) =>
+      currentSprints.filter((sprint) => sprint.project_id !== projectId),
+    );
+    setSelectedSprint((currentSprint) =>
+      currentSprint?.project_id === projectId ? null : currentSprint,
+    );
   }
 
   async function handleUpdateProject(
@@ -3787,7 +4025,9 @@ export function ApplicationController() {
           isActive={activeSection === "projects"}
           isCreatingProject={isCreatingProject}
           isLoadingProjectDetail={isLoadingProjectDetail}
+          isLoadingProjectMembers={isLoadingProjectMembers}
           isLoadingProjects={isLoadingProjects}
+          onAddProjectMember={handleAddProjectMember}
           onArchiveProject={(project) => {
             void handleArchiveProject(project);
           }}
@@ -3798,6 +4038,17 @@ export function ApplicationController() {
           onOpenProjectBoard={(projectId) => {
             setIssueFilterProjectId(projectId);
             navigateToSection("board");
+          }}
+          onProjectDetailTabChange={(tab) => {
+            void handleProjectDetailTabChange(tab);
+          }}
+          onProjectMemberRoleChange={(member, role) => {
+            void handleProjectMemberRoleChange(member, role);
+          }}
+          onProjectMemberRoleSelectionChange={setSelectedProjectMemberRole}
+          onProjectMemberUserChange={setSelectedProjectMemberUserId}
+          onRemoveProjectMember={(member) => {
+            void handleRemoveProjectMember(member);
           }}
           onProjectDescriptionChange={setProjectDescription}
           onProjectKeyChange={setProjectKey}
@@ -3817,16 +4068,24 @@ export function ApplicationController() {
             navigateToSection("issues");
           }}
           projectDescription={projectDescription}
+          projectDetailTab={projectDetailTab}
           projectDetailError={projectDetailError}
           projectFormError={projectFormError}
           projectKey={projectKey}
           projectName={projectName}
           projects={projects}
           projectsError={projectsError}
+          projectMembers={projectMembers}
+          projectMembersError={projectMembersError}
+          removingProjectMemberIds={removingProjectMemberIds}
           role={user.workspace.role}
+          selectedProjectMemberRole={selectedProjectMemberRole}
+          selectedProjectMemberUserId={selectedProjectMemberUserId}
           selectedProjectDetail={selectedProjectDetail}
           selectedProjectIssues={selectedProjectIssues}
           selectedProjectOpenIssues={selectedProjectOpenIssues}
+          teamMembers={teamMembers}
+          updatingProjectMemberIds={updatingProjectMemberIds}
           updatingProjectIds={updatingProjectIds}
         />
 

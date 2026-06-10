@@ -1,5 +1,12 @@
 import { useState } from "react";
-import type { Label, Project, TeamInvite, TeamMember } from "../lib/api";
+import type {
+  Label,
+  Project,
+  ProjectMember,
+  ProjectRole,
+  TeamInvite,
+  TeamMember,
+} from "../lib/api";
 
 export function useWorkspaceAdminController() {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -16,6 +23,22 @@ export function useWorkspaceAdminController() {
     useState<Project | null>(null);
   const [projectDetailError, setProjectDetailError] = useState("");
   const [isLoadingProjectDetail, setIsLoadingProjectDetail] = useState(false);
+  const [projectDetailTab, setProjectDetailTab] = useState<"summary" | "members">(
+    "summary",
+  );
+  const [projectMembers, setProjectMembers] = useState<ProjectMember[]>([]);
+  const [projectMembersError, setProjectMembersError] = useState("");
+  const [isLoadingProjectMembers, setIsLoadingProjectMembers] = useState(false);
+  const [selectedProjectMemberUserId, setSelectedProjectMemberUserId] =
+    useState("");
+  const [selectedProjectMemberRole, setSelectedProjectMemberRole] =
+    useState<ProjectRole>("contributor");
+  const [updatingProjectMemberIds, setUpdatingProjectMemberIds] = useState<
+    string[]
+  >([]);
+  const [removingProjectMemberIds, setRemovingProjectMemberIds] = useState<
+    string[]
+  >([]);
   const [projectKey, setProjectKey] = useState("");
   const [projectName, setProjectName] = useState("");
   const [projectDescription, setProjectDescription] = useState("");
@@ -83,6 +106,22 @@ export function useWorkspaceAdminController() {
     setProjectDetailError,
     isLoadingProjectDetail,
     setIsLoadingProjectDetail,
+    projectDetailTab,
+    setProjectDetailTab,
+    projectMembers,
+    setProjectMembers,
+    projectMembersError,
+    setProjectMembersError,
+    isLoadingProjectMembers,
+    setIsLoadingProjectMembers,
+    selectedProjectMemberUserId,
+    setSelectedProjectMemberUserId,
+    selectedProjectMemberRole,
+    setSelectedProjectMemberRole,
+    updatingProjectMemberIds,
+    setUpdatingProjectMemberIds,
+    removingProjectMemberIds,
+    setRemovingProjectMemberIds,
     projectKey,
     setProjectKey,
     projectName,
