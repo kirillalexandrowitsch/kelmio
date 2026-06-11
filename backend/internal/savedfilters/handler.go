@@ -19,13 +19,7 @@ import (
 
 var uuidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 
-var validIssueStatuses = map[string]bool{
-	"backlog":     true,
-	"todo":        true,
-	"in_progress": true,
-	"blocked":     true,
-	"done":        true,
-}
+var workflowStatusKeyPattern = regexp.MustCompile(`^[a-z][a-z0-9_]{0,31}$`)
 
 var validIssuePriorities = map[string]bool{
 	"low":      true,
@@ -49,15 +43,16 @@ var validIssueDueFilters = map[string]bool{
 }
 
 var validSavedFilterKeys = map[string]bool{
-	"query":      true,
-	"sort":       true,
-	"projectId":  true,
-	"sprintId":   true,
-	"status":     true,
-	"priority":   true,
-	"assigneeId": true,
-	"labelId":    true,
-	"due":        true,
+	"query":            true,
+	"sort":             true,
+	"projectId":        true,
+	"sprintId":         true,
+	"status":           true,
+	"workflowStatusId": true,
+	"priority":         true,
+	"assigneeId":       true,
+	"labelId":          true,
+	"due":              true,
 }
 
 var errSavedFilterExists = errors.New("saved filter exists")
@@ -421,7 +416,7 @@ func normalizeSavedFilterValues(filters map[string]string) (map[string]string, e
 				return nil, errors.New("sort is invalid")
 			}
 			normalized[key] = value
-		case "projectId", "labelId":
+		case "projectId", "labelId", "workflowStatusId":
 			if !uuidPattern.MatchString(value) {
 				return nil, errors.New(key + " is invalid")
 			}
@@ -432,7 +427,7 @@ func normalizeSavedFilterValues(filters map[string]string) (map[string]string, e
 			}
 			normalized[key] = strings.ToLower(value)
 		case "status":
-			if !validIssueStatuses[value] {
+			if !workflowStatusKeyPattern.MatchString(value) {
 				return nil, errors.New("status is invalid")
 			}
 			normalized[key] = value

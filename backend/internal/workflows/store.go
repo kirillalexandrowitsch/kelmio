@@ -234,19 +234,6 @@ func (h *Handler) archiveWorkflowStatus(
 		}
 	}
 
-	var issueCount int
-	if err := tx.QueryRow(ctx, `
-		SELECT count(*)::int
-		FROM issues
-		WHERE project_id = $1
-			AND workflow_status_id = $2
-	`, projectID, statusID).Scan(&issueCount); err != nil {
-		return statusResponse{}, err
-	}
-	if issueCount > 0 && !legacyAssignableStatusKeys[replacement.Key] {
-		return statusResponse{}, errStatusNotAssignable
-	}
-
 	payload, err := json.Marshal(map[string]string{
 		"from_status": status.Key,
 		"to_status":   replacement.Key,
@@ -257,7 +244,7 @@ func (h *Handler) archiveWorkflowStatus(
 	if _, err := tx.Exec(ctx, `
 		WITH updated_issues AS (
 			UPDATE issues
-			SET status = $3,
+			SET workflow_status_id = $3,
 				updated_at = now()
 			WHERE project_id = $1
 				AND workflow_status_id = $2
@@ -266,7 +253,7 @@ func (h *Handler) archiveWorkflowStatus(
 		INSERT INTO activity_log (entity_type, entity_id, action, actor_id, payload)
 		SELECT 'issue', id, 'status_changed', $4, $5::jsonb
 		FROM updated_issues
-	`, projectID, statusID, replacement.Key, user.ID, string(payload)); err != nil {
+	`, projectID, statusID, replacement.ID, user.ID, string(payload)); err != nil {
 		return statusResponse{}, err
 	}
 	if _, err := tx.Exec(ctx, `

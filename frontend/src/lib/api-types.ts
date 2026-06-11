@@ -105,6 +105,14 @@ export type Label = {
 };
 
 export type IssueStatus = "backlog" | "todo" | "in_progress" | "blocked" | "done";
+export type WorkflowStatusCategory = "backlog" | "todo" | "in_progress" | "done";
+export type WorkflowStatus = {
+  id: string;
+  key: string;
+  name: string;
+  color: string;
+  category: WorkflowStatusCategory;
+};
 export type IssuePriority = "low" | "medium" | "high" | "critical";
 export type IssueType = "task" | "bug" | "story" | "epic" | "subtask";
 export type IssueLinkType = "blocks" | "relates";
@@ -127,7 +135,8 @@ export type Issue = {
   title: string;
   description: string;
   issue_type: IssueType;
-  status: IssueStatus;
+  status: string;
+  workflow_status: WorkflowStatus;
   priority: IssuePriority;
   story_points: number;
   reporter_id: string;
@@ -178,7 +187,8 @@ export type IssueLinkIssue = {
   issue_key: string;
   title: string;
   issue_type: IssueType;
-  status: IssueStatus;
+  status: string;
+  workflow_status: WorkflowStatus;
   priority: IssuePriority;
 };
 
@@ -219,7 +229,8 @@ export type SavedIssueFilters = {
   sort: IssueSort;
   projectId?: string;
   sprintId?: string;
-  status?: IssueStatus;
+  status?: string;
+  workflowStatusId?: string;
   priority?: IssuePriority;
   assigneeId?: string;
   labelId?: string;
@@ -335,7 +346,8 @@ export type IssueFilters = {
   sort?: IssueSort;
   projectId?: string;
   sprintId?: string;
-  status?: IssueStatus;
+  status?: string;
+  workflowStatusId?: string;
   priority?: IssuePriority;
   assigneeId?: string;
   labelId?: string;
@@ -383,7 +395,8 @@ export type CreateIssueInput = {
   title: string;
   description: string;
   issue_type: IssueType;
-  status: IssueStatus;
+  status?: string;
+  workflow_status_id?: string;
   priority: IssuePriority;
   story_points: number;
   assignee_id: string;
@@ -394,7 +407,8 @@ export type CreateIssueInput = {
 export type CreateSubtaskInput = {
   title: string;
   description: string;
-  status: IssueStatus;
+  status?: string;
+  workflow_status_id?: string;
   priority: IssuePriority;
   story_points: number;
   assignee_id: string;
@@ -405,6 +419,11 @@ export type CreateSubtaskInput = {
 export type CreateIssueLinkInput = {
   target_issue_id: string;
   link_type: IssueLinkType;
+};
+
+export type TransitionIssueInput = {
+  status?: string;
+  workflow_status_id?: string;
 };
 
 export type CreateSprintInput = {

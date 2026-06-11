@@ -3,6 +3,7 @@ import { test } from "vitest";
 
 import {
   issueDueInfo,
+  isIssueDone,
   issueLabelIds,
   issueMatchesFilters,
   missingFilterOptionLabel,
@@ -27,6 +28,13 @@ function makeIssue(overrides: Partial<Issue> = {}): Issue {
     description: "Add direct app routes",
     issue_type: "task",
     status: "todo",
+    workflow_status: {
+      id: "status-todo",
+      key: "todo",
+      name: "Todo",
+      color: "#3b82f6",
+      category: "todo",
+    },
     priority: "medium",
     story_points: 3,
     reporter_id: "user-1",
@@ -66,6 +74,22 @@ test("formats story point labels", () => {
   assert.equal(storyPointsLabel(5), "5 points");
 });
 
+test("uses workflow category for done state", () => {
+  const issue = makeIssue({
+    status: "shipped",
+    workflow_status: {
+      id: "status-shipped",
+      key: "shipped",
+      name: "Shipped",
+      color: "#16a34a",
+      category: "done",
+    },
+  });
+
+  assert.equal(isIssueDone(issue), true);
+  assert.equal(issueDueInfo(issue, new Date(2026, 4, 27))?.tone, "done");
+});
+
 test("builds saved issue filters without empty values", () => {
   assert.deepEqual(
     savedIssueFiltersFromState({
@@ -74,6 +98,7 @@ test("builds saved issue filters without empty values", () => {
       projectId: "project-1",
       sprintId: "",
       status: "todo",
+      workflowStatusId: "status-todo",
       priority: "",
       assigneeId: "unassigned",
       labelId: "",
@@ -84,6 +109,7 @@ test("builds saved issue filters without empty values", () => {
       sort: "priority_desc",
       projectId: "project-1",
       status: "todo",
+      workflowStatusId: "status-todo",
       assigneeId: "unassigned",
       due: "due_soon",
     },
@@ -102,6 +128,7 @@ test("applies saved issue filters with defaults", () => {
       projectId: "",
       sprintId: "",
       status: "",
+      workflowStatusId: "",
       priority: "",
       assigneeId: "",
       labelId: "label-1",
@@ -163,6 +190,7 @@ test("matches combined issue filters", () => {
       "project-1",
       "sprint-1",
       "todo",
+      "status-todo",
       "medium",
       "user-2",
       "label-1",
@@ -173,19 +201,23 @@ test("matches combined issue filters", () => {
     true,
   );
   assert.equal(
-    issueMatchesFilters(issue, "other-project", "", "", "", "", "", "", "", today),
+    issueMatchesFilters(issue, "other-project", "", "", "", "", "", "", "", "", today),
     false,
   );
   assert.equal(
-    issueMatchesFilters(issue, "", "other-sprint", "", "", "", "", "", "", today),
+    issueMatchesFilters(issue, "", "other-sprint", "", "", "", "", "", "", "", today),
     false,
   );
   assert.equal(
-    issueMatchesFilters(issue, "", "none", "", "", "", "", "", "", today),
+    issueMatchesFilters(issue, "", "", "", "status-other", "", "", "", "", "", today),
     false,
   );
   assert.equal(
-    issueMatchesFilters(issue, "", "", "", "", "unassigned", "", "", "", today),
+    issueMatchesFilters(issue, "", "none", "", "", "", "", "", "", "", today),
+    false,
+  );
+  assert.equal(
+    issueMatchesFilters(issue, "", "", "", "", "", "unassigned", "", "", "", today),
     false,
   );
 });

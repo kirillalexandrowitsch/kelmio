@@ -11,6 +11,69 @@ import (
 	"team-task-tracker/backend/internal/projectaccess"
 )
 
+type resolvedWorkflowStatus struct {
+	ID       string
+	Key      string
+	Name     string
+	Color    string
+	Category string
+}
+
+func resolveActiveWorkflowStatus(
+	ctx context.Context,
+	tx pgx.Tx,
+	projectID string,
+	workflowStatusID string,
+	statusKey string,
+) (resolvedWorkflowStatus, error) {
+	var status resolvedWorkflowStatus
+	query := `
+		SELECT id::text, key, name, color, category
+		FROM project_workflow_statuses
+		WHERE project_id = $1
+			AND archived_at IS NULL
+			AND key = $2
+	`
+	value := statusKey
+	if workflowStatusID != "" {
+		query = `
+			SELECT id::text, key, name, color, category
+			FROM project_workflow_statuses
+			WHERE project_id = $1
+				AND archived_at IS NULL
+				AND id = $2
+		`
+		value = workflowStatusID
+	}
+	if err := tx.QueryRow(ctx, query, projectID, value).Scan(
+		&status.ID,
+		&status.Key,
+		&status.Name,
+		&status.Color,
+		&status.Category,
+	); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return resolvedWorkflowStatus{}, errWorkflowStatusNotFound
+		}
+		return resolvedWorkflowStatus{}, err
+	}
+	return status, nil
+}
+
+func workflowTransitionExists(ctx context.Context, tx pgx.Tx, projectID string, fromStatusID string, toStatusID string) (bool, error) {
+	var exists bool
+	err := tx.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1
+			FROM project_workflow_transitions
+			WHERE project_id = $1
+				AND from_status_id = $2
+				AND to_status_id = $3
+		)
+	`, projectID, fromStatusID, toStatusID).Scan(&exists)
+	return exists, err
+}
+
 func listIssueLabelIDs(ctx context.Context, tx pgx.Tx, issueID string) ([]string, error) {
 	rows, err := tx.Query(ctx, `
 		SELECT label_id::text
@@ -208,6 +271,7 @@ func getIssueInTx(ctx context.Context, tx pgx.Tx, workspaceID string, issueID st
 			i.description,
 			i.issue_type,
 			i.status,
+			(SELECT jsonb_build_object('id', ws.id::text, 'key', ws.key, 'name', ws.name, 'color', ws.color, 'category', ws.category) FROM project_workflow_statuses ws WHERE ws.id = i.workflow_status_id),
 			i.priority,
 			i.story_points,
 			i.reporter_id::text,
@@ -287,12 +351,14 @@ func getIssueLinkInTx(ctx context.Context, tx pgx.Tx, workspaceID string, linkID
 			source_issue.title,
 			source_issue.issue_type,
 			source_issue.status,
+			(SELECT jsonb_build_object('id', ws.id::text, 'key', ws.key, 'name', ws.name, 'color', ws.color, 'category', ws.category) FROM project_workflow_statuses ws WHERE ws.id = source_issue.workflow_status_id),
 			source_issue.priority,
 			target_issue.id::text,
 			target_issue.issue_key,
 			target_issue.title,
 			target_issue.issue_type,
 			target_issue.status,
+			(SELECT jsonb_build_object('id', ws.id::text, 'key', ws.key, 'name', ws.name, 'color', ws.color, 'category', ws.category) FROM project_workflow_statuses ws WHERE ws.id = target_issue.workflow_status_id),
 			target_issue.priority
 		FROM issue_links il
 		JOIN issues source_issue ON source_issue.id = il.source_issue_id
@@ -323,12 +389,14 @@ func getIssueLinkForIssueInTx(ctx context.Context, tx pgx.Tx, workspaceID string
 			source_issue.title,
 			source_issue.issue_type,
 			source_issue.status,
+			(SELECT jsonb_build_object('id', ws.id::text, 'key', ws.key, 'name', ws.name, 'color', ws.color, 'category', ws.category) FROM project_workflow_statuses ws WHERE ws.id = source_issue.workflow_status_id),
 			source_issue.priority,
 			target_issue.id::text,
 			target_issue.issue_key,
 			target_issue.title,
 			target_issue.issue_type,
 			target_issue.status,
+			(SELECT jsonb_build_object('id', ws.id::text, 'key', ws.key, 'name', ws.name, 'color', ws.color, 'category', ws.category) FROM project_workflow_statuses ws WHERE ws.id = target_issue.workflow_status_id),
 			target_issue.priority
 		FROM issue_links il
 		JOIN issues source_issue ON source_issue.id = il.source_issue_id

@@ -163,12 +163,14 @@ func seedAccessIntegrationWorkspace(t *testing.T, ctx context.Context, db *pgxpo
 	}
 	projectA := insertProject("ACCA", leadID)
 	projectB := insertProject("ACCB", adminID)
-	if _, err := db.Exec(ctx, `
-		UPDATE project_members SET role = 'viewer' WHERE project_id = $1 AND user_id = $2;
-		DELETE FROM project_members WHERE project_id = $1 AND user_id = $3;
-		DELETE FROM project_members WHERE project_id = $4 AND user_id IN ($3, $5, $6);
-	`, projectA, viewerID, outsiderID, projectB, leadID, contributorID); err != nil {
-		t.Fatalf("configure project memberships: %v", err)
+	if _, err := db.Exec(ctx, `UPDATE project_members SET role = 'viewer' WHERE project_id = $1 AND user_id = $2`, projectA, viewerID); err != nil {
+		t.Fatalf("configure viewer membership: %v", err)
+	}
+	if _, err := db.Exec(ctx, `DELETE FROM project_members WHERE project_id = $1 AND user_id = $2`, projectA, outsiderID); err != nil {
+		t.Fatalf("remove outsider membership: %v", err)
+	}
+	if _, err := db.Exec(ctx, `DELETE FROM project_members WHERE project_id = $1 AND user_id IN ($2, $3, $4)`, projectB, outsiderID, leadID, contributorID); err != nil {
+		t.Fatalf("configure inaccessible project memberships: %v", err)
 	}
 
 	insertIssue := func(projectID string, key string, reporterID string) string {

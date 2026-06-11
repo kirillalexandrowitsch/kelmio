@@ -16,16 +16,17 @@ func normalizeCreateIssue(req createIssueRequest) (normalizedCreateIssue, error)
 	}
 
 	input := normalizedCreateIssue{
-		ProjectID:   strings.TrimSpace(req.ProjectID),
-		Title:       strings.TrimSpace(req.Title),
-		Description: strings.TrimSpace(req.Description),
-		IssueType:   withDefault(strings.TrimSpace(req.IssueType), "task"),
-		Status:      withDefault(strings.TrimSpace(req.Status), "todo"),
-		Priority:    withDefault(strings.TrimSpace(req.Priority), "medium"),
-		StoryPoints: req.StoryPoints,
-		AssigneeID:  strings.TrimSpace(req.AssigneeID),
-		DueDate:     strings.TrimSpace(req.DueDate),
-		LabelIDs:    labelIDs,
+		ProjectID:        strings.TrimSpace(req.ProjectID),
+		Title:            strings.TrimSpace(req.Title),
+		Description:      strings.TrimSpace(req.Description),
+		IssueType:        withDefault(strings.TrimSpace(req.IssueType), "task"),
+		Status:           strings.TrimSpace(req.Status),
+		WorkflowStatusID: strings.ToLower(strings.TrimSpace(req.WorkflowStatusID)),
+		Priority:         withDefault(strings.TrimSpace(req.Priority), "medium"),
+		StoryPoints:      req.StoryPoints,
+		AssigneeID:       strings.TrimSpace(req.AssigneeID),
+		DueDate:          strings.TrimSpace(req.DueDate),
+		LabelIDs:         labelIDs,
 	}
 
 	parentIssueID, err := normalizeOptionalIssueID(req.ParentIssueID)
@@ -54,7 +55,13 @@ func normalizeCreateIssue(req createIssueRequest) (normalizedCreateIssue, error)
 	if input.IssueType == "epic" && input.ParentIssueID != "" {
 		return input, errors.New("epic cannot have a parent issue")
 	}
-	if !validIssueStatuses[input.Status] {
+	if input.WorkflowStatusID != "" && !uuidPattern.MatchString(input.WorkflowStatusID) {
+		return input, errors.New("workflow_status_id is invalid")
+	}
+	if input.Status == "" && input.WorkflowStatusID == "" {
+		input.Status = "todo"
+	}
+	if input.WorkflowStatusID == "" && input.Status != "" && !workflowStatusKeyPattern.MatchString(input.Status) {
 		return input, errors.New("status is invalid")
 	}
 	if !validIssuePriorities[input.Priority] {
@@ -74,30 +81,36 @@ func normalizeCreateIssue(req createIssueRequest) (normalizedCreateIssue, error)
 
 func normalizeCreateSubtask(parent issueResponse, req createSubtaskRequest) (normalizedCreateIssue, error) {
 	return normalizeCreateIssue(createIssueRequest{
-		ProjectID:     parent.ProjectID,
-		ParentIssueID: parent.ID,
-		Title:         req.Title,
-		Description:   req.Description,
-		IssueType:     "subtask",
-		Status:        req.Status,
-		Priority:      req.Priority,
-		StoryPoints:   req.StoryPoints,
-		AssigneeID:    req.AssigneeID,
-		DueDate:       req.DueDate,
-		LabelIDs:      req.LabelIDs,
+		ProjectID:        parent.ProjectID,
+		ParentIssueID:    parent.ID,
+		Title:            req.Title,
+		Description:      req.Description,
+		IssueType:        "subtask",
+		Status:           req.Status,
+		WorkflowStatusID: req.WorkflowStatusID,
+		Priority:         req.Priority,
+		StoryPoints:      req.StoryPoints,
+		AssigneeID:       req.AssigneeID,
+		DueDate:          req.DueDate,
+		LabelIDs:         req.LabelIDs,
 	})
 }
 
-func normalizeTransitionIssue(req transitionIssueRequest) (string, error) {
-	status := strings.TrimSpace(req.Status)
-	if status == "" {
-		return "", errors.New("status is required")
+func normalizeTransitionIssue(req transitionIssueRequest) (normalizedTransitionIssue, error) {
+	input := normalizedTransitionIssue{
+		Status:           strings.TrimSpace(req.Status),
+		WorkflowStatusID: strings.ToLower(strings.TrimSpace(req.WorkflowStatusID)),
 	}
-	if !validIssueStatuses[status] {
-		return "", errors.New("status is invalid")
+	if input.Status == "" && input.WorkflowStatusID == "" {
+		return input, errors.New("status or workflow_status_id is required")
 	}
-
-	return status, nil
+	if input.WorkflowStatusID != "" && !uuidPattern.MatchString(input.WorkflowStatusID) {
+		return input, errors.New("workflow_status_id is invalid")
+	}
+	if input.WorkflowStatusID == "" && input.Status != "" && !workflowStatusKeyPattern.MatchString(input.Status) {
+		return input, errors.New("status is invalid")
+	}
+	return input, nil
 }
 
 func normalizeUpdateIssue(req updateIssueRequest) (normalizedUpdateIssue, error) {

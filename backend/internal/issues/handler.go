@@ -27,14 +27,6 @@ var validIssueTypes = map[string]bool{
 	"subtask": true,
 }
 
-var validIssueStatuses = map[string]bool{
-	"backlog":     true,
-	"todo":        true,
-	"in_progress": true,
-	"blocked":     true,
-	"done":        true,
-}
-
 var validIssuePriorities = map[string]bool{
 	"low":      true,
 	"medium":   true,
@@ -48,6 +40,7 @@ var validIssueLinkTypes = map[string]bool{
 }
 
 var uuidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
+var workflowStatusKeyPattern = regexp.MustCompile(`^[a-z][a-z0-9_]{0,31}$`)
 
 var errCommentForbidden = errors.New("comment update is forbidden")
 
@@ -58,28 +51,30 @@ type Handler struct {
 }
 
 type createIssueRequest struct {
-	ProjectID     string   `json:"project_id"`
-	ParentIssueID string   `json:"parent_issue_id"`
-	Title         string   `json:"title"`
-	Description   string   `json:"description"`
-	IssueType     string   `json:"issue_type"`
-	Status        string   `json:"status"`
-	Priority      string   `json:"priority"`
-	StoryPoints   int      `json:"story_points"`
-	AssigneeID    string   `json:"assignee_id"`
-	DueDate       string   `json:"due_date"`
-	LabelIDs      []string `json:"label_ids"`
+	ProjectID        string   `json:"project_id"`
+	ParentIssueID    string   `json:"parent_issue_id"`
+	Title            string   `json:"title"`
+	Description      string   `json:"description"`
+	IssueType        string   `json:"issue_type"`
+	Status           string   `json:"status"`
+	WorkflowStatusID string   `json:"workflow_status_id"`
+	Priority         string   `json:"priority"`
+	StoryPoints      int      `json:"story_points"`
+	AssigneeID       string   `json:"assignee_id"`
+	DueDate          string   `json:"due_date"`
+	LabelIDs         []string `json:"label_ids"`
 }
 
 type createSubtaskRequest struct {
-	Title       string   `json:"title"`
-	Description string   `json:"description"`
-	Status      string   `json:"status"`
-	Priority    string   `json:"priority"`
-	StoryPoints int      `json:"story_points"`
-	AssigneeID  string   `json:"assignee_id"`
-	DueDate     string   `json:"due_date"`
-	LabelIDs    []string `json:"label_ids"`
+	Title            string   `json:"title"`
+	Description      string   `json:"description"`
+	Status           string   `json:"status"`
+	WorkflowStatusID string   `json:"workflow_status_id"`
+	Priority         string   `json:"priority"`
+	StoryPoints      int      `json:"story_points"`
+	AssigneeID       string   `json:"assignee_id"`
+	DueDate          string   `json:"due_date"`
+	LabelIDs         []string `json:"label_ids"`
 }
 
 type updateIssueRequest struct {
@@ -92,7 +87,8 @@ type updateIssueRequest struct {
 }
 
 type transitionIssueRequest struct {
-	Status string `json:"status"`
+	Status           string `json:"status"`
+	WorkflowStatusID string `json:"workflow_status_id"`
 }
 
 type assignIssueRequest struct {
@@ -127,25 +123,26 @@ type issueLabelResponse struct {
 }
 
 type issueResponse struct {
-	ID            string               `json:"id"`
-	ProjectID     string               `json:"project_id"`
-	ProjectKey    string               `json:"project_key"`
-	Number        int                  `json:"number"`
-	IssueKey      string               `json:"issue_key"`
-	Title         string               `json:"title"`
-	Description   string               `json:"description"`
-	IssueType     string               `json:"issue_type"`
-	Status        string               `json:"status"`
-	Priority      string               `json:"priority"`
-	StoryPoints   int                  `json:"story_points"`
-	ReporterID    string               `json:"reporter_id"`
-	AssigneeID    *string              `json:"assignee_id"`
-	ParentIssueID *string              `json:"parent_issue_id"`
-	SprintID      *string              `json:"sprint_id"`
-	DueDate       *string              `json:"due_date"`
-	Labels        []issueLabelResponse `json:"labels"`
-	CreatedAt     time.Time            `json:"created_at"`
-	UpdatedAt     time.Time            `json:"updated_at"`
+	ID             string                 `json:"id"`
+	ProjectID      string                 `json:"project_id"`
+	ProjectKey     string                 `json:"project_key"`
+	Number         int                    `json:"number"`
+	IssueKey       string                 `json:"issue_key"`
+	Title          string                 `json:"title"`
+	Description    string                 `json:"description"`
+	IssueType      string                 `json:"issue_type"`
+	Status         string                 `json:"status"`
+	WorkflowStatus workflowStatusResponse `json:"workflow_status"`
+	Priority       string                 `json:"priority"`
+	StoryPoints    int                    `json:"story_points"`
+	ReporterID     string                 `json:"reporter_id"`
+	AssigneeID     *string                `json:"assignee_id"`
+	ParentIssueID  *string                `json:"parent_issue_id"`
+	SprintID       *string                `json:"sprint_id"`
+	DueDate        *string                `json:"due_date"`
+	Labels         []issueLabelResponse   `json:"labels"`
+	CreatedAt      time.Time              `json:"created_at"`
+	UpdatedAt      time.Time              `json:"updated_at"`
 }
 
 type listIssuesResponse struct {
@@ -187,12 +184,13 @@ type listActivityResponse struct {
 }
 
 type issueLinkIssueResponse struct {
-	ID        string `json:"id"`
-	IssueKey  string `json:"issue_key"`
-	Title     string `json:"title"`
-	IssueType string `json:"issue_type"`
-	Status    string `json:"status"`
-	Priority  string `json:"priority"`
+	ID             string                 `json:"id"`
+	IssueKey       string                 `json:"issue_key"`
+	Title          string                 `json:"title"`
+	IssueType      string                 `json:"issue_type"`
+	Status         string                 `json:"status"`
+	WorkflowStatus workflowStatusResponse `json:"workflow_status"`
+	Priority       string                 `json:"priority"`
 }
 
 type issueLinkResponse struct {
@@ -211,17 +209,31 @@ type listIssueLinksResponse struct {
 }
 
 type normalizedCreateIssue struct {
-	ProjectID     string
-	ParentIssueID string
-	Title         string
-	Description   string
-	IssueType     string
-	Status        string
-	Priority      string
-	StoryPoints   int
-	AssigneeID    string
-	DueDate       string
-	LabelIDs      []string
+	ProjectID        string
+	ParentIssueID    string
+	Title            string
+	Description      string
+	IssueType        string
+	Status           string
+	WorkflowStatusID string
+	Priority         string
+	StoryPoints      int
+	AssigneeID       string
+	DueDate          string
+	LabelIDs         []string
+}
+
+type normalizedTransitionIssue struct {
+	Status           string
+	WorkflowStatusID string
+}
+
+type workflowStatusResponse struct {
+	ID       string `json:"id"`
+	Key      string `json:"key"`
+	Name     string `json:"name"`
+	Color    string `json:"color"`
+	Category string `json:"category"`
 }
 
 type normalizedUpdateIssue struct {
@@ -327,6 +339,10 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 		}
 		if errors.Is(err, pgx.ErrNoRows) {
 			writeError(w, http.StatusNotFound, "project_not_found", "project was not found")
+			return
+		}
+		if errors.Is(err, errWorkflowStatusNotFound) {
+			writeError(w, http.StatusNotFound, "workflow_status_not_found", "workflow status was not found")
 			return
 		}
 		if errors.Is(err, errInvalidAssignee) {
@@ -491,7 +507,6 @@ func (h *Handler) createSubtask(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusNotFound, "issue_not_found", "parent issue was not found")
 			return
 		}
-
 		writeError(w, http.StatusInternalServerError, "internal_error", "could not load parent issue")
 		return
 	}
@@ -509,6 +524,10 @@ func (h *Handler) createSubtask(w http.ResponseWriter, r *http.Request) {
 		}
 		if errors.Is(err, pgx.ErrNoRows) {
 			writeError(w, http.StatusNotFound, "issue_not_found", "parent issue was not found")
+			return
+		}
+		if errors.Is(err, errWorkflowStatusNotFound) {
+			writeError(w, http.StatusNotFound, "workflow_status_not_found", "workflow status was not found")
 			return
 		}
 		if errors.Is(err, errInvalidAssignee) {
@@ -662,7 +681,7 @@ func (h *Handler) createLink(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if errors.Is(err, errInvalidIssueLinkTarget) {
-			writeError(w, http.StatusBadRequest, "invalid_target", "target issue must be accessible in this workspace")
+			writeError(w, http.StatusNotFound, "issue_not_found", "target issue was not found")
 			return
 		}
 		if errors.Is(err, errIssueLinkSelf) {
@@ -758,6 +777,14 @@ func (h *Handler) transition(w http.ResponseWriter, r *http.Request) {
 	issue, err := h.transitionIssueStatus(ctx, user, issueID, status)
 	if err != nil {
 		if h.writeProjectAccessError(w, err) {
+			return
+		}
+		if errors.Is(err, errWorkflowStatusNotFound) {
+			writeError(w, http.StatusNotFound, "workflow_status_not_found", "workflow status was not found")
+			return
+		}
+		if errors.Is(err, errTransitionNotAllowed) {
+			writeError(w, http.StatusConflict, "transition_not_allowed", "workflow transition is not allowed")
 			return
 		}
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -1275,6 +1302,7 @@ func (h *Handler) listIssuesPage(ctx context.Context, workspaceID string, query 
 		conditions = append(conditions, sprintCondition)
 	}
 	addFilter("i.status", firstQueryValue(query, "status"))
+	addFilter("i.workflow_status_id", firstQueryValue(query, "workflow_status_id"))
 	addFilter("i.priority", firstQueryValue(query, "priority"))
 	if dueCondition := issueDueFilterCondition(firstQueryValue(query, "due")); dueCondition != "" {
 		conditions = append(conditions, dueCondition)
@@ -1325,6 +1353,7 @@ func (h *Handler) listIssuesPage(ctx context.Context, workspaceID string, query 
 			i.description,
 			i.issue_type,
 			i.status,
+			(SELECT jsonb_build_object('id', ws.id::text, 'key', ws.key, 'name', ws.name, 'color', ws.color, 'category', ws.category) FROM project_workflow_statuses ws WHERE ws.id = i.workflow_status_id),
 			i.priority,
 			i.story_points,
 			i.reporter_id::text,
@@ -1389,6 +1418,8 @@ var errIssueParentForbidden = errors.New("issue parent forbidden")
 var errInvalidIssueLinkTarget = errors.New("invalid issue link target")
 var errIssueLinkSelf = errors.New("issue link self")
 var errIssueLinkDuplicate = errors.New("issue link duplicate")
+var errWorkflowStatusNotFound = errors.New("workflow status not found")
+var errTransitionNotAllowed = errors.New("transition not allowed")
 
 func (h *Handler) getIssue(ctx context.Context, workspaceID string, issueID string, users ...auth.CurrentUser) (issueResponse, error) {
 	if len(users) > 0 {
@@ -1407,6 +1438,7 @@ func (h *Handler) getIssue(ctx context.Context, workspaceID string, issueID stri
 			i.description,
 			i.issue_type,
 			i.status,
+			(SELECT jsonb_build_object('id', ws.id::text, 'key', ws.key, 'name', ws.name, 'color', ws.color, 'category', ws.category) FROM project_workflow_statuses ws WHERE ws.id = i.workflow_status_id),
 			i.priority,
 			i.story_points,
 			i.reporter_id::text,
@@ -1487,6 +1519,10 @@ func (h *Handler) createIssue(ctx context.Context, user auth.CurrentUser, input 
 	if err := verifyIssueParent(ctx, tx, user, "", input.ParentIssueID); err != nil {
 		return issueResponse{}, err
 	}
+	workflowStatus, err := resolveActiveWorkflowStatus(ctx, tx, input.ProjectID, input.WorkflowStatusID, input.Status)
+	if err != nil {
+		return issueResponse{}, err
+	}
 
 	var nextNumber int
 	if err := tx.QueryRow(ctx, `
@@ -1521,6 +1557,7 @@ func (h *Handler) createIssue(ctx context.Context, user auth.CurrentUser, input 
 			description,
 			issue_type,
 			status,
+			workflow_status_id,
 			priority,
 			story_points,
 			reporter_id,
@@ -1528,17 +1565,18 @@ func (h *Handler) createIssue(ctx context.Context, user auth.CurrentUser, input 
 			parent_issue_id,
 			due_date
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 		RETURNING
 			id::text,
 			project_id::text,
-			$14::text,
+			$15::text,
 			number,
 			issue_key,
 			title,
 			description,
 			issue_type,
 			status,
+			(SELECT jsonb_build_object('id', ws.id::text, 'key', ws.key, 'name', ws.name, 'color', ws.color, 'category', ws.category) FROM project_workflow_statuses ws WHERE ws.id = workflow_status_id),
 			priority,
 			story_points,
 			reporter_id::text,
@@ -1549,7 +1587,7 @@ func (h *Handler) createIssue(ctx context.Context, user auth.CurrentUser, input 
 			created_at,
 			updated_at,
 			'[]'::jsonb
-	`, input.ProjectID, nextNumber, issueKey, input.Title, input.Description, input.IssueType, input.Status, input.Priority, input.StoryPoints, user.ID, assigneeID, parentIssueID, dueDate, projectKey))
+	`, input.ProjectID, nextNumber, issueKey, input.Title, input.Description, input.IssueType, workflowStatus.Key, workflowStatus.ID, input.Priority, input.StoryPoints, user.ID, assigneeID, parentIssueID, dueDate, projectKey))
 	if err != nil {
 		return issueResponse{}, err
 	}
@@ -1614,6 +1652,7 @@ func (h *Handler) updateIssue(ctx context.Context, user auth.CurrentUser, issueI
 			i.description,
 			i.issue_type,
 			i.status,
+			(SELECT jsonb_build_object('id', ws.id::text, 'key', ws.key, 'name', ws.name, 'color', ws.color, 'category', ws.category) FROM project_workflow_statuses ws WHERE ws.id = i.workflow_status_id),
 			i.priority,
 			i.story_points,
 			i.reporter_id::text,
@@ -1688,6 +1727,7 @@ func (h *Handler) updateIssue(ctx context.Context, user auth.CurrentUser, issueI
 			i.description,
 			i.issue_type,
 			i.status,
+			(SELECT jsonb_build_object('id', ws.id::text, 'key', ws.key, 'name', ws.name, 'color', ws.color, 'category', ws.category) FROM project_workflow_statuses ws WHERE ws.id = i.workflow_status_id),
 			i.priority,
 			i.story_points,
 			i.reporter_id::text,
@@ -1759,6 +1799,7 @@ func (h *Handler) listIssueChildren(ctx context.Context, workspaceID string, iss
 			i.description,
 			i.issue_type,
 			i.status,
+			(SELECT jsonb_build_object('id', ws.id::text, 'key', ws.key, 'name', ws.name, 'color', ws.color, 'category', ws.category) FROM project_workflow_statuses ws WHERE ws.id = i.workflow_status_id),
 			i.priority,
 			i.story_points,
 			i.reporter_id::text,
@@ -1839,6 +1880,7 @@ func (h *Handler) setIssueParent(ctx context.Context, user auth.CurrentUser, iss
 			i.description,
 			i.issue_type,
 			i.status,
+			(SELECT jsonb_build_object('id', ws.id::text, 'key', ws.key, 'name', ws.name, 'color', ws.color, 'category', ws.category) FROM project_workflow_statuses ws WHERE ws.id = i.workflow_status_id),
 			i.priority,
 			i.story_points,
 			i.reporter_id::text,
@@ -1920,6 +1962,7 @@ func (h *Handler) setIssueParent(ctx context.Context, user auth.CurrentUser, iss
 			i.description,
 			i.issue_type,
 			i.status,
+			(SELECT jsonb_build_object('id', ws.id::text, 'key', ws.key, 'name', ws.name, 'color', ws.color, 'category', ws.category) FROM project_workflow_statuses ws WHERE ws.id = i.workflow_status_id),
 			i.priority,
 			i.story_points,
 			i.reporter_id::text,
@@ -1997,12 +2040,14 @@ func (h *Handler) listIssueLinks(ctx context.Context, workspaceID string, issueI
 			source_issue.title,
 			source_issue.issue_type,
 			source_issue.status,
+			(SELECT jsonb_build_object('id', ws.id::text, 'key', ws.key, 'name', ws.name, 'color', ws.color, 'category', ws.category) FROM project_workflow_statuses ws WHERE ws.id = source_issue.workflow_status_id),
 			source_issue.priority,
 			target_issue.id::text,
 			target_issue.issue_key,
 			target_issue.title,
 			target_issue.issue_type,
 			target_issue.status,
+			(SELECT jsonb_build_object('id', ws.id::text, 'key', ws.key, 'name', ws.name, 'color', ws.color, 'category', ws.category) FROM project_workflow_statuses ws WHERE ws.id = target_issue.workflow_status_id),
 			target_issue.priority
 		FROM issue_links il
 		JOIN issues source_issue ON source_issue.id = il.source_issue_id
@@ -2148,7 +2193,7 @@ func (h *Handler) deleteIssueLink(ctx context.Context, user auth.CurrentUser, is
 	return tx.Commit(ctx)
 }
 
-func (h *Handler) transitionIssueStatus(ctx context.Context, user auth.CurrentUser, issueID string, status string) (issueResponse, error) {
+func (h *Handler) transitionIssueStatus(ctx context.Context, user auth.CurrentUser, issueID string, input normalizedTransitionIssue) (issueResponse, error) {
 	tx, err := h.db.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return issueResponse{}, err
@@ -2160,9 +2205,11 @@ func (h *Handler) transitionIssueStatus(ctx context.Context, user auth.CurrentUs
 	if _, err := projectaccess.RequireIssueWrite(ctx, tx, user, issueID); err != nil {
 		return issueResponse{}, err
 	}
+	var projectID string
 	var previousStatus string
+	var previousWorkflowStatusID string
 	if err := tx.QueryRow(ctx, `
-		SELECT i.status
+		SELECT i.project_id::text, i.status, i.workflow_status_id::text
 		FROM issues i
 		JOIN projects p ON p.id = i.project_id
 	WHERE i.id = $1
@@ -2170,13 +2217,34 @@ func (h *Handler) transitionIssueStatus(ctx context.Context, user auth.CurrentUs
 		AND p.archived_at IS NULL
 		AND i.archived_at IS NULL
 	FOR UPDATE OF i
-	`, issueID, user.WorkspaceID).Scan(&previousStatus); err != nil {
+	`, issueID, user.WorkspaceID).Scan(&projectID, &previousStatus, &previousWorkflowStatusID); err != nil {
 		return issueResponse{}, err
+	}
+	target, err := resolveActiveWorkflowStatus(ctx, tx, projectID, input.WorkflowStatusID, input.Status)
+	if err != nil {
+		return issueResponse{}, err
+	}
+	if target.ID == previousWorkflowStatusID {
+		issue, err := getIssueInTx(ctx, tx, user.WorkspaceID, issueID)
+		if err != nil {
+			return issueResponse{}, err
+		}
+		if err := tx.Commit(ctx); err != nil {
+			return issueResponse{}, err
+		}
+		return issue, nil
+	}
+	allowed, err := workflowTransitionExists(ctx, tx, projectID, previousWorkflowStatusID, target.ID)
+	if err != nil {
+		return issueResponse{}, err
+	}
+	if !allowed {
+		return issueResponse{}, errTransitionNotAllowed
 	}
 
 	issue, err := scanIssue(tx.QueryRow(ctx, `
 		UPDATE issues i
-		SET status = $3,
+		SET workflow_status_id = $3,
 			updated_at = now()
 		FROM projects p
 		WHERE i.project_id = p.id
@@ -2194,6 +2262,7 @@ func (h *Handler) transitionIssueStatus(ctx context.Context, user auth.CurrentUs
 			i.description,
 			i.issue_type,
 			i.status,
+			(SELECT jsonb_build_object('id', ws.id::text, 'key', ws.key, 'name', ws.name, 'color', ws.color, 'category', ws.category) FROM project_workflow_statuses ws WHERE ws.id = i.workflow_status_id),
 			i.priority,
 			i.story_points,
 			i.reporter_id::text,
@@ -2219,7 +2288,7 @@ func (h *Handler) transitionIssueStatus(ctx context.Context, user auth.CurrentUs
 				JOIN labels l ON l.id = il.label_id
 				WHERE il.issue_id = i.id
 			)
-	`, issueID, user.WorkspaceID, status))
+	`, issueID, user.WorkspaceID, target.ID))
 	if err != nil {
 		return issueResponse{}, err
 	}
@@ -2296,6 +2365,7 @@ func (h *Handler) assignIssue(ctx context.Context, user auth.CurrentUser, issueI
 			i.description,
 			i.issue_type,
 			i.status,
+			(SELECT jsonb_build_object('id', ws.id::text, 'key', ws.key, 'name', ws.name, 'color', ws.color, 'category', ws.category) FROM project_workflow_statuses ws WHERE ws.id = i.workflow_status_id),
 			i.priority,
 			i.story_points,
 			i.reporter_id::text,
@@ -2424,6 +2494,7 @@ func (h *Handler) setIssueLabels(ctx context.Context, user auth.CurrentUser, iss
 			i.description,
 			i.issue_type,
 			i.status,
+			(SELECT jsonb_build_object('id', ws.id::text, 'key', ws.key, 'name', ws.name, 'color', ws.color, 'category', ws.category) FROM project_workflow_statuses ws WHERE ws.id = i.workflow_status_id),
 			i.priority,
 			i.story_points,
 			i.reporter_id::text,

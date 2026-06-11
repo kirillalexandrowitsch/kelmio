@@ -230,6 +230,7 @@ func TestPostgresMigrationsCreateCoreSchema(t *testing.T) {
 		"project_workflow_transitions_to_status_fk",
 		"project_workflow_transitions_not_self",
 		"issues_workflow_status_project_fk",
+		"issues_status_key_valid",
 		"project_members_role_valid",
 	}
 	for _, constraintName := range expectedConstraints {
@@ -833,8 +834,8 @@ func TestProjectWorkflowMigrationBackfillsLegacyIssues(t *testing.T) {
 	if err != nil {
 		t.Fatalf("apply workflow migration: %v", err)
 	}
-	if len(applied) != 2 || applied[0].Version != 11 || applied[1].Version != 12 {
-		t.Fatalf("post-legacy migrations applied = %#v, want versions 11 and 12", applied)
+	if len(applied) != 3 || applied[0].Version != 11 || applied[1].Version != 12 || applied[2].Version != 13 {
+		t.Fatalf("post-legacy migrations applied = %#v, want versions 11, 12 and 13", applied)
 	}
 
 	var workflowStatuses int

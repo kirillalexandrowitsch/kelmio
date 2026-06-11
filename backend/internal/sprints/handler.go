@@ -486,7 +486,7 @@ func (h *Handler) listSprints(ctx context.Context, workspaceID string, projectID
 				FROM issues i
 				WHERE i.sprint_id = s.id
 					AND i.archived_at IS NULL
-					AND i.status = 'done'
+					AND EXISTS (SELECT 1 FROM project_workflow_statuses ws_done WHERE ws_done.id = i.workflow_status_id AND ws_done.category = 'done')
 			),
 			(
 				SELECT COALESCE(SUM(i.story_points), 0)::int
@@ -499,14 +499,14 @@ func (h *Handler) listSprints(ctx context.Context, workspaceID string, projectID
 				FROM issues i
 				WHERE i.sprint_id = s.id
 					AND i.archived_at IS NULL
-					AND i.status = 'done'
+					AND EXISTS (SELECT 1 FROM project_workflow_statuses ws_done WHERE ws_done.id = i.workflow_status_id AND ws_done.category = 'done')
 			),
 			(
 				SELECT COALESCE(SUM(i.story_points), 0)::int
 				FROM issues i
 				WHERE i.sprint_id = s.id
 					AND i.archived_at IS NULL
-					AND i.status <> 'done'
+					AND EXISTS (SELECT 1 FROM project_workflow_statuses ws_open WHERE ws_open.id = i.workflow_status_id AND ws_open.category <> 'done')
 			)
 		FROM sprints s
 		JOIN projects p ON p.id = s.project_id
@@ -674,7 +674,7 @@ func (h *Handler) updateSprint(ctx context.Context, workspaceID string, sprintID
 				FROM issues i
 				WHERE i.sprint_id = s.id
 					AND i.archived_at IS NULL
-					AND i.status = 'done'
+					AND EXISTS (SELECT 1 FROM project_workflow_statuses ws_done WHERE ws_done.id = i.workflow_status_id AND ws_done.category = 'done')
 			),
 			(
 				SELECT COALESCE(SUM(i.story_points), 0)::int
@@ -687,14 +687,14 @@ func (h *Handler) updateSprint(ctx context.Context, workspaceID string, sprintID
 				FROM issues i
 				WHERE i.sprint_id = s.id
 					AND i.archived_at IS NULL
-					AND i.status = 'done'
+					AND EXISTS (SELECT 1 FROM project_workflow_statuses ws_done WHERE ws_done.id = i.workflow_status_id AND ws_done.category = 'done')
 			),
 			(
 				SELECT COALESCE(SUM(i.story_points), 0)::int
 				FROM issues i
 				WHERE i.sprint_id = s.id
 					AND i.archived_at IS NULL
-					AND i.status <> 'done'
+					AND EXISTS (SELECT 1 FROM project_workflow_statuses ws_open WHERE ws_open.id = i.workflow_status_id AND ws_open.category <> 'done')
 			)
 	`, sprintID, workspaceID, input.Name, input.Goal, dateOrNil(input.StartDate), dateOrNil(input.EndDate)))
 	if err != nil {
@@ -762,7 +762,7 @@ func (h *Handler) startSprint(ctx context.Context, user auth.CurrentUser, sprint
 				FROM issues i
 				WHERE i.sprint_id = s.id
 					AND i.archived_at IS NULL
-					AND i.status = 'done'
+					AND EXISTS (SELECT 1 FROM project_workflow_statuses ws_done WHERE ws_done.id = i.workflow_status_id AND ws_done.category = 'done')
 			),
 			(
 				SELECT COALESCE(SUM(i.story_points), 0)::int
@@ -775,14 +775,14 @@ func (h *Handler) startSprint(ctx context.Context, user auth.CurrentUser, sprint
 				FROM issues i
 				WHERE i.sprint_id = s.id
 					AND i.archived_at IS NULL
-					AND i.status = 'done'
+					AND EXISTS (SELECT 1 FROM project_workflow_statuses ws_done WHERE ws_done.id = i.workflow_status_id AND ws_done.category = 'done')
 			),
 			(
 				SELECT COALESCE(SUM(i.story_points), 0)::int
 				FROM issues i
 				WHERE i.sprint_id = s.id
 					AND i.archived_at IS NULL
-					AND i.status <> 'done'
+					AND EXISTS (SELECT 1 FROM project_workflow_statuses ws_open WHERE ws_open.id = i.workflow_status_id AND ws_open.category <> 'done')
 			)
 	`, sprintID, user.WorkspaceID))
 	if err != nil {
@@ -859,7 +859,7 @@ func (h *Handler) completeSprint(ctx context.Context, user auth.CurrentUser, spr
 				FROM issues i
 				WHERE i.sprint_id = s.id
 					AND i.archived_at IS NULL
-					AND i.status = 'done'
+					AND EXISTS (SELECT 1 FROM project_workflow_statuses ws_done WHERE ws_done.id = i.workflow_status_id AND ws_done.category = 'done')
 			),
 			(
 				SELECT COALESCE(SUM(i.story_points), 0)::int
@@ -872,14 +872,14 @@ func (h *Handler) completeSprint(ctx context.Context, user auth.CurrentUser, spr
 				FROM issues i
 				WHERE i.sprint_id = s.id
 					AND i.archived_at IS NULL
-					AND i.status = 'done'
+					AND EXISTS (SELECT 1 FROM project_workflow_statuses ws_done WHERE ws_done.id = i.workflow_status_id AND ws_done.category = 'done')
 			),
 			(
 				SELECT COALESCE(SUM(i.story_points), 0)::int
 				FROM issues i
 				WHERE i.sprint_id = s.id
 					AND i.archived_at IS NULL
-					AND i.status <> 'done'
+					AND EXISTS (SELECT 1 FROM project_workflow_statuses ws_open WHERE ws_open.id = i.workflow_status_id AND ws_open.category <> 'done')
 			)
 	`, sprintID, user.WorkspaceID))
 	if err != nil {

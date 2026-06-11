@@ -49,7 +49,7 @@ type IssueListPanelProps = {
   onQueryChange: (value: string) => void;
   onSortChange: (value: IssueSort) => void;
   onSprintFilterChange: (value: string) => void;
-  onStatusFilterChange: (value: IssueStatus | "") => void;
+  onStatusFilterChange: (value: string) => void;
   priorityFilter: IssuePriority | "";
   projectFilterId: string;
   projects: Project[];
@@ -57,7 +57,7 @@ type IssueListPanelProps = {
   sort: IssueSort;
   sprintFilterId: string;
   sprints: Sprint[];
-  statusFilter: IssueStatus | "";
+  statusFilter: string;
   teamMembers: TeamMember[];
   today: Date;
 };

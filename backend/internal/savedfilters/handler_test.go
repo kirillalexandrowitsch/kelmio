@@ -13,15 +13,16 @@ func TestNormalizeCreateSavedFilter(t *testing.T) {
 	got, err := normalizeCreateSavedFilter(createSavedFilterRequest{
 		Name: "  My   Work  ",
 		Filters: map[string]string{
-			"query":      " routing ",
-			"sort":       "priority_desc",
-			"projectId":  " 6D5257D4-002E-44DA-8925-D9108699C504 ",
-			"sprintId":   "none",
-			"status":     "todo",
-			"priority":   "high",
-			"assigneeId": "unassigned",
-			"labelId":    testUUID,
-			"due":        "due_soon",
+			"query":            " routing ",
+			"sort":             "priority_desc",
+			"projectId":        " 6D5257D4-002E-44DA-8925-D9108699C504 ",
+			"sprintId":         "none",
+			"status":           "todo",
+			"workflowStatusId": testUUID,
+			"priority":         "high",
+			"assigneeId":       "unassigned",
+			"labelId":          testUUID,
+			"due":              "due_soon",
 		},
 	})
 	if err != nil {
@@ -39,6 +40,9 @@ func TestNormalizeCreateSavedFilter(t *testing.T) {
 	}
 	if got.Filters["sort"] != "priority_desc" {
 		t.Fatalf("sort = %q, want priority_desc", got.Filters["sort"])
+	}
+	if got.Filters["workflowStatusId"] != testUUID {
+		t.Fatalf("workflowStatusId = %q, want %q", got.Filters["workflowStatusId"], testUUID)
 	}
 }
 
@@ -89,7 +93,14 @@ func TestNormalizeCreateSavedFilterValidation(t *testing.T) {
 			name: "bad status",
 			req: createSavedFilterRequest{
 				Name:    "Bad status",
-				Filters: map[string]string{"status": "started"},
+				Filters: map[string]string{"status": "Ready for review"},
+			},
+		},
+		{
+			name: "bad workflow status id",
+			req: createSavedFilterRequest{
+				Name:    "Bad workflow status",
+				Filters: map[string]string{"workflowStatusId": "not-a-uuid"},
 			},
 		},
 		{

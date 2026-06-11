@@ -65,7 +65,8 @@ export type IssueFilterState = {
   sort: IssueSort;
   projectId: string;
   sprintId: string;
-  status: IssueStatus | "";
+  status: string;
+  workflowStatusId: string;
   priority: IssuePriority | "";
   assigneeId: string;
   labelId: string;
@@ -78,7 +79,8 @@ export function issueMatchesFilters(
   issue: Issue,
   projectId: string,
   sprintId: string,
-  status: IssueStatus | "",
+  status: string,
+  workflowStatusId: string,
   priority: IssuePriority | "",
   assigneeId: string,
   labelId: string,
@@ -96,6 +98,9 @@ export function issueMatchesFilters(
     return false;
   }
   if (status && issue.status !== status) {
+    return false;
+  }
+  if (workflowStatusId && issue.workflow_status.id !== workflowStatusId) {
     return false;
   }
   if (priority && issue.priority !== priority) {
@@ -159,6 +164,9 @@ export function savedIssueFiltersFromState(
   if (state.status) {
     filters.status = state.status;
   }
+  if (state.workflowStatusId) {
+    filters.workflowStatusId = state.workflowStatusId;
+  }
   if (state.priority) {
     filters.priority = state.priority;
   }
@@ -184,6 +192,7 @@ export function savedIssueFilterStateFromFilters(
     projectId: filters.projectId ?? "",
     sprintId: filters.sprintId ?? "",
     status: filters.status ?? "",
+    workflowStatusId: filters.workflowStatusId ?? "",
     priority: filters.priority ?? "",
     assigneeId: filters.assigneeId ?? "",
     labelId: filters.labelId ?? "",
@@ -256,7 +265,7 @@ export function issueDueInfo(issue: Issue, today: Date) {
     (dueDate.getTime() - today.getTime()) / (24 * 60 * 60 * 1000),
   );
 
-  if (issue.status === "done") {
+  if (isIssueDone(issue)) {
     return { label: `Done, due ${issue.due_date}`, tone: "done" as DueTone };
   }
   if (daysUntilDue < 0) {
@@ -291,7 +300,7 @@ export function issueMatchesDueFilter(
     return issue.due_date === null;
   }
 
-  if (issue.status === "done") {
+  if (isIssueDone(issue)) {
     return false;
   }
 
@@ -312,4 +321,8 @@ export function issueMatchesDueFilter(
   }
 
   return daysUntilDue > 0 && daysUntilDue <= 7;
+}
+
+export function isIssueDone(issue: Issue) {
+  return issue.workflow_status?.category === "done" || issue.status === "done";
 }

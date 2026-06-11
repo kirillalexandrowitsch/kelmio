@@ -111,6 +111,107 @@ func TestIssueHierarchyIntegration(t *testing.T) {
 	}
 }
 
+func TestIssueWorkflowStatusesIntegration(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	db := newIssueIntegrationDB(t, ctx)
+	handler := NewHandler(db, nil)
+	user, projectID := seedIssueIntegrationWorkspace(t, ctx, db)
+
+	var todoID, reviewID string
+	if err := db.QueryRow(ctx, `SELECT id::text FROM project_workflow_statuses WHERE project_id = $1 AND key = 'todo'`, projectID).Scan(&todoID); err != nil {
+		t.Fatalf("load todo status: %v", err)
+	}
+	if err := db.QueryRow(ctx, `
+		INSERT INTO project_workflow_statuses (project_id, key, name, color, category, position)
+		VALUES ($1, 'review', 'Ready for review', '#0ea5e9', 'in_progress', 600)
+		RETURNING id::text
+	`, projectID).Scan(&reviewID); err != nil {
+		t.Fatalf("create review status: %v", err)
+	}
+	if _, err := db.Exec(ctx, `
+		INSERT INTO project_workflow_transitions (project_id, from_status_id, to_status_id)
+		VALUES ($1, $2, $3)
+	`, projectID, todoID, reviewID); err != nil {
+		t.Fatalf("create review transition: %v", err)
+	}
+
+	issue, err := handler.createIssue(ctx, user, normalizedCreateIssue{
+		ProjectID:        projectID,
+		Title:            "Workflow issue",
+		IssueType:        "task",
+		Status:           "done",
+		WorkflowStatusID: reviewID,
+		Priority:         "medium",
+	})
+	if err != nil {
+		t.Fatalf("create issue by workflow status id: %v", err)
+	}
+	if issue.Status != "review" || issue.WorkflowStatus.ID != reviewID || issue.WorkflowStatus.Category != "in_progress" {
+		t.Fatalf("created workflow issue = %#v", issue)
+	}
+
+	legacy, err := handler.createIssue(ctx, user, normalizedCreateIssue{
+		ProjectID: projectID,
+		Title:     "Legacy custom key issue",
+		IssueType: "task",
+		Status:    "review",
+		Priority:  "medium",
+	})
+	if err != nil {
+		t.Fatalf("create issue by custom key: %v", err)
+	}
+	if legacy.WorkflowStatus.ID != reviewID {
+		t.Fatalf("legacy custom key workflow status = %#v", legacy.WorkflowStatus)
+	}
+
+	todo, err := handler.createIssue(ctx, user, normalizedCreateIssue{
+		ProjectID: projectID,
+		Title:     "Transition issue",
+		IssueType: "task",
+		Status:    "todo",
+		Priority:  "medium",
+	})
+	if err != nil {
+		t.Fatalf("create transition issue: %v", err)
+	}
+	transitioned, err := handler.transitionIssueStatus(ctx, user, todo.ID, normalizedTransitionIssue{WorkflowStatusID: reviewID})
+	if err != nil {
+		t.Fatalf("allowed transition: %v", err)
+	}
+	if transitioned.Status != "review" {
+		t.Fatalf("transitioned status = %q, want review", transitioned.Status)
+	}
+	if _, err := handler.transitionIssueStatus(ctx, user, todo.ID, normalizedTransitionIssue{Status: "done"}); !errors.Is(err, errTransitionNotAllowed) {
+		t.Fatalf("forbidden transition error = %v, want %v", err, errTransitionNotAllowed)
+	}
+	if _, err := handler.transitionIssueStatus(ctx, user, todo.ID, normalizedTransitionIssue{WorkflowStatusID: reviewID}); err != nil {
+		t.Fatalf("no-op transition: %v", err)
+	}
+	var transitionActivityCount int
+	if err := db.QueryRow(ctx, `
+		SELECT count(*)::int
+		FROM activity_log
+		WHERE entity_type = 'issue'
+			AND entity_id = $1
+			AND action = 'status_changed'
+	`, todo.ID).Scan(&transitionActivityCount); err != nil {
+		t.Fatalf("count transition activity: %v", err)
+	}
+	if transitionActivityCount != 1 {
+		t.Fatalf("transition activity count = %d, want 1", transitionActivityCount)
+	}
+
+	filtered, err := handler.listIssues(ctx, user.WorkspaceID, map[string][]string{"workflow_status_id": {reviewID}})
+	if err != nil {
+		t.Fatalf("filter issues by workflow status id: %v", err)
+	}
+	if len(filtered) != 3 {
+		t.Fatalf("workflow status filter returned %d issues, want 3", len(filtered))
+	}
+}
+
 func TestIssueLinksIntegration(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()

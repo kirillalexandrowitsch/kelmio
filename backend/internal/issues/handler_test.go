@@ -70,6 +70,23 @@ func TestNormalizeCreateIssueAcceptsEpic(t *testing.T) {
 	}
 }
 
+func TestNormalizeCreateIssueWorkflowStatusIDTakesPrecedence(t *testing.T) {
+	t.Parallel()
+
+	got, err := normalizeCreateIssue(createIssueRequest{
+		ProjectID:        "project-id",
+		Title:            "Workflow issue",
+		Status:           "Ready for review",
+		WorkflowStatusID: testIssueID,
+	})
+	if err != nil {
+		t.Fatalf("normalize create issue with workflow status id: %v", err)
+	}
+	if got.WorkflowStatusID != testIssueID {
+		t.Fatalf("workflow status id = %q, want %q", got.WorkflowStatusID, testIssueID)
+	}
+}
+
 func TestNormalizeCreateIssueAcceptsSubtaskWithParent(t *testing.T) {
 	t.Parallel()
 
@@ -225,14 +242,29 @@ func TestNormalizeCreateSubtask(t *testing.T) {
 func TestNormalizeTransitionIssue(t *testing.T) {
 	t.Parallel()
 
-	status, err := normalizeTransitionIssue(transitionIssueRequest{
+	input, err := normalizeTransitionIssue(transitionIssueRequest{
 		Status: " in_progress ",
 	})
 	if err != nil {
 		t.Fatalf("normalize transition issue: %v", err)
 	}
-	if status != "in_progress" {
-		t.Fatalf("status = %q, want %q", status, "in_progress")
+	if input.Status != "in_progress" {
+		t.Fatalf("status = %q, want %q", input.Status, "in_progress")
+	}
+}
+
+func TestNormalizeTransitionIssueWorkflowStatusIDTakesPrecedence(t *testing.T) {
+	t.Parallel()
+
+	input, err := normalizeTransitionIssue(transitionIssueRequest{
+		Status:           "Ready for review",
+		WorkflowStatusID: testIssueID,
+	})
+	if err != nil {
+		t.Fatalf("normalize transition issue with workflow status id: %v", err)
+	}
+	if input.WorkflowStatusID != testIssueID {
+		t.Fatalf("workflow status id = %q, want %q", input.WorkflowStatusID, testIssueID)
 	}
 }
 
@@ -247,12 +279,7 @@ func TestNormalizeTransitionIssueValidation(t *testing.T) {
 			name: "missing status",
 			req:  transitionIssueRequest{},
 		},
-		{
-			name: "bad status",
-			req: transitionIssueRequest{
-				Status: "review",
-			},
-		},
+		{name: "bad status", req: transitionIssueRequest{Status: "Ready for review"}},
 	}
 
 	for _, tt := range tests {
@@ -639,17 +666,17 @@ func TestIssueDueFilterCondition(t *testing.T) {
 		{
 			name:     "overdue",
 			dueValue: "overdue",
-			want:     "i.status <> 'done' AND i.due_date < CURRENT_DATE",
+			want:     "EXISTS (SELECT 1 FROM project_workflow_statuses ws_due WHERE ws_due.id = i.workflow_status_id AND ws_due.category <> 'done') AND i.due_date < CURRENT_DATE",
 		},
 		{
 			name:     "today",
 			dueValue: "today",
-			want:     "i.status <> 'done' AND i.due_date = CURRENT_DATE",
+			want:     "EXISTS (SELECT 1 FROM project_workflow_statuses ws_due WHERE ws_due.id = i.workflow_status_id AND ws_due.category <> 'done') AND i.due_date = CURRENT_DATE",
 		},
 		{
 			name:     "due soon",
 			dueValue: "due_soon",
-			want:     "i.status <> 'done' AND i.due_date > CURRENT_DATE AND i.due_date <= CURRENT_DATE + INTERVAL '7 days'",
+			want:     "EXISTS (SELECT 1 FROM project_workflow_statuses ws_due WHERE ws_due.id = i.workflow_status_id AND ws_due.category <> 'done') AND i.due_date > CURRENT_DATE AND i.due_date <= CURRENT_DATE + INTERVAL '7 days'",
 		},
 		{
 			name:     "no due",

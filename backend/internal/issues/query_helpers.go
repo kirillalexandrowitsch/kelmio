@@ -53,11 +53,11 @@ func issueSearchPattern(query string) string {
 func issueDueFilterCondition(dueValue string) string {
 	switch strings.TrimSpace(dueValue) {
 	case "overdue":
-		return "i.status <> 'done' AND i.due_date < CURRENT_DATE"
+		return "EXISTS (SELECT 1 FROM project_workflow_statuses ws_due WHERE ws_due.id = i.workflow_status_id AND ws_due.category <> 'done') AND i.due_date < CURRENT_DATE"
 	case "today":
-		return "i.status <> 'done' AND i.due_date = CURRENT_DATE"
+		return "EXISTS (SELECT 1 FROM project_workflow_statuses ws_due WHERE ws_due.id = i.workflow_status_id AND ws_due.category <> 'done') AND i.due_date = CURRENT_DATE"
 	case "due_soon":
-		return "i.status <> 'done' AND i.due_date > CURRENT_DATE AND i.due_date <= CURRENT_DATE + INTERVAL '7 days'"
+		return "EXISTS (SELECT 1 FROM project_workflow_statuses ws_due WHERE ws_due.id = i.workflow_status_id AND ws_due.category <> 'done') AND i.due_date > CURRENT_DATE AND i.due_date <= CURRENT_DATE + INTERVAL '7 days'"
 	case "no_due":
 		return "i.due_date IS NULL"
 	default:

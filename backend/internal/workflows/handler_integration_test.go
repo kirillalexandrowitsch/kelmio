@@ -149,10 +149,10 @@ func TestWorkflowLifecycleIntegration(t *testing.T) {
 		t.Fatalf("create custom replacement: %v", err)
 	}
 	issueID := insertWorkflowTestIssue(t, ctx, db, projectID, admin.ID, "todo", 1)
-	if _, err := handler.archiveWorkflowStatus(ctx, admin, projectID, todoID, customReplacement.ID); !errors.Is(err, errStatusNotAssignable) {
-		t.Fatalf("custom replacement error = %v, want %v", err, errStatusNotAssignable)
+	if _, err := handler.archiveWorkflowStatus(ctx, admin, projectID, todoID, customReplacement.ID); err != nil {
+		t.Fatalf("archive used status with custom replacement: %v", err)
 	}
-	expectIssueStatus(t, ctx, db, issueID, "todo")
+	expectIssueStatus(t, ctx, db, issueID, "verify")
 
 	blockedID := workflowStatusID(workflow.Statuses, "blocked")
 	blockedIssueID := insertWorkflowTestIssue(t, ctx, db, projectID, admin.ID, "blocked", 2)
@@ -176,7 +176,7 @@ func TestWorkflowLifecycleIntegration(t *testing.T) {
 		t.Fatalf("replacement activity count = %d, want 1", activityCount)
 	}
 
-	if _, err := handler.archiveWorkflowStatus(ctx, admin, projectID, doneID, todoID); !errors.Is(err, errRequiresDoneStatus) {
+	if _, err := handler.archiveWorkflowStatus(ctx, admin, projectID, doneID, customReplacement.ID); !errors.Is(err, errRequiresDoneStatus) {
 		t.Fatalf("last done archive error = %v, want %v", err, errRequiresDoneStatus)
 	}
 	if _, err := handler.updateWorkflowStatus(ctx, admin.WorkspaceID, projectID, doneID, normalizedUpdateStatus{

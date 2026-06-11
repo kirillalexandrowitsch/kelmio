@@ -21,7 +21,6 @@ var errStatusNameExists = errors.New("workflow status name exists")
 var errStatusNotFound = errors.New("workflow status not found")
 var errStatusArchived = errors.New("workflow status is archived")
 var errRequiresDoneStatus = errors.New("workflow requires a done status")
-var errStatusNotAssignable = errors.New("workflow status is not assignable")
 var errStatusOrderMismatch = errors.New("workflow status order mismatch")
 var errInvalidTransitionStatus = errors.New("invalid workflow transition status")
 
@@ -332,8 +331,6 @@ func (h *Handler) writeStoreError(w http.ResponseWriter, err error, fallback str
 		writeError(w, http.StatusConflict, "workflow_status_name_exists", "workflow status name already exists")
 	case errors.Is(err, errRequiresDoneStatus):
 		writeError(w, http.StatusConflict, "workflow_requires_done_status", "workflow requires at least one active done status")
-	case errors.Is(err, errStatusNotAssignable):
-		writeError(w, http.StatusConflict, "workflow_status_not_assignable", "replacement status is not assignable until issue workflow migration")
 	case errors.Is(err, errStatusOrderMismatch), errors.Is(err, errInvalidTransitionStatus):
 		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
 	default:

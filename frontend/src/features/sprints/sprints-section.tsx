@@ -9,6 +9,7 @@ import {
   type SprintStatus,
   type TeamMember,
 } from "../../lib/api-types";
+import { isIssueDone } from "../../lib/issue-model";
 import {
   columns,
   issueDueInfo,
@@ -536,10 +537,10 @@ function SprintPointsSummary({ issues }: { issues: Issue[] }) {
     0,
   );
   const donePoints = issues
-    .filter((issue) => issue.status === "done")
+    .filter((issue) => isIssueDone(issue))
     .reduce((sum, issue) => sum + issue.story_points, 0);
   const openPoints = totalPoints - donePoints;
-  const doneIssues = issues.filter((issue) => issue.status === "done").length;
+  const doneIssues = issues.filter((issue) => isIssueDone(issue)).length;
 
   return (
     <section className="sprint-points-summary" aria-label="Sprint points summary">

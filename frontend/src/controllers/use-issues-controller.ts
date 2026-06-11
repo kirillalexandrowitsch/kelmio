@@ -33,7 +33,8 @@ export function useIssuesController() {
   const [issueSort, setIssueSort] = useState<IssueSort>("created_desc");
   const [issueFilterProjectId, setIssueFilterProjectId] = useState("");
   const [issueFilterSprintId, setIssueFilterSprintId] = useState("");
-  const [issueFilterStatus, setIssueFilterStatus] = useState<IssueStatus | "">("");
+  const [issueFilterStatus, setIssueFilterStatus] = useState("");
+  const [issueFilterWorkflowStatusId, setIssueFilterWorkflowStatusId] = useState("");
   const [issueFilterPriority, setIssueFilterPriority] = useState<
     IssuePriority | ""
   >("");
@@ -112,6 +113,7 @@ export function useIssuesController() {
     issueFilterQuery, setIssueFilterQuery, issueSort, setIssueSort,
     issueFilterProjectId, setIssueFilterProjectId, issueFilterSprintId,
     setIssueFilterSprintId, issueFilterStatus, setIssueFilterStatus,
+    issueFilterWorkflowStatusId, setIssueFilterWorkflowStatusId,
     issueFilterPriority, setIssueFilterPriority, issueFilterAssigneeId,
     setIssueFilterAssigneeId, issueFilterLabelId, setIssueFilterLabelId,
     issueFilterDue, setIssueFilterDue, savedFilters, setSavedFilters,

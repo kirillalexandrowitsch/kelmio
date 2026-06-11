@@ -44,6 +44,7 @@ import {
   type SprintStatus,
   type TeamInvite,
   type TeamMember,
+  type TransitionIssueInput,
   type UnreadNotificationsCountResponse,
   type UpdateIssueInput,
   type UpdateProjectInput,
@@ -51,6 +52,8 @@ import {
   type UpdateSavedFilterInput,
   type UpdateSprintInput,
   type UpdateTeamMemberInput,
+  type WorkflowStatus,
+  type WorkflowStatusCategory,
 } from "./api-types";
 import {
   CSRF_HEADER_NAME,
@@ -94,6 +97,7 @@ export type {
   TeamInvite,
   TeamInviteStatus,
   TeamMember,
+  TransitionIssueInput,
   CreateIssueLinkInput,
   CreateSavedFilterInput,
   CreateSprintInput,
@@ -102,6 +106,8 @@ export type {
   UpdateProjectMemberInput,
   UpdateSavedFilterInput,
   UpdateSprintInput,
+  WorkflowStatus,
+  WorkflowStatusCategory,
 } from "./api-types";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080";
@@ -396,6 +402,9 @@ export async function listIssues(
   if (filters.status) {
     params.set("status", filters.status);
   }
+  if (filters.workflowStatusId) {
+    params.set("workflow_status_id", filters.workflowStatusId);
+  }
   if (filters.priority) {
     params.set("priority", filters.priority);
   }
@@ -487,10 +496,13 @@ export async function setIssueParent(issueId: string, parentIssueId: string | nu
   });
 }
 
-export async function transitionIssue(issueId: string, status: IssueStatus) {
+export async function transitionIssue(
+  issueId: string,
+  input: IssueStatus | TransitionIssueInput,
+) {
   return request<Issue>(`/api/v1/issues/${encodeURIComponent(issueId)}/transition`, {
     method: "POST",
-    body: JSON.stringify({ status }),
+    body: JSON.stringify(typeof input === "string" ? { status: input } : input),
   });
 }
 

@@ -106,6 +106,24 @@ func TestSprintLifecycleIntegration(t *testing.T) {
 	if withIssue.PointsTotal != 5 || withIssue.PointsOpen != 5 || withIssue.PointsDone != 0 {
 		t.Fatalf("points after add = total:%d open:%d done:%d, want total:5 open:5 done:0", withIssue.PointsTotal, withIssue.PointsOpen, withIssue.PointsDone)
 	}
+	var shippedStatusID string
+	if err := db.QueryRow(ctx, `
+		INSERT INTO project_workflow_statuses (project_id, key, name, color, category, position)
+		VALUES ($1, 'shipped', 'Shipped', '#16a34a', 'done', 600)
+		RETURNING id::text
+	`, projectID).Scan(&shippedStatusID); err != nil {
+		t.Fatalf("create custom done status: %v", err)
+	}
+	if _, err := db.Exec(ctx, `UPDATE issues SET workflow_status_id = $2 WHERE id = $1`, issueID, shippedStatusID); err != nil {
+		t.Fatalf("move issue to custom done status: %v", err)
+	}
+	withCustomDone, err := handler.getSprint(ctx, user.WorkspaceID, sprint.ID)
+	if err != nil {
+		t.Fatalf("get sprint with custom done issue: %v", err)
+	}
+	if withCustomDone.DoneCount != 1 || withCustomDone.PointsDone != 5 || withCustomDone.PointsOpen != 0 {
+		t.Fatalf("custom done metrics = count:%d done:%d open:%d, want 1/5/0", withCustomDone.DoneCount, withCustomDone.PointsDone, withCustomDone.PointsOpen)
+	}
 	expectIssueSprint(t, ctx, db, issueID, sprint.ID)
 	expectIssueActivity(t, ctx, db, issueID, "issue_added_to_sprint")
 

@@ -17,14 +17,6 @@ var validWorkflowCategories = map[string]bool{
 	"done":        true,
 }
 
-var legacyAssignableStatusKeys = map[string]bool{
-	"backlog":     true,
-	"todo":        true,
-	"in_progress": true,
-	"blocked":     true,
-	"done":        true,
-}
-
 func normalizeCreateStatus(req createStatusRequest) (normalizedCreateStatus, error) {
 	input := normalizedCreateStatus{
 		Key:      strings.ToLower(strings.TrimSpace(req.Key)),

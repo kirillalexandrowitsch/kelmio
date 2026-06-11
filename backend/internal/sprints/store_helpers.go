@@ -44,7 +44,7 @@ func getSprintForUpdate(ctx context.Context, querier sprintQuerier, workspaceID 
 				FROM issues i
 				WHERE i.sprint_id = s.id
 					AND i.archived_at IS NULL
-					AND i.status = 'done'
+					AND EXISTS (SELECT 1 FROM project_workflow_statuses ws_done WHERE ws_done.id = i.workflow_status_id AND ws_done.category = 'done')
 			),
 			(
 				SELECT COALESCE(SUM(i.story_points), 0)::int
@@ -57,14 +57,14 @@ func getSprintForUpdate(ctx context.Context, querier sprintQuerier, workspaceID 
 				FROM issues i
 				WHERE i.sprint_id = s.id
 					AND i.archived_at IS NULL
-					AND i.status = 'done'
+					AND EXISTS (SELECT 1 FROM project_workflow_statuses ws_done WHERE ws_done.id = i.workflow_status_id AND ws_done.category = 'done')
 			),
 			(
 				SELECT COALESCE(SUM(i.story_points), 0)::int
 				FROM issues i
 				WHERE i.sprint_id = s.id
 					AND i.archived_at IS NULL
-					AND i.status <> 'done'
+					AND EXISTS (SELECT 1 FROM project_workflow_statuses ws_open WHERE ws_open.id = i.workflow_status_id AND ws_open.category <> 'done')
 			)
 		FROM sprints s
 		JOIN projects p ON p.id = s.project_id

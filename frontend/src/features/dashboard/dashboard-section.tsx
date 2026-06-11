@@ -7,6 +7,7 @@ import {
 } from "../../lib/api-types";
 import { type AppSection } from "../../lib/routing";
 import { memberDisplayName } from "../../lib/team-view";
+import { isIssueDone } from "../../lib/issue-model";
 
 type DashboardSectionProps = {
   activeSprint: Sprint | null;
@@ -40,7 +41,7 @@ export function DashboardSection({
   teamMembersCount,
 }: DashboardSectionProps) {
   const workload = activeSprintIssues
-    .filter((issue) => issue.status !== "done")
+    .filter((issue) => !isIssueDone(issue))
     .reduce<Record<string, number>>((totals, issue) => {
       const key = issue.assignee_id ?? "unassigned";
       return {
@@ -53,14 +54,14 @@ export function DashboardSection({
     .slice(0, 3);
   const activeSprintIssueCount = activeSprintIssues.length;
   const activeSprintDoneCount = activeSprintIssues.filter(
-    (issue) => issue.status === "done",
+    (issue) => isIssueDone(issue),
   ).length;
   const activeSprintPointsTotal = activeSprintIssues.reduce(
     (sum, issue) => sum + issue.story_points,
     0,
   );
   const activeSprintPointsDone = activeSprintIssues
-    .filter((issue) => issue.status === "done")
+    .filter((issue) => isIssueDone(issue))
     .reduce((sum, issue) => sum + issue.story_points, 0);
   const activeSprintPointsOpen = activeSprintPointsTotal - activeSprintPointsDone;
   const sprintProgress =

@@ -17,6 +17,7 @@ func scanIssue(row rowScanner) (issueResponse, error) {
 	var parentIssueID pgtype.Text
 	var sprintID pgtype.Text
 	var dueDate pgtype.Text
+	var workflowStatusJSON []byte
 	var labelsJSON []byte
 
 	if err := row.Scan(
@@ -29,6 +30,7 @@ func scanIssue(row rowScanner) (issueResponse, error) {
 		&issue.Description,
 		&issue.IssueType,
 		&issue.Status,
+		&workflowStatusJSON,
 		&issue.Priority,
 		&issue.StoryPoints,
 		&issue.ReporterID,
@@ -47,6 +49,9 @@ func scanIssue(row rowScanner) (issueResponse, error) {
 	issue.ParentIssueID = nullableText(parentIssueID)
 	issue.SprintID = nullableText(sprintID)
 	issue.DueDate = nullableText(dueDate)
+	if err := json.Unmarshal(workflowStatusJSON, &issue.WorkflowStatus); err != nil {
+		return issueResponse{}, err
+	}
 	labels, err := decodeIssueLabels(labelsJSON)
 	if err != nil {
 		return issueResponse{}, err
@@ -85,6 +90,8 @@ func decodeIssueLabels(labelsJSON []byte) ([]issueLabelResponse, error) {
 
 func scanIssueLink(row rowScanner) (issueLinkResponse, error) {
 	var link issueLinkResponse
+	var sourceWorkflowStatusJSON []byte
+	var targetWorkflowStatusJSON []byte
 	if err := row.Scan(
 		&link.ID,
 		&link.SourceIssueID,
@@ -97,14 +104,22 @@ func scanIssueLink(row rowScanner) (issueLinkResponse, error) {
 		&link.SourceIssue.Title,
 		&link.SourceIssue.IssueType,
 		&link.SourceIssue.Status,
+		&sourceWorkflowStatusJSON,
 		&link.SourceIssue.Priority,
 		&link.TargetIssue.ID,
 		&link.TargetIssue.IssueKey,
 		&link.TargetIssue.Title,
 		&link.TargetIssue.IssueType,
 		&link.TargetIssue.Status,
+		&targetWorkflowStatusJSON,
 		&link.TargetIssue.Priority,
 	); err != nil {
+		return issueLinkResponse{}, err
+	}
+	if err := json.Unmarshal(sourceWorkflowStatusJSON, &link.SourceIssue.WorkflowStatus); err != nil {
+		return issueLinkResponse{}, err
+	}
+	if err := json.Unmarshal(targetWorkflowStatusJSON, &link.TargetIssue.WorkflowStatus); err != nil {
 		return issueLinkResponse{}, err
 	}
 

@@ -97,6 +97,7 @@ import {
 } from "./lib/validation";
 import {
   issueDueInfo,
+  isIssueDone,
   issueLabelIds,
   issueMatchesFilters,
   savedIssueFilterStateFromFilters,
@@ -419,6 +420,8 @@ export function ApplicationController() {
     setIssueFilterSprintId,
     issueFilterStatus,
     setIssueFilterStatus,
+    issueFilterWorkflowStatusId,
+    setIssueFilterWorkflowStatusId,
     issueFilterPriority,
     setIssueFilterPriority,
     issueFilterAssigneeId,
@@ -1014,6 +1017,7 @@ export function ApplicationController() {
       projectId: issueFilterProjectId || undefined,
       sprintId: issueFilterSprintId || undefined,
       status: issueFilterStatus || undefined,
+      workflowStatusId: issueFilterWorkflowStatusId || undefined,
       priority: issueFilterPriority || undefined,
       assigneeId: issueFilterAssigneeId || undefined,
       labelId: issueFilterLabelId || undefined,
@@ -1045,6 +1049,7 @@ export function ApplicationController() {
     issueFilterProjectId,
     issueFilterSprintId,
     issueFilterStatus,
+    issueFilterWorkflowStatusId,
     issueFilterPriority,
     issueFilterAssigneeId,
     issueFilterLabelId,
@@ -1588,6 +1593,7 @@ export function ApplicationController() {
     setIssueFilterProjectId("");
     setIssueFilterSprintId("");
     setIssueFilterStatus("");
+    setIssueFilterWorkflowStatusId("");
     setIssueFilterPriority("");
     setIssueFilterAssigneeId("");
     setIssueFilterLabelId("");
@@ -2509,6 +2515,7 @@ export function ApplicationController() {
         issueFilterProjectId,
         issueFilterSprintId,
         issueFilterStatus,
+        issueFilterWorkflowStatusId,
         issueFilterPriority,
         issueFilterAssigneeId,
         issueFilterLabelId,
@@ -2839,6 +2846,7 @@ export function ApplicationController() {
             issueFilterProjectId,
             issueFilterSprintId,
             issueFilterStatus,
+            issueFilterWorkflowStatusId,
             issueFilterPriority,
             issueFilterAssigneeId,
             issueFilterLabelId,
@@ -2884,6 +2892,7 @@ export function ApplicationController() {
             issueFilterProjectId,
             issueFilterSprintId,
             issueFilterStatus,
+            issueFilterWorkflowStatusId,
             issueFilterPriority,
             issueFilterAssigneeId,
             issueFilterLabelId,
@@ -2947,6 +2956,7 @@ export function ApplicationController() {
             issueFilterProjectId,
             issueFilterSprintId,
             issueFilterStatus,
+            issueFilterWorkflowStatusId,
             issueFilterPriority,
             issueFilterAssigneeId,
             issueFilterLabelId,
@@ -3006,6 +3016,7 @@ export function ApplicationController() {
             issueFilterProjectId,
             issueFilterSprintId,
             issueFilterStatus,
+            issueFilterWorkflowStatusId,
             issueFilterPriority,
             issueFilterAssigneeId,
             issueFilterLabelId,
@@ -3168,6 +3179,7 @@ export function ApplicationController() {
           issueFilterProjectId,
           issueFilterSprintId,
           issueFilterStatus,
+          issueFilterWorkflowStatusId,
           issueFilterPriority,
           issueFilterAssigneeId,
           issueFilterLabelId,
@@ -3238,6 +3250,7 @@ export function ApplicationController() {
             issueFilterProjectId,
             issueFilterSprintId,
             issueFilterStatus,
+            issueFilterWorkflowStatusId,
             issueFilterPriority,
             issueFilterAssigneeId,
             issueFilterLabelId,
@@ -3490,6 +3503,7 @@ export function ApplicationController() {
       projectId: issueFilterProjectId,
       sprintId: issueFilterSprintId,
       status: issueFilterStatus,
+      workflowStatusId: issueFilterWorkflowStatusId,
       priority: issueFilterPriority,
       assigneeId: issueFilterAssigneeId,
       labelId: issueFilterLabelId,
@@ -3504,6 +3518,7 @@ export function ApplicationController() {
     setIssueFilterProjectId(nextState.projectId);
     setIssueFilterSprintId(nextState.sprintId);
     setIssueFilterStatus(nextState.status);
+    setIssueFilterWorkflowStatusId(nextState.workflowStatusId);
     setIssueFilterPriority(nextState.priority);
     setIssueFilterAssigneeId(nextState.assigneeId);
     setIssueFilterLabelId(nextState.labelId);
@@ -3720,12 +3735,12 @@ export function ApplicationController() {
   }
 
   const today = startOfToday();
-  const openIssues = issues.filter((issue) => issue.status !== "done");
+  const openIssues = issues.filter((issue) => !isIssueDone(issue));
   const selectedProjectIssues = selectedProjectDetail
     ? issues.filter((issue) => issue.project_id === selectedProjectDetail.id)
     : [];
   const selectedProjectOpenIssues = selectedProjectIssues.filter(
-    (issue) => issue.status !== "done",
+    (issue) => !isIssueDone(issue),
   );
   const selectedSprintIssues = selectedSprint
     ? sprintPlanningIssues.filter((issue) => issue.sprint_id === selectedSprint.id)
@@ -3735,7 +3750,7 @@ export function ApplicationController() {
         (issue) =>
           issue.project_id === selectedSprint.project_id &&
           issue.sprint_id === null &&
-          issue.status !== "done",
+          !isIssueDone(issue),
       )
     : [];
   const issueFilterVisibleSprints = issueFilterProjectId
@@ -4254,6 +4269,7 @@ export function ApplicationController() {
               setIssueFilterProjectId("");
               setIssueFilterSprintId("");
               setIssueFilterStatus("");
+              setIssueFilterWorkflowStatusId("");
               setIssueFilterPriority("");
               setIssueFilterAssigneeId("");
               setIssueFilterLabelId("");
