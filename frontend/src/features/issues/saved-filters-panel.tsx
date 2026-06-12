@@ -23,6 +23,7 @@ type SavedFiltersPanelProps = {
   savedFilters: SavedFilter[];
   savedFiltersError: string;
   updatingSavedFilterIds: string[];
+  workflowStatusNamesById: Record<string, string>;
 };
 
 export function SavedFiltersPanel({
@@ -45,6 +46,7 @@ export function SavedFiltersPanel({
   savedFilters,
   savedFiltersError,
   updatingSavedFilterIds,
+  workflowStatusNamesById,
 }: SavedFiltersPanelProps) {
   return (
     <section className="saved-filters-panel" aria-label="Saved issue filters">
@@ -119,7 +121,12 @@ export function SavedFiltersPanel({
                   <>
                     <div>
                       <h4>{savedFilter.name}</h4>
-                      <p>{savedIssueFilterSummary(savedFilter.filters).join(" · ")}</p>
+                      <p>
+                        {savedIssueFilterSummary(
+                          savedFilter.filters,
+                          workflowStatusNamesById,
+                        ).join(" · ")}
+                      </p>
                     </div>
                     <div className="saved-filter-actions">
                       <button

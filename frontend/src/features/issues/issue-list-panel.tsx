@@ -4,14 +4,13 @@ import {
   type IssueDueFilter,
   type IssuePriority,
   type IssueSort,
-  type IssueStatus,
   type Label,
   type Project,
+  type ProjectWorkflowStatus,
   type Sprint,
   type TeamMember,
 } from "../../lib/api-types";
 import {
-  columns,
   issueDueFilterLabels,
   issueDueInfo,
   issueSortLabels,
@@ -20,6 +19,7 @@ import {
   priorityLabels,
   storyPointsLabel,
 } from "../../lib/issue-model";
+import { WorkflowStatusBadge } from "../../components/workflow-status-badge";
 import {
   sprintDisplayName,
   sprintOptionLabel,
@@ -49,7 +49,7 @@ type IssueListPanelProps = {
   onQueryChange: (value: string) => void;
   onSortChange: (value: IssueSort) => void;
   onSprintFilterChange: (value: string) => void;
-  onStatusFilterChange: (value: string) => void;
+  onWorkflowStatusFilterChange: (value: string) => void;
   priorityFilter: IssuePriority | "";
   projectFilterId: string;
   projects: Project[];
@@ -57,7 +57,9 @@ type IssueListPanelProps = {
   sort: IssueSort;
   sprintFilterId: string;
   sprints: Sprint[];
-  statusFilter: string;
+  legacyStatusFilter: string;
+  workflowStatusFilterId: string;
+  workflowStatuses: ProjectWorkflowStatus[];
   teamMembers: TeamMember[];
   today: Date;
 };
@@ -82,7 +84,7 @@ export function IssueListPanel({
   onQueryChange,
   onSortChange,
   onSprintFilterChange,
-  onStatusFilterChange,
+  onWorkflowStatusFilterChange,
   priorityFilter,
   projectFilterId,
   projects,
@@ -90,14 +92,17 @@ export function IssueListPanel({
   sort,
   sprintFilterId,
   sprints,
-  statusFilter,
+  legacyStatusFilter,
   teamMembers,
   today,
+  workflowStatusFilterId,
+  workflowStatuses,
 }: IssueListPanelProps) {
   const hasFilters =
     projectFilterId !== "" ||
     sprintFilterId !== "" ||
-    statusFilter !== "" ||
+    legacyStatusFilter !== "" ||
+    workflowStatusFilterId !== "" ||
     priorityFilter !== "" ||
     assigneeFilterId !== "" ||
     labelFilterId !== "" ||
@@ -121,6 +126,11 @@ export function IssueListPanel({
     !teamMembers.some((member) => member.id === assigneeFilterId);
   const hasMissingLabelFilter =
     labelFilterId !== "" && !labels.some((label) => label.id === labelFilterId);
+  const hasMissingWorkflowStatusFilter =
+    workflowStatusFilterId !== "" &&
+    !workflowStatuses.some((status) => status.id === workflowStatusFilterId);
+  const statusFilterValue =
+    workflowStatusFilterId || (legacyStatusFilter ? `legacy:${legacyStatusFilter}` : "");
 
   return (
     <div className="issues-panel">
@@ -213,15 +223,27 @@ export function IssueListPanel({
         <label>
           <span>Status</span>
           <select
-            onChange={(event) =>
-              onStatusFilterChange(event.target.value as IssueStatus | "")
-            }
-            value={statusFilter}
+            aria-label="Status"
+            disabled={!projectFilterId && !statusFilterValue}
+            onChange={(event) => onWorkflowStatusFilterChange(event.target.value)}
+            value={statusFilterValue}
           >
-            <option value="">All statuses</option>
-            {columns.map((column) => (
-              <option key={column.status} value={column.status}>
-                {column.title}
+            <option value="">
+              {projectFilterId ? "All statuses" : "Select a project first"}
+            </option>
+            {hasMissingWorkflowStatusFilter ? (
+              <option disabled value={workflowStatusFilterId}>
+                {missingFilterOptionLabel("status")}
+              </option>
+            ) : null}
+            {legacyStatusFilter ? (
+              <option disabled value={`legacy:${legacyStatusFilter}`}>
+                Legacy status: {legacyStatusFilter.replaceAll("_", " ")}
+              </option>
+            ) : null}
+            {workflowStatuses.map((status) => (
+              <option key={status.id} value={status.id}>
+                {status.name}
               </option>
             ))}
           </select>
@@ -332,12 +354,14 @@ export function IssueListPanel({
                   <p>
                     {issueTypeLabels[issue.issue_type]} ·{" "}
                     {priorityLabels[issue.priority]} ·{" "}
-                    {columns.find((column) => column.status === issue.status)
-                      ?.title ?? issue.status}{" "}
-                    · {storyPointsLabel(issue.story_points)} ·{" "}
+                    {storyPointsLabel(issue.story_points)} ·{" "}
                     {memberDisplayName(teamMembers, issue.assignee_id)}
                     {sprintName ? ` · Sprint: ${sprintName}` : ""}
                   </p>
+                  <WorkflowStatusBadge
+                    fallbackLabel={issue.status.replaceAll("_", " ")}
+                    status={issue.workflow_status}
+                  />
                   {dueInfo ? (
                     <span className={`due-badge due-badge-${dueInfo.tone}`}>
                       {dueInfo.label}
@@ -370,7 +394,10 @@ export function IssueListPanel({
                   </button>
                   <button
                     className="small-button danger-button"
-                    disabled={archivingIssueIds.includes(issue.id)}
+                    disabled={
+                      !projects.find((project) => project.id === issue.project_id)
+                        ?.can_write || archivingIssueIds.includes(issue.id)
+                    }
                     onClick={() => onArchiveIssue(issue)}
                     type="button"
                   >

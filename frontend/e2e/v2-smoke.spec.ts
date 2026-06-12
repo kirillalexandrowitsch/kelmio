@@ -194,7 +194,7 @@ test("V2 browser smoke: saved filters", async ({ page }) => {
     await filters.getByLabel("Search").fill(issue.title);
     await filters.getByLabel("Sort").selectOption("priority_desc");
     await filters.getByLabel("Project").selectOption(project.id);
-    await filters.getByLabel("Status").selectOption("blocked");
+    await filters.getByLabel("Status").selectOption({ label: "Blocked" });
     await expect(page.locator(".issue-row").filter({ hasText: issue.title })).toBeVisible();
 
     const savedFilters = page.getByRole("region", { name: "Saved issue filters" });

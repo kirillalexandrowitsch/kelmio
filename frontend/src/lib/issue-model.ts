@@ -100,7 +100,7 @@ export function issueMatchesFilters(
   if (status && issue.status !== status) {
     return false;
   }
-  if (workflowStatusId && issue.workflow_status.id !== workflowStatusId) {
+  if (workflowStatusId && issue.workflow_status?.id !== workflowStatusId) {
     return false;
   }
   if (priority && issue.priority !== priority) {
@@ -201,12 +201,15 @@ export function savedIssueFilterStateFromFilters(
 }
 
 export function missingFilterOptionLabel(
-  kind: "project" | "sprint" | "assignee" | "label",
+  kind: "project" | "sprint" | "assignee" | "label" | "status",
 ) {
   return `Missing ${kind}`;
 }
 
-export function savedIssueFilterSummary(filters: SavedIssueFilters) {
+export function savedIssueFilterSummary(
+  filters: SavedIssueFilters,
+  workflowStatusNamesById: Record<string, string> = {},
+) {
   const parts: string[] = [];
   if (filters.query) {
     parts.push(`Search: ${filters.query}`);
@@ -219,6 +222,11 @@ export function savedIssueFilterSummary(filters: SavedIssueFilters) {
   }
   if (filters.status) {
     parts.push(`Status: ${statusLabel(filters.status)}`);
+  }
+  if (filters.workflowStatusId) {
+    parts.push(
+      `Status: ${workflowStatusNamesById[filters.workflowStatusId] ?? "Missing status"}`,
+    );
   }
   if (filters.priority) {
     parts.push(`Priority: ${priorityLabels[filters.priority]}`);

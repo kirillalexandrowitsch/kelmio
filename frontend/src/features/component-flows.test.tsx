@@ -181,7 +181,8 @@ test("issue create form exposes project, label, and disabled submit behavior", a
       priority="medium"
       projectId=""
       projects={[project]}
-      status="todo"
+      statusId=""
+      statuses={[]}
       storyPoints="0"
       teamMembers={[teamMember]}
       title=""
@@ -227,6 +228,7 @@ test("saved filters expose apply, rename, and delete actions", async () => {
       savedFilters={[savedFilter]}
       savedFiltersError=""
       updatingSavedFilterIds={[]}
+      workflowStatusNamesById={{}}
     />,
   );
 

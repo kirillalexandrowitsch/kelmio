@@ -1,16 +1,16 @@
 import { type FormEvent } from "react";
 
 import { FormError } from "../../components/form-feedback";
+import { WorkflowStatusBadge } from "../../components/workflow-status-badge";
 import {
   type IssuePriority,
-  type IssueStatus,
   type IssueType,
   type Label,
   type Project,
+  type ProjectWorkflowStatus,
   type TeamMember,
 } from "../../lib/api-types";
 import {
-  columns,
   issueTypeLabels,
   priorityLabels,
   rootIssueTypeOptions,
@@ -34,13 +34,14 @@ type IssueCreateFormProps = {
   onPriorityChange: (value: IssuePriority) => void;
   onProjectChange: (value: string) => void;
   onStoryPointsChange: (value: string) => void;
-  onStatusChange: (value: IssueStatus) => void;
+  onStatusChange: (value: string) => void;
   onTitleChange: (value: string) => void;
   onTypeChange: (value: IssueType) => void;
   priority: IssuePriority;
   projectId: string;
   projects: Project[];
-  status: IssueStatus;
+  statusId: string;
+  statuses: ProjectWorkflowStatus[];
   storyPoints: string;
   teamMembers: TeamMember[];
   title: string;
@@ -70,7 +71,8 @@ export function IssueCreateForm({
   priority,
   projectId,
   projects,
-  status,
+  statusId,
+  statuses,
   storyPoints,
   teamMembers,
   title,
@@ -201,15 +203,26 @@ export function IssueCreateForm({
         <label>
           <span>Status</span>
           <select
-            onChange={(event) => onStatusChange(event.target.value as IssueStatus)}
-            value={status}
+            aria-label="Status"
+            disabled={!projectId || statuses.length === 0}
+            onChange={(event) => onStatusChange(event.target.value)}
+            value={statusId}
           >
-            {columns.map((column) => (
-              <option key={column.status} value={column.status}>
-                {column.title}
+            {!projectId ? <option value="">Select project first</option> : null}
+            {projectId && statuses.length === 0 ? (
+              <option value="">Workflow unavailable</option>
+            ) : null}
+            {statuses.map((status) => (
+              <option key={status.id} value={status.id}>
+                {status.name} · {status.category.replaceAll("_", " ")}
               </option>
             ))}
           </select>
+          {statuses.find((status) => status.id === statusId) ? (
+            <WorkflowStatusBadge
+              status={statuses.find((status) => status.id === statusId)!}
+            />
+          ) : null}
         </label>
 
         <label>

@@ -25,6 +25,7 @@ import {
   Sprint,
   SprintStatus,
   TeamMember,
+  TransitionIssueInput,
   addIssueToSprint,
   archiveIssue,
   archiveProject,
@@ -49,6 +50,7 @@ import {
   getIssue,
   getCurrentUser,
   getProject,
+  getProjectWorkflow,
   getRuntimeVersion,
   getSprint,
   getUnreadNotificationsCount,
@@ -138,6 +140,12 @@ import { useWorkspaceAdminController } from "./controllers/use-workspace-admin-c
 import { useIssuesController } from "./controllers/use-issues-controller";
 import { useNotificationsController } from "./controllers/use-notifications-controller";
 import { useSprintsController } from "./controllers/use-sprints-controller";
+import { useWorkflowsController } from "./controllers/use-workflows-controller";
+import {
+  activeWorkflowStatuses,
+  allowedTransitionStatuses,
+  defaultWorkflowStatus,
+} from "./lib/workflow-model";
 
 function apiErrorMessage(error: unknown, fallback: string) {
   return error instanceof ApiError ? error.message : fallback;
@@ -402,8 +410,8 @@ export function ApplicationController() {
     setIssuePriority,
     issueStoryPoints,
     setIssueStoryPoints,
-    issueStatus,
-    setIssueStatus,
+    issueWorkflowStatusId,
+    setIssueWorkflowStatusId,
     issueAssigneeId,
     setIssueAssigneeId,
     issueDueDate,
@@ -520,8 +528,8 @@ export function ApplicationController() {
     setSubtaskPriority,
     subtaskStoryPoints,
     setSubtaskStoryPoints,
-    subtaskStatus,
-    setSubtaskStatus,
+    subtaskWorkflowStatusId,
+    setSubtaskWorkflowStatusId,
     issueLinks,
     setIssueLinks,
     linksError,
@@ -539,6 +547,14 @@ export function ApplicationController() {
     linkType,
     setLinkType,
   } = useIssuesController();
+  const {
+    workflowsByProjectId,
+    setWorkflowsByProjectId,
+    loadingWorkflowProjectIds,
+    setLoadingWorkflowProjectIds,
+    workflowErrorsByProjectId,
+    setWorkflowErrorsByProjectId,
+  } = useWorkflowsController();
   const {
     sprints,
     setSprints,
@@ -823,11 +839,13 @@ export function ApplicationController() {
           setSelectedProjectId((currentProjectId) => {
             if (
               currentProjectId &&
-              response.projects.some((project) => project.id === currentProjectId)
+              response.projects.some(
+                (project) => project.id === currentProjectId && project.can_write,
+              )
             ) {
               return currentProjectId;
             }
-            return response.projects[0]?.id ?? "";
+            return response.projects.find((project) => project.can_write)?.id ?? "";
           });
           setIssueFilterProjectId((currentProjectId) =>
             currentProjectId &&
@@ -867,6 +885,103 @@ export function ApplicationController() {
       isMounted = false;
     };
   }, [user]);
+
+  useEffect(() => {
+    if (!user) {
+      setWorkflowsByProjectId((currentWorkflows) =>
+        Object.keys(currentWorkflows).length > 0 ? {} : currentWorkflows,
+      );
+      setLoadingWorkflowProjectIds((currentIds) =>
+        currentIds.length > 0 ? [] : currentIds,
+      );
+      setWorkflowErrorsByProjectId((currentErrors) =>
+        Object.keys(currentErrors).length > 0 ? {} : currentErrors,
+      );
+      return;
+    }
+
+    const projectIds = Array.from(
+      new Set(
+        [selectedProjectId, issueFilterProjectId, selectedIssue?.project_id].filter(
+          (projectId): projectId is string => Boolean(projectId),
+        ),
+      ),
+    );
+
+    for (const projectId of projectIds) {
+      if (
+        workflowsByProjectId[projectId] ||
+        workflowErrorsByProjectId[projectId] ||
+        loadingWorkflowProjectIds.includes(projectId)
+      ) {
+        continue;
+      }
+
+      setLoadingWorkflowProjectIds((currentIds) =>
+        currentIds.includes(projectId) ? currentIds : [...currentIds, projectId],
+      );
+      setWorkflowErrorsByProjectId((currentErrors) => ({
+        ...currentErrors,
+        [projectId]: "",
+      }));
+
+      getProjectWorkflow(projectId)
+        .then((workflow) => {
+          setWorkflowsByProjectId((currentWorkflows) => ({
+            ...currentWorkflows,
+            [projectId]: workflow,
+          }));
+        })
+        .catch((err) => {
+          setWorkflowErrorsByProjectId((currentErrors) => ({
+            ...currentErrors,
+            [projectId]: apiErrorMessage(err, "Could not load project workflow."),
+          }));
+        })
+        .finally(() => {
+          setLoadingWorkflowProjectIds((currentIds) =>
+            currentIds.filter((currentId) => currentId !== projectId),
+          );
+        });
+    }
+  }, [
+    user,
+    selectedProjectId,
+    issueFilterProjectId,
+    selectedIssue?.project_id,
+    workflowsByProjectId,
+    workflowErrorsByProjectId,
+    loadingWorkflowProjectIds,
+    setLoadingWorkflowProjectIds,
+    setWorkflowErrorsByProjectId,
+    setWorkflowsByProjectId,
+  ]);
+
+  useEffect(() => {
+    const workflow = workflowsByProjectId[selectedProjectId];
+    const activeStatuses = activeWorkflowStatuses(workflow);
+    if (
+      issueWorkflowStatusId &&
+      activeStatuses.some((status) => status.id === issueWorkflowStatusId)
+    ) {
+      return;
+    }
+    setIssueWorkflowStatusId(defaultWorkflowStatus(workflow)?.id ?? "");
+  }, [issueWorkflowStatusId, selectedProjectId, workflowsByProjectId]);
+
+  useEffect(() => {
+    const workflow = selectedIssue
+      ? workflowsByProjectId[selectedIssue.project_id]
+      : undefined;
+    const activeStatuses = activeWorkflowStatuses(workflow);
+    if (
+      subtaskWorkflowStatusId &&
+      activeStatuses.some((status) => status.id === subtaskWorkflowStatusId)
+    ) {
+      return;
+    }
+    setSubtaskWorkflowStatusId(defaultWorkflowStatus(workflow)?.id ?? "");
+  }, [selectedIssue?.project_id, subtaskWorkflowStatusId, workflowsByProjectId]);
 
   useEffect(() => {
     setProjectDetailTab("summary");
@@ -1399,7 +1514,7 @@ export function ApplicationController() {
       setSubtaskTitle("");
       setSubtaskPriority("medium");
       setSubtaskStoryPoints("0");
-      setSubtaskStatus("todo");
+      setSubtaskWorkflowStatusId("");
       return;
     }
 
@@ -1635,7 +1750,7 @@ export function ApplicationController() {
     setSubtaskTitle("");
     setSubtaskPriority("medium");
     setSubtaskStoryPoints("0");
-    setSubtaskStatus("todo");
+    setSubtaskWorkflowStatusId("");
     setIssueLinks([]);
     setLinksError("");
     setLinkFormError("");
@@ -2004,11 +2119,15 @@ export function ApplicationController() {
     setProjectDetailTab("summary");
     setProjectMembers([]);
     setSelectedProjectId((currentId) =>
-      currentId === projectId ? fallbackProject?.id ?? "" : currentId,
+      currentId === projectId
+        ? response.projects.find((project) => project.can_write)?.id ?? ""
+        : currentId,
     );
     setIssueFilterProjectId((currentId) =>
       currentId === projectId ? "" : currentId,
     );
+    setIssueFilterStatus("");
+    setIssueFilterWorkflowStatusId("");
     setSprintProjectId((currentId) =>
       currentId === projectId ? fallbackProject?.id ?? "" : currentId,
     );
@@ -2082,7 +2201,9 @@ export function ApplicationController() {
         currentProjects.filter((currentProject) => currentProject.id !== project.id),
       );
       setSelectedProjectId((currentProjectId) =>
-        currentProjectId === project.id ? nextProjects[0]?.id ?? "" : currentProjectId,
+        currentProjectId === project.id
+          ? nextProjects.find((currentProject) => currentProject.can_write)?.id ?? ""
+          : currentProjectId,
       );
       setSelectedProjectDetail((currentProject) =>
         currentProject?.id === project.id ? nextProjects[0] ?? null : currentProject,
@@ -2090,6 +2211,8 @@ export function ApplicationController() {
       setIssueFilterProjectId((currentProjectId) =>
         currentProjectId === project.id ? "" : currentProjectId,
       );
+      setIssueFilterStatus("");
+      setIssueFilterWorkflowStatusId("");
       setSprintProjectId((currentProjectId) =>
         currentProjectId === project.id ? nextProjects[0]?.id ?? "" : currentProjectId,
       );
@@ -2877,14 +3000,17 @@ export function ApplicationController() {
     }
   }
 
-  async function handleTransitionIssue(issueId: string, status: IssueStatus) {
+  async function handleTransitionIssue(
+    issueId: string,
+    input: IssueStatus | TransitionIssueInput,
+  ) {
     setIssuesError("");
     setTransitioningIssueIds((currentIds) =>
       currentIds.includes(issueId) ? currentIds : [...currentIds, issueId],
     );
 
     try {
-      const updatedIssue = await transitionIssue(issueId, status);
+      const updatedIssue = await transitionIssue(issueId, input);
       setIssues((currentIssues) => {
         if (
           !issueMatchesFilters(
@@ -3072,7 +3198,7 @@ export function ApplicationController() {
         setSubtaskFormError("");
         setSubtaskTitle("");
         setSubtaskPriority("medium");
-        setSubtaskStatus("todo");
+        setSubtaskWorkflowStatusId("");
         setIssueLinks([]);
         setLinksError("");
         setLinkFormError("");
@@ -3140,6 +3266,18 @@ export function ApplicationController() {
       setIssueFormError("Choose a project.");
       return;
     }
+    if (!selectedCreateProject?.can_write) {
+      setIssueFormError("You do not have permission to create issues in this project.");
+      return;
+    }
+    if (
+      !selectedCreateWorkflowStatuses.some(
+        (status) => status.id === issueWorkflowStatusId,
+      )
+    ) {
+      setIssueFormError("Choose an active project status.");
+      return;
+    }
     if (!hasText(issueTitle)) {
       setIssueFormError("Issue title is required.");
       return;
@@ -3165,7 +3303,7 @@ export function ApplicationController() {
         title: issueTitle,
         description: issueDescription,
         issue_type: issueType,
-        status: issueStatus,
+        workflow_status_id: issueWorkflowStatusId,
         priority: issuePriority,
         story_points: storyPoints,
         assignee_id: issueAssigneeId,
@@ -3197,7 +3335,9 @@ export function ApplicationController() {
       setIssueType("task");
       setIssuePriority("medium");
       setIssueStoryPoints("0");
-      setIssueStatus("todo");
+      setIssueWorkflowStatusId(
+        defaultWorkflowStatus(workflowsByProjectId[selectedProjectId])?.id ?? "",
+      );
       setIssueAssigneeId("");
       setIssueDueDate("");
       setNewIssueLabelIds([]);
@@ -3222,6 +3362,18 @@ export function ApplicationController() {
       setSubtaskFormError("Subtask title is required.");
       return;
     }
+    if (!canWriteSelectedIssue) {
+      setSubtaskFormError("You do not have permission to create subtasks.");
+      return;
+    }
+    if (
+      !selectedIssueWorkflowStatuses.some(
+        (status) => status.id === subtaskWorkflowStatusId,
+      )
+    ) {
+      setSubtaskFormError("Choose an active project status.");
+      return;
+    }
     const storyPoints = parseStoryPoints(subtaskStoryPoints);
     if (storyPoints === null) {
       setSubtaskFormError("Story points must be a whole number from 0 to 100.");
@@ -3234,7 +3386,7 @@ export function ApplicationController() {
       const subtask = await createSubtask(selectedIssue.id, {
         title,
         description: "",
-        status: subtaskStatus,
+        workflow_status_id: subtaskWorkflowStatusId,
         priority: subtaskPriority,
         story_points: storyPoints,
         assignee_id: "",
@@ -3267,7 +3419,10 @@ export function ApplicationController() {
       setSubtaskTitle("");
       setSubtaskPriority("medium");
       setSubtaskStoryPoints("0");
-      setSubtaskStatus("todo");
+      setSubtaskWorkflowStatusId(
+        defaultWorkflowStatus(workflowsByProjectId[selectedIssue.project_id])
+          ?.id ?? "",
+      );
       await refreshIssueChildren(selectedIssue.id);
     } catch (err) {
       setSubtaskFormError(apiErrorMessage(err, "Could not create subtask."));
@@ -3708,6 +3863,8 @@ export function ApplicationController() {
 
   function handleIssueProjectFilterChange(projectId: string) {
     setIssueFilterProjectId(projectId);
+    setIssueFilterStatus("");
+    setIssueFilterWorkflowStatusId("");
     setIssueFilterSprintId((currentSprintId) => {
       if (!currentSprintId || currentSprintId === "none" || !projectId) {
         return currentSprintId;
@@ -3730,8 +3887,22 @@ export function ApplicationController() {
       (currentSprint) => currentSprint.id === sprintId,
     );
     if (sprint) {
+      if (sprint.project_id !== issueFilterProjectId) {
+        setIssueFilterStatus("");
+        setIssueFilterWorkflowStatusId("");
+      }
       setIssueFilterProjectId(sprint.project_id);
     }
+  }
+
+  function handleIssueWorkflowStatusFilterChange(workflowStatusId: string) {
+    setIssueFilterStatus("");
+    setIssueFilterWorkflowStatusId(workflowStatusId);
+  }
+
+  function handleCreateIssueProjectChange(projectId: string) {
+    setSelectedProjectId(projectId);
+    setIssueWorkflowStatusId("");
   }
 
   const today = startOfToday();
@@ -3797,8 +3968,42 @@ export function ApplicationController() {
     !isCreatingLabel;
   const issueStoryPointsValue = parseStoryPoints(issueStoryPoints);
   const subtaskStoryPointsValue = parseStoryPoints(subtaskStoryPoints);
+  const selectedCreateProject =
+    projects.find((project) => project.id === selectedProjectId) ?? null;
+  const selectedIssueProject = selectedIssue
+    ? projects.find((project) => project.id === selectedIssue.project_id) ?? null
+    : null;
+  const selectedCreateWorkflow = workflowsByProjectId[selectedProjectId];
+  const selectedFilterWorkflow = workflowsByProjectId[issueFilterProjectId];
+  const selectedIssueWorkflow = selectedIssue
+    ? workflowsByProjectId[selectedIssue.project_id]
+    : undefined;
+  const selectedCreateWorkflowStatuses = activeWorkflowStatuses(
+    selectedCreateWorkflow,
+  );
+  const selectedFilterWorkflowStatuses = activeWorkflowStatuses(
+    selectedFilterWorkflow,
+  );
+  const selectedIssueWorkflowStatuses = activeWorkflowStatuses(
+    selectedIssueWorkflow,
+  );
+  const selectedIssueTransitionStatuses = selectedIssue
+      ? allowedTransitionStatuses(
+          selectedIssueWorkflow,
+          selectedIssue.workflow_status?.id ?? "",
+        )
+    : [];
+  const workflowStatusNamesById = Object.fromEntries(
+    Object.values(workflowsByProjectId).flatMap((workflow) =>
+      activeWorkflowStatuses(workflow).map((status) => [status.id, status.name]),
+    ),
+  );
+  const canWriteSelectedIssue = selectedIssueProject?.can_write ?? false;
   const canCreateIssue =
-    selectedProjectId !== "" &&
+    selectedCreateProject?.can_write === true &&
+    selectedCreateWorkflowStatuses.some(
+      (status) => status.id === issueWorkflowStatusId,
+    ) &&
     hasText(issueTitle) &&
     issueStoryPointsValue !== null &&
     !isCreatingIssue;
@@ -3810,9 +4015,12 @@ export function ApplicationController() {
     hasText(editSprintName) &&
     !isUpdatingSprint;
   const canCreateComment =
-    selectedIssue !== null && hasText(commentBody) && !isCreatingComment;
+    canWriteSelectedIssue && hasText(commentBody) && !isCreatingComment;
   const canCreateSubtask =
-    selectedIssue !== null &&
+    canWriteSelectedIssue &&
+    selectedIssueWorkflowStatuses.some(
+      (status) => status.id === subtaskWorkflowStatusId,
+    ) &&
     hasText(subtaskTitle) &&
     subtaskStoryPointsValue !== null &&
     !isCreatingSubtask;
@@ -3820,6 +4028,7 @@ export function ApplicationController() {
     ? issues.filter((issue) => issue.id !== selectedIssue.id)
     : [];
   const canCreateIssueLink =
+    canWriteSelectedIssue &&
     selectedIssue !== null &&
     linkTargetIssueId !== "" &&
     linkTargetIssueId !== selectedIssue.id &&
@@ -4193,7 +4402,9 @@ export function ApplicationController() {
             canCreateIssue={canCreateIssue}
             description={issueDescription}
             dueDate={issueDueDate}
-            formError={issueFormError}
+            formError={
+              issueFormError || workflowErrorsByProjectId[selectedProjectId] || ""
+            }
             isCreatingIssue={isCreatingIssue}
             labels={labels}
             labelIds={newIssueLabelIds}
@@ -4203,15 +4414,16 @@ export function ApplicationController() {
             onDueDateChange={setIssueDueDate}
             onLabelChange={handleCreateIssueLabel}
             onPriorityChange={setIssuePriority}
-            onProjectChange={setSelectedProjectId}
+            onProjectChange={handleCreateIssueProjectChange}
             onStoryPointsChange={setIssueStoryPoints}
-            onStatusChange={setIssueStatus}
+            onStatusChange={setIssueWorkflowStatusId}
             onTitleChange={setIssueTitle}
             onTypeChange={setIssueType}
             priority={issuePriority}
             projectId={selectedProjectId}
-            projects={projects}
-            status={issueStatus}
+            projects={projects.filter((project) => project.can_write)}
+            statusId={issueWorkflowStatusId}
+            statuses={selectedCreateWorkflowStatuses}
             storyPoints={issueStoryPoints}
             teamMembers={teamMembers}
             title={issueTitle}
@@ -4249,6 +4461,7 @@ export function ApplicationController() {
             savedFilters={savedFilters}
             savedFiltersError={savedFiltersError}
             updatingSavedFilterIds={updatingSavedFilterIds}
+            workflowStatusNamesById={workflowStatusNamesById}
           />
 
           <IssueListPanel
@@ -4257,7 +4470,11 @@ export function ApplicationController() {
             dueFilter={issueFilterDue}
             isLoadingIssues={isLoadingIssues}
             issues={issues}
-            issuesError={issuesError}
+            issuesError={
+              issuesError ||
+              workflowErrorsByProjectId[issueFilterProjectId] ||
+              ""
+            }
             labelFilterId={issueFilterLabelId}
             labels={labels}
             onArchiveIssue={(issue) => {
@@ -4285,7 +4502,7 @@ export function ApplicationController() {
             onQueryChange={setIssueFilterQuery}
             onSortChange={setIssueSort}
             onSprintFilterChange={handleIssueSprintFilterChange}
-            onStatusFilterChange={setIssueFilterStatus}
+            onWorkflowStatusFilterChange={handleIssueWorkflowStatusFilterChange}
             priorityFilter={issueFilterPriority}
             projectFilterId={issueFilterProjectId}
             projects={projects}
@@ -4293,9 +4510,11 @@ export function ApplicationController() {
             sort={issueSort}
             sprintFilterId={issueFilterSprintId}
             sprints={issueFilterVisibleSprints}
-            statusFilter={issueFilterStatus}
+            legacyStatusFilter={issueFilterStatus}
             teamMembers={teamMembers}
             today={today}
+            workflowStatusFilterId={issueFilterWorkflowStatusId}
+            workflowStatuses={selectedFilterWorkflowStatuses}
           />
         </section>
 
@@ -4305,6 +4524,7 @@ export function ApplicationController() {
           archivingIssueIds={archivingIssueIds}
           assigningIssueIds={assigningIssueIds}
           availableLinkIssues={availableLinkIssues}
+          canWriteIssue={canWriteSelectedIssue}
           canCreateComment={canCreateComment}
           canCreateIssueLink={canCreateIssueLink}
           canCreateSubtask={canCreateSubtask}
@@ -4335,7 +4555,11 @@ export function ApplicationController() {
           isLoadingIssue={isLoadingSelectedIssue}
           isUpdatingIssue={isUpdatingIssue}
           issue={selectedIssue}
-          issueError={selectedIssueError}
+          issueError={
+            selectedIssueError ||
+            workflowErrorsByProjectId[selectedIssue?.project_id ?? ""] ||
+            ""
+          }
           hierarchyError={hierarchyError}
           issueLinks={issueLinks}
           labelingIssueIds={labelingIssueIds}
@@ -4362,7 +4586,7 @@ export function ApplicationController() {
             setSubtaskTitle("");
             setSubtaskPriority("medium");
             setSubtaskStoryPoints("0");
-            setSubtaskStatus("todo");
+            setSubtaskWorkflowStatusId("");
             setIssueLinks([]);
             setLinksError("");
             setLinkFormError("");
@@ -4405,10 +4629,12 @@ export function ApplicationController() {
           onStartEditingIssue={startEditingIssue}
           onSubtaskPriorityChange={setSubtaskPriority}
           onSubtaskStoryPointsChange={setSubtaskStoryPoints}
-          onSubtaskStatusChange={setSubtaskStatus}
+          onSubtaskStatusChange={setSubtaskWorkflowStatusId}
           onSubtaskTitleChange={setSubtaskTitle}
-          onTransitionIssue={(issueId, status) => {
-            void handleTransitionIssue(issueId, status);
+          onTransitionIssue={(issueId, workflowStatusId) => {
+            void handleTransitionIssue(issueId, {
+              workflow_status_id: workflowStatusId,
+            });
           }}
           onUpdateComment={(event, comment) => {
             void handleUpdateComment(event, comment);
@@ -4421,9 +4647,11 @@ export function ApplicationController() {
           subtaskFormError={subtaskFormError}
           subtaskPriority={subtaskPriority}
           subtaskStoryPoints={subtaskStoryPoints}
-          subtaskStatus={subtaskStatus}
+          subtaskStatusId={subtaskWorkflowStatusId}
           subtaskTitle={subtaskTitle}
           updatingCommentIds={updatingCommentIds}
+          workflowStatuses={selectedIssueWorkflowStatuses}
+          transitionStatuses={selectedIssueTransitionStatuses}
         />
 
         <BoardSection

@@ -8,7 +8,6 @@ import type {
   IssueLinkType,
   IssuePriority,
   IssueSort,
-  IssueStatus,
   IssueType,
   SavedFilter,
 } from "../lib/api";
@@ -25,7 +24,7 @@ export function useIssuesController() {
   const [issueType, setIssueType] = useState<IssueType>("task");
   const [issuePriority, setIssuePriority] = useState<IssuePriority>("medium");
   const [issueStoryPoints, setIssueStoryPoints] = useState("0");
-  const [issueStatus, setIssueStatus] = useState<IssueStatus>("todo");
+  const [issueWorkflowStatusId, setIssueWorkflowStatusId] = useState("");
   const [issueAssigneeId, setIssueAssigneeId] = useState("");
   const [issueDueDate, setIssueDueDate] = useState("");
   const [newIssueLabelIds, setNewIssueLabelIds] = useState<string[]>([]);
@@ -92,7 +91,7 @@ export function useIssuesController() {
   const [subtaskPriority, setSubtaskPriority] =
     useState<IssuePriority>("medium");
   const [subtaskStoryPoints, setSubtaskStoryPoints] = useState("0");
-  const [subtaskStatus, setSubtaskStatus] = useState<IssueStatus>("todo");
+  const [subtaskWorkflowStatusId, setSubtaskWorkflowStatusId] = useState("");
   const [issueLinks, setIssueLinks] = useState<IssueLink[]>([]);
   const [linksError, setLinksError] = useState("");
   const [linkFormError, setLinkFormError] = useState("");
@@ -108,7 +107,8 @@ export function useIssuesController() {
     setIsCreatingIssue, selectedProjectId, setSelectedProjectId, issueTitle,
     setIssueTitle, issueDescription, setIssueDescription, issueType, setIssueType,
     issuePriority, setIssuePriority, issueStoryPoints, setIssueStoryPoints,
-    issueStatus, setIssueStatus, issueAssigneeId, setIssueAssigneeId,
+    issueWorkflowStatusId, setIssueWorkflowStatusId, issueAssigneeId,
+    setIssueAssigneeId,
     issueDueDate, setIssueDueDate, newIssueLabelIds, setNewIssueLabelIds,
     issueFilterQuery, setIssueFilterQuery, issueSort, setIssueSort,
     issueFilterProjectId, setIssueFilterProjectId, issueFilterSprintId,
@@ -143,7 +143,8 @@ export function useIssuesController() {
     setSubtaskFormError, isLoadingIssueChildren, setIsLoadingIssueChildren,
     isCreatingSubtask, setIsCreatingSubtask, subtaskTitle, setSubtaskTitle,
     subtaskPriority, setSubtaskPriority, subtaskStoryPoints,
-    setSubtaskStoryPoints, subtaskStatus, setSubtaskStatus, issueLinks,
+    setSubtaskStoryPoints, subtaskWorkflowStatusId, setSubtaskWorkflowStatusId,
+    issueLinks,
     setIssueLinks, linksError, setLinksError, linkFormError, setLinkFormError,
     isLoadingIssueLinks, setIsLoadingIssueLinks, isCreatingIssueLink,
     setIsCreatingIssueLink, deletingIssueLinkIds, setDeletingIssueLinkIds,

@@ -9,9 +9,10 @@ import {
   type IssueLink,
   type IssueLinkType,
   type IssuePriority,
-  type IssueStatus,
   type IssueType,
   type Label,
+  type ProjectWorkflowStatus,
+  type WorkflowStatus,
   type TeamMember,
 } from "../../lib/api-types";
 import { IssueActivitySection } from "./issue-activity-section";
@@ -27,6 +28,7 @@ type IssueDetailSectionProps = {
   archivingIssueIds: string[];
   assigningIssueIds: string[];
   availableLinkIssues: Issue[];
+  canWriteIssue: boolean;
   canCreateComment: boolean;
   canCreateIssueLink: boolean;
   canCreateSubtask: boolean;
@@ -89,7 +91,7 @@ type IssueDetailSectionProps = {
   onOpenIssue: (issueId: string) => void;
   onSubtaskPriorityChange: (value: IssuePriority) => void;
   onSubtaskStoryPointsChange: (value: string) => void;
-  onSubtaskStatusChange: (value: IssueStatus) => void;
+  onSubtaskStatusChange: (value: string) => void;
   onSubtaskTitleChange: (value: string) => void;
   onSetIssueLabel: (
     issue: Issue,
@@ -98,7 +100,7 @@ type IssueDetailSectionProps = {
   ) => void;
   onStartEditingComment: (comment: IssueComment) => void;
   onStartEditingIssue: (issue: Issue) => void;
-  onTransitionIssue: (issueId: string, status: IssueStatus) => void;
+  onTransitionIssue: (issueId: string, workflowStatusId: string) => void;
   onUpdateComment: (
     event: FormEvent<HTMLFormElement>,
     comment: IssueComment,
@@ -111,7 +113,9 @@ type IssueDetailSectionProps = {
   subtaskFormError: string;
   subtaskPriority: IssuePriority;
   subtaskStoryPoints: string;
-  subtaskStatus: IssueStatus;
+  subtaskStatusId: string;
+  workflowStatuses: ProjectWorkflowStatus[];
+  transitionStatuses: WorkflowStatus[];
   subtaskTitle: string;
   updatingCommentIds: string[];
 };
@@ -122,6 +126,7 @@ export function IssueDetailSection({
   archivingIssueIds,
   assigningIssueIds,
   availableLinkIssues,
+  canWriteIssue,
   canCreateComment,
   canCreateIssueLink,
   canCreateSubtask,
@@ -199,9 +204,11 @@ export function IssueDetailSection({
   subtaskFormError,
   subtaskPriority,
   subtaskStoryPoints,
-  subtaskStatus,
+  subtaskStatusId,
   subtaskTitle,
+  transitionStatuses,
   updatingCommentIds,
+  workflowStatuses,
 }: IssueDetailSectionProps) {
   return (
     <section
@@ -220,6 +227,7 @@ export function IssueDetailSection({
           <div className="detail-actions">
             <button
               className="ghost-button"
+              disabled={!canWriteIssue}
               onClick={() => {
                 if (isEditingIssueDetails) {
                   onCancelIssueEdit();
@@ -240,7 +248,7 @@ export function IssueDetailSection({
             </button>
             <button
               className="ghost-button danger-button"
-              disabled={archivingIssueIds.includes(issue.id)}
+              disabled={!canWriteIssue || archivingIssueIds.includes(issue.id)}
               onClick={() => onArchiveIssue(issue)}
               type="button"
             >
@@ -294,8 +302,9 @@ export function IssueDetailSection({
               parentIssue={parentIssue}
               subtaskPriority={subtaskPriority}
               subtaskStoryPoints={subtaskStoryPoints}
-              subtaskStatus={subtaskStatus}
+              subtaskStatusId={subtaskStatusId}
               subtaskTitle={subtaskTitle}
+              statuses={workflowStatuses}
             />
 
             <IssueLinksSection
@@ -348,6 +357,7 @@ export function IssueDetailSection({
 
           <IssueDetailSidebar
             assigningIssueIds={assigningIssueIds}
+            canWriteIssue={canWriteIssue}
             issue={issue}
             labelingIssueIds={labelingIssueIds}
             labels={labels}
@@ -356,6 +366,7 @@ export function IssueDetailSection({
             onTransitionIssue={onTransitionIssue}
             teamMembers={teamMembers}
             today={today}
+            transitionStatuses={transitionStatuses}
             transitioningIssueIds={transitioningIssueIds}
           />
         </div>

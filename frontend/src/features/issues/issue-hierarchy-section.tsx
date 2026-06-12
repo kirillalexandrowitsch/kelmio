@@ -4,9 +4,10 @@ import { FormError } from "../../components/form-feedback";
 import {
   type Issue,
   type IssuePriority,
-  type IssueStatus,
+  type ProjectWorkflowStatus,
 } from "../../lib/api-types";
-import { columns, issueTypeLabels, priorityLabels } from "../../lib/issue-model";
+import { issueTypeLabels, priorityLabels } from "../../lib/issue-model";
+import { workflowStatusLabel } from "../../lib/workflow-model";
 
 type IssueHierarchySectionProps = {
   canCreateSubtask: boolean;
@@ -20,12 +21,13 @@ type IssueHierarchySectionProps = {
   onOpenIssue: (issueId: string) => void;
   onPriorityChange: (value: IssuePriority) => void;
   onStoryPointsChange: (value: string) => void;
-  onStatusChange: (value: IssueStatus) => void;
+  onStatusChange: (value: string) => void;
   onTitleChange: (value: string) => void;
   parentIssue: Issue | null;
   subtaskPriority: IssuePriority;
   subtaskStoryPoints: string;
-  subtaskStatus: IssueStatus;
+  subtaskStatusId: string;
+  statuses: ProjectWorkflowStatus[];
   subtaskTitle: string;
 };
 
@@ -46,8 +48,9 @@ export function IssueHierarchySection({
   parentIssue,
   subtaskPriority,
   subtaskStoryPoints,
-  subtaskStatus,
+  subtaskStatusId,
   subtaskTitle,
+  statuses,
 }: IssueHierarchySectionProps) {
   return (
     <section className="hierarchy-section">
@@ -101,7 +104,7 @@ export function IssueHierarchySection({
                 </strong>
                 <small>
                   {issueTypeLabels[child.issue_type]} ·{" "}
-                  {child.status.replaceAll("_", " ")} · {child.story_points} pts
+                  {workflowStatusLabel(child)} · {child.story_points} pts
                 </small>
               </button>
             ))}
@@ -124,14 +127,17 @@ export function IssueHierarchySection({
         <label>
           <span>Status</span>
           <select
-            onChange={(event) =>
-              onStatusChange(event.target.value as IssueStatus)
-            }
-            value={subtaskStatus}
+            aria-label="Subtask status"
+            disabled={statuses.length === 0}
+            onChange={(event) => onStatusChange(event.target.value)}
+            value={subtaskStatusId}
           >
-            {columns.map((column) => (
-              <option key={column.status} value={column.status}>
-                {column.title}
+            {statuses.length === 0 ? (
+              <option value="">Workflow unavailable</option>
+            ) : null}
+            {statuses.map((status) => (
+              <option key={status.id} value={status.id}>
+                {status.name}
               </option>
             ))}
           </select>

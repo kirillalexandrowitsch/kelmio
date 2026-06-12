@@ -1,15 +1,17 @@
 import {
   type Issue,
-  type IssueStatus,
   type Label,
   type TeamMember,
+  type WorkflowStatus,
 } from "../../lib/api-types";
-import { columns, issueDueInfo } from "../../lib/issue-model";
+import { issueDueInfo } from "../../lib/issue-model";
 import { formatDateTime } from "../../lib/formatting";
 import { assignableTeamMembers, memberOptionLabel } from "../../lib/team-view";
+import { WorkflowStatusBadge } from "../../components/workflow-status-badge";
 
 type IssueDetailSidebarProps = {
   assigningIssueIds: string[];
+  canWriteIssue: boolean;
   issue: Issue;
   labelingIssueIds: string[];
   labels: Label[];
@@ -19,7 +21,8 @@ type IssueDetailSidebarProps = {
     labelId: string,
     shouldAttach: boolean,
   ) => void;
-  onTransitionIssue: (issueId: string, status: IssueStatus) => void;
+  onTransitionIssue: (issueId: string, workflowStatusId: string) => void;
+  transitionStatuses: WorkflowStatus[];
   teamMembers: TeamMember[];
   today: Date;
   transitioningIssueIds: string[];
@@ -27,6 +30,7 @@ type IssueDetailSidebarProps = {
 
 export function IssueDetailSidebar({
   assigningIssueIds,
+  canWriteIssue,
   issue,
   labelingIssueIds,
   labels,
@@ -35,33 +39,56 @@ export function IssueDetailSidebar({
   onTransitionIssue,
   teamMembers,
   today,
+  transitionStatuses,
   transitioningIssueIds,
 }: IssueDetailSidebarProps) {
   const dueInfo = issueDueInfo(issue, today);
+  const statusOptions =
+    transitionStatuses.length > 0
+      ? transitionStatuses
+      : issue.workflow_status
+        ? [issue.workflow_status]
+        : [];
 
   return (
     <aside className="issue-detail-sidebar">
       <label className="issue-detail-status">
         <span>Status</span>
+        <WorkflowStatusBadge
+          fallbackLabel={issue.status.replaceAll("_", " ")}
+          status={issue.workflow_status}
+        />
         <select
-          disabled={transitioningIssueIds.includes(issue.id)}
-          onChange={(event) =>
-            onTransitionIssue(issue.id, event.target.value as IssueStatus)
+          aria-label={`Status for ${issue.issue_key}`}
+          disabled={
+            !canWriteIssue ||
+            !issue.workflow_status ||
+            transitioningIssueIds.includes(issue.id) ||
+            transitionStatuses.length <= 1
           }
-          value={issue.status}
+          onChange={(event) =>
+            onTransitionIssue(issue.id, event.target.value)
+          }
+          value={issue.workflow_status?.id ?? ""}
         >
-          {columns.map((column) => (
-            <option key={column.status} value={column.status}>
-              {column.title}
+          {statusOptions.length === 0 ? (
+            <option value="">{issue.status.replaceAll("_", " ")}</option>
+          ) : null}
+          {statusOptions.map((status) => (
+            <option key={status.id} value={status.id}>
+              {status.name}
             </option>
           ))}
         </select>
+        {canWriteIssue && transitionStatuses.length <= 1 ? (
+          <small className="muted">No allowed transitions</small>
+        ) : null}
       </label>
 
       <label className="issue-detail-status">
         <span>Assignee</span>
         <select
-          disabled={assigningIssueIds.includes(issue.id)}
+          disabled={!canWriteIssue || assigningIssueIds.includes(issue.id)}
           onChange={(event) => onAssignIssue(issue.id, event.target.value)}
           value={issue.assignee_id ?? ""}
         >
@@ -88,7 +115,7 @@ export function IssueDetailSidebar({
                   checked={issue.labels.some(
                     (issueLabel) => issueLabel.id === label.id,
                   )}
-                  disabled={labelingIssueIds.includes(issue.id)}
+                  disabled={!canWriteIssue || labelingIssueIds.includes(issue.id)}
                   onChange={(event) =>
                     onSetIssueLabel(issue, label.id, event.target.checked)
                   }

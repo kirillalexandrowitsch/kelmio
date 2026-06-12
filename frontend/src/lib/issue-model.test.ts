@@ -147,6 +147,21 @@ test("describes saved filters and missing options", () => {
     ["No sprint", "Priority: Critical", "Sort: Newest first"],
   );
   assert.equal(missingFilterOptionLabel("project"), "Missing project");
+  assert.equal(missingFilterOptionLabel("status"), "Missing status");
+  assert.deepEqual(
+    savedIssueFilterSummary(
+      { sort: "created_desc", workflowStatusId: "status-review" },
+      { "status-review": "Ready for review" },
+    ),
+    ["Status: Ready for review", "Sort: Newest first"],
+  );
+  assert.deepEqual(
+    savedIssueFilterSummary({
+      sort: "created_desc",
+      workflowStatusId: "missing-status",
+    }),
+    ["Status: Missing status", "Sort: Newest first"],
+  );
 });
 
 test("keeps safe issue type options for root and child issues", () => {

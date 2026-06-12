@@ -37,6 +37,7 @@ import {
   type Project,
   type ProjectMember,
   type ProjectRole,
+  type ProjectWorkflow,
   type RuntimeVersion,
   type SavedFilter,
   type Sprint,
@@ -88,6 +89,7 @@ export type {
   Project,
   ProjectMember,
   ProjectRole,
+  ProjectWorkflow,
   RuntimeVersion,
   SavedFilter,
   SavedIssueFilters,
@@ -176,6 +178,12 @@ export async function listProjects() {
 
 export async function getProject(projectId: string) {
   return request<Project>(`/api/v1/projects/${encodeURIComponent(projectId)}`);
+}
+
+export async function getProjectWorkflow(projectId: string) {
+  return request<ProjectWorkflow>(
+    `/api/v1/projects/${encodeURIComponent(projectId)}/workflow`,
+  );
 }
 
 export async function createProject(input: CreateProjectInput) {

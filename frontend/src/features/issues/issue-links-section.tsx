@@ -6,7 +6,8 @@ import {
   type IssueLink,
   type IssueLinkType,
 } from "../../lib/api-types";
-import { issueTypeLabels, statusLabel } from "../../lib/issue-model";
+import { issueTypeLabels } from "../../lib/issue-model";
+import { workflowStatusLabel } from "../../lib/workflow-model";
 
 type IssueLinksSectionProps = {
   availableIssues: Issue[];
@@ -83,7 +84,7 @@ export function IssueLinksSection({
                   </strong>
                   <small>
                     {issueTypeLabels[linkedIssue.issue_type]} ·{" "}
-                    {statusLabel(linkedIssue.status)}
+                    {workflowStatusLabel(linkedIssue)}
                   </small>
                 </button>
 
