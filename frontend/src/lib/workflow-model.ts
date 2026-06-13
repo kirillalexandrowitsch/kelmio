@@ -37,6 +37,40 @@ export function allowedTransitionStatuses(
   );
 }
 
+export function workflowStatusForIssue(
+  issue: Pick<Issue, "status" | "workflow_status">,
+  workflow: ProjectWorkflow | undefined,
+) {
+  const statuses = activeWorkflowStatuses(workflow);
+  return (
+    statuses.find((status) => status.id === issue.workflow_status?.id) ??
+    statuses.find((status) => status.key === issue.status) ??
+    null
+  );
+}
+
+export function canTransitionToWorkflowStatus(
+  issue: Pick<Issue, "status" | "workflow_status">,
+  workflow: ProjectWorkflow | undefined,
+  targetStatusId: string,
+) {
+  const currentStatus = workflowStatusForIssue(issue, workflow);
+  if (!currentStatus) {
+    return false;
+  }
+  if (currentStatus.id === targetStatusId) {
+    return true;
+  }
+
+  return (
+    workflow?.transitions.some(
+      (transition) =>
+        transition.from_status_id === currentStatus.id &&
+        transition.to_status_id === targetStatusId,
+    ) ?? false
+  );
+}
+
 export function workflowStatusLabel(
   value: Pick<Issue, "status" | "workflow_status"> | IssueLinkIssue,
 ) {

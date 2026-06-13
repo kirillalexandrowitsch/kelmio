@@ -5,7 +5,9 @@ import type { ProjectWorkflow } from "./api-types";
 import {
   activeWorkflowStatuses,
   allowedTransitionStatuses,
+  canTransitionToWorkflowStatus,
   defaultWorkflowStatus,
+  workflowStatusForIssue,
   workflowStatusLabel,
 } from "./workflow-model";
 
@@ -63,6 +65,18 @@ test("uses workflow display name with legacy fallback", () => {
     }),
     "Blocked",
   );
+});
+
+test("matches issue columns and validates workflow transitions", () => {
+  const legacyIssue = {
+    status: "todo",
+    workflow_status: undefined as never,
+  };
+
+  assert.equal(workflowStatusForIssue(legacyIssue, workflow)?.id, "todo");
+  assert.equal(canTransitionToWorkflowStatus(legacyIssue, workflow, "review"), true);
+  assert.equal(canTransitionToWorkflowStatus(legacyIssue, workflow, "done"), false);
+  assert.equal(canTransitionToWorkflowStatus(legacyIssue, workflow, "todo"), true);
 });
 
 function status(id: string, name: string, position: number) {

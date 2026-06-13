@@ -1,21 +1,19 @@
-import { type DragEvent, type FormEvent } from "react";
+import { useState, type DragEvent, type FormEvent } from "react";
 
 import { FormError } from "../../components/form-feedback";
 import {
   type Issue,
-  type IssueStatus,
   type Project,
+  type ProjectWorkflow,
   type Sprint,
   type SprintStatus,
   type TeamMember,
 } from "../../lib/api-types";
 import { isIssueDone } from "../../lib/issue-model";
 import {
-  columns,
   issueDueInfo,
   issueTypeLabels,
   priorityLabels,
-  statusLabel,
   storyPointsLabel,
 } from "../../lib/issue-model";
 import {
@@ -25,6 +23,14 @@ import {
 } from "../../lib/sprint-model";
 import { memberDisplayName } from "../../lib/team-view";
 import { hasText } from "../../lib/validation";
+import {
+  activeWorkflowStatuses,
+  allowedTransitionStatuses,
+  canTransitionToWorkflowStatus,
+  workflowStatusForIssue,
+  workflowStatusLabel,
+  workflowStatusStyle,
+} from "../../lib/workflow-model";
 
 type SprintsSectionProps = {
   addingIssueToSprintIds: string[];
@@ -53,11 +59,10 @@ type SprintsSectionProps = {
   onProjectFilterChange: (value: string) => void;
   onRemoveIssueFromSprint: (issue: Issue) => void;
   onSelectSprint: (sprintId: string) => void;
-  onSprintIssueDragOver: (event: DragEvent<HTMLElement>) => void;
   onSprintIssueDragStart: (event: DragEvent<HTMLElement>, issueId: string) => void;
   onSprintIssueDrop: (
     event: DragEvent<HTMLElement>,
-    nextStatus: IssueStatus,
+    workflowStatusId: string,
   ) => void;
   onSprintEndDateChange: (value: string) => void;
   onSprintGoalChange: (value: string) => void;
@@ -67,7 +72,7 @@ type SprintsSectionProps = {
   onStartEditingSprint: (sprint: Sprint) => void;
   onStartSprint: (sprint: Sprint) => void;
   onStatusFilterChange: (value: SprintStatus | "") => void;
-  onTransitionIssue: (issueId: string, status: IssueStatus) => void;
+  onTransitionIssue: (issueId: string, workflowStatusId: string) => void;
   onUpdateSprint: (event: FormEvent<HTMLFormElement>) => void;
   onViewSprintProjectIssues: (projectId: string) => void;
   projectFilterId: string;
@@ -77,6 +82,8 @@ type SprintsSectionProps = {
   selectedSprintBacklogIssues: Issue[];
   selectedSprintError: string;
   selectedSprintIssues: Issue[];
+  selectedSprintWorkflow?: ProjectWorkflow;
+  selectedSprintWorkflowError: string;
   sprintEndDate: string;
   sprintFormError: string;
   sprintGoal: string;
@@ -91,6 +98,7 @@ type SprintsSectionProps = {
   teamMembers: TeamMember[];
   today: Date;
   transitioningIssueIds: string[];
+  isLoadingSelectedSprintWorkflow: boolean;
 };
 
 export function SprintsSection({
@@ -120,7 +128,6 @@ export function SprintsSection({
   onProjectFilterChange,
   onRemoveIssueFromSprint,
   onSelectSprint,
-  onSprintIssueDragOver,
   onSprintIssueDragStart,
   onSprintIssueDrop,
   onSprintEndDateChange,
@@ -141,6 +148,8 @@ export function SprintsSection({
   selectedSprintBacklogIssues,
   selectedSprintError,
   selectedSprintIssues,
+  selectedSprintWorkflow,
+  selectedSprintWorkflowError,
   sprintEndDate,
   sprintFormError,
   sprintGoal,
@@ -155,6 +164,7 @@ export function SprintsSection({
   teamMembers,
   today,
   transitioningIssueIds,
+  isLoadingSelectedSprintWorkflow,
 }: SprintsSectionProps) {
   const hasFilters = projectFilterId !== "" || sprintStatusFilter !== "";
   const summary = hasFilters
@@ -483,8 +493,12 @@ export function SprintsSection({
                 <SprintPointsSummary issues={selectedSprintIssues} />
 
                 <ActiveSprintBoardPanel
+                  canWrite={
+                    projects.find(
+                      (project) => project.id === selectedSprint.project_id,
+                    )?.can_write ?? false
+                  }
                   issues={selectedSprintIssues}
-                  onIssueDragOver={onSprintIssueDragOver}
                   onIssueDragStart={onSprintIssueDragStart}
                   onIssueDrop={onSprintIssueDrop}
                   onTransitionIssue={onTransitionIssue}
@@ -492,6 +506,9 @@ export function SprintsSection({
                   teamMembers={teamMembers}
                   today={today}
                   transitioningIssueIds={transitioningIssueIds}
+                  workflow={selectedSprintWorkflow}
+                  workflowError={selectedSprintWorkflowError}
+                  isLoadingWorkflow={isLoadingSelectedSprintWorkflow}
                 />
 
                 <SprintPlanningPanel
@@ -520,15 +537,18 @@ export function SprintsSection({
 }
 
 type ActiveSprintBoardPanelProps = {
+  canWrite: boolean;
   issues: Issue[];
-  onIssueDragOver: (event: DragEvent<HTMLElement>) => void;
   onIssueDragStart: (event: DragEvent<HTMLElement>, issueId: string) => void;
-  onIssueDrop: (event: DragEvent<HTMLElement>, nextStatus: IssueStatus) => void;
-  onTransitionIssue: (issueId: string, status: IssueStatus) => void;
+  onIssueDrop: (event: DragEvent<HTMLElement>, workflowStatusId: string) => void;
+  onTransitionIssue: (issueId: string, workflowStatusId: string) => void;
   sprint: Sprint;
   teamMembers: TeamMember[];
   today: Date;
   transitioningIssueIds: string[];
+  workflow?: ProjectWorkflow;
+  workflowError: string;
+  isLoadingWorkflow: boolean;
 };
 
 function SprintPointsSummary({ issues }: { issues: Issue[] }) {
@@ -567,8 +587,8 @@ function SprintPointsSummary({ issues }: { issues: Issue[] }) {
 }
 
 function ActiveSprintBoardPanel({
+  canWrite,
   issues,
-  onIssueDragOver,
   onIssueDragStart,
   onIssueDrop,
   onTransitionIssue,
@@ -576,7 +596,12 @@ function ActiveSprintBoardPanel({
   teamMembers,
   today,
   transitioningIssueIds,
+  workflow,
+  workflowError,
+  isLoadingWorkflow,
 }: ActiveSprintBoardPanelProps) {
+  const [draggedIssueId, setDraggedIssueId] = useState("");
+
   if (sprint.status !== "active") {
     return (
       <section className="active-sprint-board-panel" aria-label="Active sprint board">
@@ -595,6 +620,10 @@ function ActiveSprintBoardPanel({
     );
   }
 
+  const statuses = activeWorkflowStatuses(workflow);
+  const draggedIssue =
+    issues.find((currentIssue) => currentIssue.id === draggedIssueId) ?? null;
+
   return (
     <section className="active-sprint-board-panel" aria-label="Active sprint board">
       <header className="section-header">
@@ -605,22 +634,61 @@ function ActiveSprintBoardPanel({
         <span className="muted">{issues.length} issues</span>
       </header>
 
-      <div className="active-sprint-board">
-        {columns.map((column) => {
-          const columnIssues = issues.filter(
-            (issue) => issue.status === column.status,
-          );
+      {workflowError ? (
+        <p className="active-sprint-note">{workflowError}</p>
+      ) : isLoadingWorkflow || !workflow ? (
+        <p className="active-sprint-note">Loading sprint workflow</p>
+      ) : statuses.length === 0 ? (
+        <p className="active-sprint-note">This project has no active statuses.</p>
+      ) : (
+        <>
+          {!canWrite ? (
+            <p className="active-sprint-note">
+              This sprint board is read-only for your project role.
+            </p>
+          ) : null}
+          <div className="active-sprint-board">
+            {statuses.map((status) => {
+              const columnIssues = issues.filter(
+                (issue) =>
+                  workflowStatusForIssue(issue, workflow)?.id === status.id,
+              );
+              const canDrop =
+                draggedIssue !== null &&
+                canWrite &&
+                canTransitionToWorkflowStatus(draggedIssue, workflow, status.id);
+              const dropStateClass = draggedIssue
+                ? canDrop
+                  ? " active-sprint-column-drop-allowed"
+                  : " active-sprint-column-drop-disabled"
+                : "";
 
-          return (
+              return (
             <article
-              className="active-sprint-column"
-              key={column.status}
-              onDragOver={onIssueDragOver}
-              onDrop={(event) => onIssueDrop(event, column.status)}
+              className={`active-sprint-column${dropStateClass}`}
+              key={status.id}
+              onDragOver={(event) => {
+                if (canDrop) {
+                  event.preventDefault();
+                  event.dataTransfer.dropEffect = "move";
+                }
+              }}
+              onDrop={(event) => {
+                if (canDrop) {
+                  onIssueDrop(event, status.id);
+                }
+                setDraggedIssueId("");
+              }}
+              style={{ borderTopColor: status.color }}
             >
               <header>
-                <span>{column.title}</span>
-                <strong>{columnIssues.length}</strong>
+                <div>
+                  <span>{status.name}</span>
+                  <small>{status.category.replaceAll("_", " ")}</small>
+                </div>
+                <strong style={workflowStatusStyle(status)}>
+                  {columnIssues.length}
+                </strong>
               </header>
 
               <div className="active-sprint-card-list">
@@ -631,9 +699,17 @@ function ActiveSprintBoardPanel({
                   return (
                     <article
                       className="active-sprint-card"
-                      draggable
+                      draggable={canWrite && !isTransitioning}
                       key={issue.id}
-                      onDragStart={(event) => onIssueDragStart(event, issue.id)}
+                      onDragEnd={() => setDraggedIssueId("")}
+                      onDragStart={(event) => {
+                        if (!canWrite) {
+                          event.preventDefault();
+                          return;
+                        }
+                        setDraggedIssueId(issue.id);
+                        onIssueDragStart(event, issue.id);
+                      }}
                     >
                       <div className="active-sprint-card-meta">
                         <span>{issue.issue_key}</span>
@@ -660,23 +736,25 @@ function ActiveSprintBoardPanel({
                         <span>Status</span>
                         <select
                           aria-label={`Status for ${issue.issue_key}`}
-                          disabled={isTransitioning}
+                          disabled={!canWrite || isTransitioning}
                           onChange={(event) => {
-                            const nextStatus = event.target.value as IssueStatus;
-                            if (nextStatus !== issue.status) {
-                              onTransitionIssue(issue.id, nextStatus);
+                            const nextStatusId = event.target.value;
+                            if (nextStatusId !== status.id) {
+                              onTransitionIssue(issue.id, nextStatusId);
                             }
                           }}
-                          value={issue.status}
+                          value={status.id}
                         >
-                          {columns.map((nextColumn) => (
-                            <option
-                              key={nextColumn.status}
-                              value={nextColumn.status}
-                            >
-                              {nextColumn.title}
-                            </option>
-                          ))}
+                          {allowedTransitionStatuses(workflow, status.id).map(
+                            (nextStatus) => (
+                              <option
+                                key={nextStatus.id}
+                                value={nextStatus.id}
+                              >
+                                {nextStatus.name}
+                              </option>
+                            ),
+                          )}
                         </select>
                       </label>
                     </article>
@@ -688,9 +766,11 @@ function ActiveSprintBoardPanel({
                 ) : null}
               </div>
             </article>
-          );
-        })}
-      </div>
+              );
+            })}
+          </div>
+        </>
+      )}
     </section>
   );
 }
@@ -826,7 +906,7 @@ function PlanningIssueCard({
         <h4>{issue.title}</h4>
         <p>
           {issueTypeLabels[issue.issue_type]} · {priorityLabels[issue.priority]} ·{" "}
-          {statusLabel(issue.status)} · {storyPointsLabel(issue.story_points)}
+          {workflowStatusLabel(issue)} · {storyPointsLabel(issue.story_points)}
         </p>
       </div>
       <button

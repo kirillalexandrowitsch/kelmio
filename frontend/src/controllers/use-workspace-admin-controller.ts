@@ -12,7 +12,7 @@ export function useWorkspaceAdminController() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectsError, setProjectsError] = useState("");
   const [projectFormError, setProjectFormError] = useState("");
-  const [isLoadingProjects, setIsLoadingProjects] = useState(false);
+  const [isLoadingProjects, setIsLoadingProjects] = useState(true);
   const [isCreatingProject, setIsCreatingProject] = useState(false);
   const [archivingProjectIds, setArchivingProjectIds] = useState<string[]>([]);
   const [editingProjectId, setEditingProjectId] = useState("");

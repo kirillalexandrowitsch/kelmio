@@ -148,7 +148,7 @@ test("V2 browser smoke: sprint workflow", async ({ page }) => {
     });
     await firstCard
       .getByLabel(new RegExp(`Status for ${projectKey}-\\d+`))
-      .selectOption("done");
+      .selectOption({ label: "Done" });
     await expect(firstCard.getByText("5 points")).toBeVisible();
     await expect(page.getByRole("region", { name: "Sprint points summary" })).toContainText(
       "Done points",

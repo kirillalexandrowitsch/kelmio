@@ -58,6 +58,7 @@ import {
   listIssueComments,
   listIssueChildren,
   listIssueLinks,
+  listAllIssues,
   listIssues,
   listLabels,
   listNotifications,
@@ -110,6 +111,8 @@ import { sprintMatchesFilters } from "./lib/sprint-model";
 import {
   appSectionPath,
   appSections,
+  boardPath,
+  currentBoardProjectIdFromLocation,
   currentInviteAcceptTokenFromLocation,
   currentAppSectionFromLocation,
   sprintIdFromPath,
@@ -141,6 +144,7 @@ import { useIssuesController } from "./controllers/use-issues-controller";
 import { useNotificationsController } from "./controllers/use-notifications-controller";
 import { useSprintsController } from "./controllers/use-sprints-controller";
 import { useWorkflowsController } from "./controllers/use-workflows-controller";
+import { useBoardController } from "./controllers/use-board-controller";
 import {
   activeWorkflowStatuses,
   allowedTransitionStatuses,
@@ -556,6 +560,16 @@ export function ApplicationController() {
     setWorkflowErrorsByProjectId,
   } = useWorkflowsController();
   const {
+    boardProjectId,
+    setBoardProjectId,
+    boardIssues,
+    setBoardIssues,
+    boardError,
+    setBoardError,
+    isLoadingBoard,
+    setIsLoadingBoard,
+  } = useBoardController(currentBoardProjectIdFromLocation());
+  const {
     sprints,
     setSprints,
     issueFilterSprints,
@@ -649,10 +663,10 @@ export function ApplicationController() {
       return;
     }
 
-    const nextPath = appSectionPath(section);
+    const nextPath =
+      section === "board" ? boardPath(boardProjectId) : appSectionPath(section);
     if (
-      window.location.pathname === nextPath &&
-      window.location.search === "" &&
+      `${window.location.pathname}${window.location.search}` === nextPath &&
       window.location.hash === ""
     ) {
       return;
@@ -664,6 +678,35 @@ export function ApplicationController() {
     }
 
     window.history.pushState({ section }, "", nextPath);
+  }
+
+  function navigateToBoard(
+    projectId: string,
+    mode: "push" | "replace" = "push",
+  ) {
+    setActiveSection("board");
+    setBoardProjectId(projectId);
+    setRouteSprintId("");
+    setInviteAcceptToken(null);
+
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const nextPath = boardPath(projectId);
+    if (
+      `${window.location.pathname}${window.location.search}` === nextPath &&
+      window.location.hash === ""
+    ) {
+      return;
+    }
+
+    if (mode === "replace") {
+      window.history.replaceState({ section: "board", projectId }, "", nextPath);
+      return;
+    }
+
+    window.history.pushState({ section: "board", projectId }, "", nextPath);
   }
 
   function navigateToSprint(
@@ -728,6 +771,7 @@ export function ApplicationController() {
     function handleRouteChange() {
       setActiveSection(currentAppSectionFromLocation());
       setRouteSprintId(currentSprintIdFromLocation());
+      setBoardProjectId(currentBoardProjectIdFromLocation());
       setInviteAcceptToken(currentInviteAcceptTokenFromLocation());
     }
 
@@ -902,9 +946,13 @@ export function ApplicationController() {
 
     const projectIds = Array.from(
       new Set(
-        [selectedProjectId, issueFilterProjectId, selectedIssue?.project_id].filter(
-          (projectId): projectId is string => Boolean(projectId),
-        ),
+        [
+          selectedProjectId,
+          issueFilterProjectId,
+          selectedIssue?.project_id,
+          boardProjectId,
+          selectedSprint?.project_id,
+        ].filter((projectId): projectId is string => Boolean(projectId)),
       ),
     );
 
@@ -949,6 +997,8 @@ export function ApplicationController() {
     selectedProjectId,
     issueFilterProjectId,
     selectedIssue?.project_id,
+    boardProjectId,
+    selectedSprint?.project_id,
     workflowsByProjectId,
     workflowErrorsByProjectId,
     loadingWorkflowProjectIds,
@@ -956,6 +1006,55 @@ export function ApplicationController() {
     setWorkflowErrorsByProjectId,
     setWorkflowsByProjectId,
   ]);
+
+  useEffect(() => {
+    if (
+      !user ||
+      isLoadingProjects ||
+      !boardProjectId ||
+      projects.some((project) => project.id === boardProjectId)
+    ) {
+      return;
+    }
+
+    setBoardIssues([]);
+    setBoardError("");
+    navigateToBoard("", "replace");
+  }, [user, isLoadingProjects, projects, boardProjectId]);
+
+  useEffect(() => {
+    if (!user || activeSection !== "board" || !boardProjectId) {
+      setBoardIssues([]);
+      setBoardError("");
+      setIsLoadingBoard(false);
+      return;
+    }
+
+    let isMounted = true;
+    setBoardError("");
+    setIsLoadingBoard(true);
+
+    listAllIssues({ projectId: boardProjectId, sort: "created_desc" })
+      .then((projectIssues) => {
+        if (isMounted) {
+          setBoardIssues(projectIssues);
+        }
+      })
+      .catch((err) => {
+        if (isMounted) {
+          setBoardError(apiErrorMessage(err, "Could not load project board."));
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsLoadingBoard(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user, activeSection, boardProjectId]);
 
   useEffect(() => {
     const workflow = workflowsByProjectId[selectedProjectId];
@@ -1404,13 +1503,13 @@ export function ApplicationController() {
     setSprintPlanningError("");
     setIsLoadingSprintPlanning(true);
 
-    listIssues({
+    listAllIssues({
       projectId: selectedSprint.project_id,
       sort: "created_desc",
     })
-      .then((response) => {
+      .then((projectIssues) => {
         if (isMounted) {
-          setSprintPlanningIssues(response.issues);
+          setSprintPlanningIssues(projectIssues);
         }
       })
       .catch((err) => {
@@ -1656,9 +1755,14 @@ export function ApplicationController() {
     setConfirmNewPassword("");
     setIsChangingPassword(false);
     setProjects([]);
+    setIsLoadingProjects(true);
     setTeamMembers([]);
     setLabels([]);
     setIssues([]);
+    setBoardProjectId("");
+    setBoardIssues([]);
+    setBoardError("");
+    setIsLoadingBoard(false);
     setProjectsError("");
     setProjectFormError("");
     setEditingProjectId("");
@@ -2990,6 +3094,11 @@ export function ApplicationController() {
           issue.id === updatedIssue.id ? updatedIssue : issue,
         ),
       );
+      setBoardIssues((currentIssues) =>
+        currentIssues.map((issue) =>
+          issue.id === updatedIssue.id ? updatedIssue : issue,
+        ),
+      );
       setSelectedIssue(updatedIssue);
       setIsEditingIssueDetails(false);
       await refreshIssueActivity(updatedIssue.id);
@@ -3005,6 +3114,9 @@ export function ApplicationController() {
     input: IssueStatus | TransitionIssueInput,
   ) {
     setIssuesError("");
+    if (activeSection === "board") {
+      setBoardError("");
+    }
     setTransitioningIssueIds((currentIds) =>
       currentIds.includes(issueId) ? currentIds : [...currentIds, issueId],
     );
@@ -3047,11 +3159,20 @@ export function ApplicationController() {
           issue.id === updatedIssue.id ? updatedIssue : issue,
         ),
       );
+      setBoardIssues((currentIssues) =>
+        currentIssues.map((issue) =>
+          issue.id === updatedIssue.id ? updatedIssue : issue,
+        ),
+      );
       if (selectedIssue?.id === updatedIssue.id) {
         await refreshIssueActivity(updatedIssue.id);
       }
     } catch (err) {
-      setIssuesError(apiErrorMessage(err, "Could not update issue status."));
+      const message = apiErrorMessage(err, "Could not update issue status.");
+      setIssuesError(message);
+      if (activeSection === "board") {
+        setBoardError(message);
+      }
     } finally {
       setTransitioningIssueIds((currentIds) =>
         currentIds.filter((currentIssueId) => currentIssueId !== issueId),
@@ -3185,6 +3306,15 @@ export function ApplicationController() {
     try {
       await archiveIssue(issue.id);
       setIssues((currentIssues) =>
+        currentIssues.filter((currentIssue) => currentIssue.id !== issue.id),
+      );
+      setBoardIssues((currentIssues) =>
+        currentIssues.filter((currentIssue) => currentIssue.id !== issue.id),
+      );
+      setSprintPlanningIssues((currentIssues) =>
+        currentIssues.filter((currentIssue) => currentIssue.id !== issue.id),
+      );
+      setDashboardSprintIssues((currentIssues) =>
         currentIssues.filter((currentIssue) => currentIssue.id !== issue.id),
       );
       setSelectedIssue((currentIssue) =>
@@ -3614,29 +3744,24 @@ export function ApplicationController() {
     event.dataTransfer.effectAllowed = "move";
   }
 
-  function handleIssueDragOver(event: DragEvent<HTMLElement>) {
-    event.preventDefault();
-    event.dataTransfer.dropEffect = "move";
-  }
-
   function handleIssueDrop(
     event: DragEvent<HTMLElement>,
-    nextStatus: IssueStatus,
+    workflowStatusId: string,
   ) {
     event.preventDefault();
 
     const issueId = event.dataTransfer.getData("text/plain");
-    const issue = issues.find((currentIssue) => currentIssue.id === issueId);
-    if (!issue || issue.status === nextStatus) {
+    const issue = boardIssues.find((currentIssue) => currentIssue.id === issueId);
+    if (!issue || issue.workflow_status?.id === workflowStatusId) {
       return;
     }
 
-    void handleTransitionIssue(issue.id, nextStatus);
+    void handleTransitionIssue(issue.id, { workflow_status_id: workflowStatusId });
   }
 
   function handleSprintIssueDrop(
     event: DragEvent<HTMLElement>,
-    nextStatus: IssueStatus,
+    workflowStatusId: string,
   ) {
     event.preventDefault();
 
@@ -3644,11 +3769,11 @@ export function ApplicationController() {
     const issue = sprintPlanningIssues.find(
       (currentIssue) => currentIssue.id === issueId,
     );
-    if (!issue || issue.status === nextStatus) {
+    if (!issue || issue.workflow_status?.id === workflowStatusId) {
       return;
     }
 
-    void handleTransitionIssue(issue.id, nextStatus);
+    void handleTransitionIssue(issue.id, { workflow_status_id: workflowStatusId });
   }
 
   function currentSavedIssueFilters() {
@@ -3978,6 +4103,10 @@ export function ApplicationController() {
   const selectedIssueWorkflow = selectedIssue
     ? workflowsByProjectId[selectedIssue.project_id]
     : undefined;
+  const selectedBoardWorkflow = workflowsByProjectId[boardProjectId];
+  const selectedSprintWorkflow = selectedSprint
+    ? workflowsByProjectId[selectedSprint.project_id]
+    : undefined;
   const selectedCreateWorkflowStatuses = activeWorkflowStatuses(
     selectedCreateWorkflow,
   );
@@ -4260,8 +4389,7 @@ export function ApplicationController() {
           onEditProjectDescriptionChange={setEditProjectDescription}
           onEditProjectNameChange={setEditProjectName}
           onOpenProjectBoard={(projectId) => {
-            setIssueFilterProjectId(projectId);
-            navigateToSection("board");
+            navigateToBoard(projectId);
           }}
           onProjectDetailTabChange={(tab) => {
             void handleProjectDetailTabChange(tab);
@@ -4348,7 +4476,6 @@ export function ApplicationController() {
           onSelectSprint={(sprintId) => {
             void handleSelectSprint(sprintId);
           }}
-          onSprintIssueDragOver={handleIssueDragOver}
           onSprintIssueDragStart={handleIssueDragStart}
           onSprintIssueDrop={handleSprintIssueDrop}
           onSprintEndDateChange={setSprintEndDate}
@@ -4361,8 +4488,10 @@ export function ApplicationController() {
             void handleStartSprint(sprint);
           }}
           onStatusFilterChange={setSprintFilterStatus}
-          onTransitionIssue={(issueId, status) => {
-            void handleTransitionIssue(issueId, status);
+          onTransitionIssue={(issueId, workflowStatusId) => {
+            void handleTransitionIssue(issueId, {
+              workflow_status_id: workflowStatusId,
+            });
           }}
           onUpdateSprint={handleUpdateSprint}
           onViewSprintProjectIssues={(projectId) => {
@@ -4376,6 +4505,10 @@ export function ApplicationController() {
           selectedSprintBacklogIssues={selectedSprintBacklogIssues}
           selectedSprintError={selectedSprintError}
           selectedSprintIssues={selectedSprintIssues}
+          selectedSprintWorkflow={selectedSprintWorkflow}
+          selectedSprintWorkflowError={
+            workflowErrorsByProjectId[selectedSprint?.project_id ?? ""] || ""
+          }
           sprintEndDate={sprintEndDate}
           sprintFormError={sprintFormError}
           sprintGoal={sprintGoal}
@@ -4390,6 +4523,9 @@ export function ApplicationController() {
           teamMembers={teamMembers}
           today={today}
           transitioningIssueIds={transitioningIssueIds}
+          isLoadingSelectedSprintWorkflow={loadingWorkflowProjectIds.includes(
+            selectedSprint?.project_id ?? "",
+          )}
         />
 
         <section
@@ -4656,23 +4792,32 @@ export function ApplicationController() {
 
         <BoardSection
           archivingIssueIds={archivingIssueIds}
+          error={boardError}
           isActive={activeSection === "board"}
-          issues={issues}
+          isLoading={isLoadingBoard}
+          issues={boardIssues}
           onArchiveIssue={(issue) => {
             void handleArchiveIssue(issue);
           }}
-          onIssueDragOver={handleIssueDragOver}
-          onIssueDragStart={handleIssueDragStart}
           onIssueDrop={handleIssueDrop}
           onOpenIssue={(issueId) => {
             void handleSelectIssue(issueId);
           }}
-          onTransitionIssue={(issueId, status) => {
-            void handleTransitionIssue(issueId, status);
+          onProjectChange={(projectId) => {
+            navigateToBoard(projectId);
           }}
+          onTransitionIssue={(issueId, workflowStatusId) => {
+            void handleTransitionIssue(issueId, {
+              workflow_status_id: workflowStatusId,
+            });
+          }}
+          projectId={boardProjectId}
+          projects={projects}
           teamMembers={teamMembers}
           today={today}
           transitioningIssueIds={transitioningIssueIds}
+          workflow={selectedBoardWorkflow}
+          workflowError={workflowErrorsByProjectId[boardProjectId] || ""}
         />
       </section>
     </main>

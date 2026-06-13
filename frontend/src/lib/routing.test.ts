@@ -4,6 +4,8 @@ import { test } from "vitest";
 import {
   appSectionFromPath,
   appSectionPath,
+  boardPath,
+  boardProjectIdFromLocation,
   currentAppSectionFromLocation,
   inviteAcceptTokenFromLocation,
   sprintIdFromPath,
@@ -68,4 +70,23 @@ test("extracts sprint ids from direct sprint paths", () => {
   assert.equal(sprintIdFromPath("/sprints/sprint%201"), "sprint 1");
   assert.equal(sprintIdFromPath("/sprints"), "");
   assert.equal(sprintIdFromPath("/issues/sprint-1"), "");
+});
+
+test("builds and reads project-specific board routes", () => {
+  assert.equal(boardPath(), "/board");
+  assert.equal(boardPath("project one"), "/board?projectId=project%20one");
+  assert.equal(
+    boardProjectIdFromLocation({
+      pathname: "/board",
+      search: "?projectId=project-1",
+    }),
+    "project-1",
+  );
+  assert.equal(
+    boardProjectIdFromLocation({
+      pathname: "/issues",
+      search: "?projectId=project-1",
+    }),
+    "",
+  );
 });

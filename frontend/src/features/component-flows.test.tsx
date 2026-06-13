@@ -271,7 +271,6 @@ test("planned sprint exposes the start action and locks complete", async () => {
     onProjectFilterChange: vi.fn(),
     onRemoveIssueFromSprint: vi.fn(),
     onSelectSprint: vi.fn(),
-    onSprintIssueDragOver: vi.fn(),
     onSprintIssueDragStart: vi.fn(),
     onSprintIssueDrop: vi.fn(),
     onSprintEndDateChange: vi.fn(),
@@ -292,6 +291,8 @@ test("planned sprint exposes the start action and locks complete", async () => {
     selectedSprintBacklogIssues: [],
     selectedSprintError: "",
     selectedSprintIssues: [],
+    selectedSprintWorkflow: undefined,
+    selectedSprintWorkflowError: "",
     sprintEndDate: "",
     sprintFormError: "",
     sprintGoal: "",
@@ -306,9 +307,10 @@ test("planned sprint exposes the start action and locks complete", async () => {
     teamMembers: [teamMember],
     today: new Date("2026-06-07T00:00:00Z"),
     transitioningIssueIds: [],
+    isLoadingSelectedSprintWorkflow: false,
   };
 
-  render(<SprintsSection {...props} />);
+  const { rerender } = render(<SprintsSection {...props} />);
 
   await user.click(screen.getByRole("button", { name: "Start sprint" }));
 
@@ -316,6 +318,77 @@ test("planned sprint exposes the start action and locks complete", async () => {
   assert.equal(
     screen.getByRole("button", { name: "Complete sprint" }).hasAttribute("disabled"),
     true,
+  );
+
+  const reviewStatus = {
+    id: "status-review",
+    project_id: project.id,
+    key: "review",
+    name: "Ready for review",
+    color: "#0ea5e9",
+    category: "in_progress" as const,
+    position: 100,
+    created_at: "2026-06-07T00:00:00Z",
+    updated_at: "2026-06-07T00:00:00Z",
+    archived_at: null,
+  };
+  const doneStatus = {
+    ...reviewStatus,
+    id: "status-done",
+    key: "done",
+    name: "Done",
+    category: "done" as const,
+    position: 200,
+  };
+  const sprintIssue = {
+    id: "issue-1",
+    project_id: project.id,
+    project_key: project.key,
+    number: 1,
+    issue_key: "DEMO-1",
+    title: "Dynamic sprint workflow",
+    description: "",
+    issue_type: "task" as const,
+    status: reviewStatus.key,
+    workflow_status: reviewStatus,
+    priority: "medium" as const,
+    story_points: 3,
+    reporter_id: admin.id,
+    assignee_id: null,
+    parent_issue_id: null,
+    sprint_id: sprint.id,
+    due_date: null,
+    labels: [],
+    created_at: "2026-06-07T00:00:00Z",
+    updated_at: "2026-06-07T00:00:00Z",
+  };
+
+  rerender(
+    <SprintsSection
+      {...props}
+      selectedSprint={{ ...sprint, status: "active" }}
+      selectedSprintIssues={[sprintIssue]}
+      selectedSprintWorkflow={{
+        project_id: project.id,
+        statuses: [doneStatus, reviewStatus],
+        transitions: [
+          {
+            from_status_id: reviewStatus.id,
+            to_status_id: doneStatus.id,
+            created_at: "2026-06-07T00:00:00Z",
+          },
+        ],
+      }}
+    />,
+  );
+
+  assert.ok(screen.getAllByText("Ready for review").length >= 1);
+  assert.ok(screen.getAllByText("Dynamic sprint workflow").length >= 1);
+  assert.equal(
+    screen
+      .getByLabelText("Status for DEMO-1")
+      .querySelectorAll("option").length,
+    2,
   );
 });
 

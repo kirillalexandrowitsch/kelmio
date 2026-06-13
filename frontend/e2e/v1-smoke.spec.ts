@@ -46,14 +46,17 @@ test("V1 browser smoke: create and move issue with a comment", async ({ page }) 
     ).toBeVisible();
 
     await mainNav.getByRole("button", { name: "Board", exact: true }).click();
+    await page.getByLabel("Board project").selectOption(projectId);
     const boardCard = page.locator(".issue-card").filter({ hasText: issueTitle });
     await expect(boardCard).toBeVisible();
     await boardCard
       .getByLabel(new RegExp(`Status for ${projectKey}-\\d+`))
-      .selectOption("in_progress");
+      .selectOption({ label: "In progress" });
     await expect(
-      boardCard.getByLabel(new RegExp(`Status for ${projectKey}-\\d+`)),
-    ).toHaveValue("in_progress");
+      boardCard
+        .getByLabel(new RegExp(`Status for ${projectKey}-\\d+`))
+        .locator("option:checked"),
+    ).toHaveText("In progress");
 
     await boardCard.getByRole("button", { name: "Open" }).click();
     await page.getByLabel("Add comment").fill(commentBody);

@@ -62,7 +62,7 @@ import {
   isCSRFError,
   requestNeedsCSRF,
 } from "./csrf";
-import { appendPaginationParams } from "./pagination";
+import { appendPaginationParams, collectPaginatedItems } from "./pagination";
 export type {
   AcceptInviteResponse,
   AcceptTeamInviteInput,
@@ -429,6 +429,16 @@ export async function listIssues(
 
   const query = params.toString();
   return request<ListIssuesResponse>(`/api/v1/issues${query ? `?${query}` : ""}`);
+}
+
+export function listAllIssues(filters: IssueFilters = {}) {
+  return collectPaginatedItems<Issue>(async (cursor) => {
+    const response = await listIssues(filters, { limit: 100, cursor });
+    return {
+      items: response.issues,
+      nextCursor: response.next_cursor,
+    };
+  });
 }
 
 export async function getIssue(issueId: string) {

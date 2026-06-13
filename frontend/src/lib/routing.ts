@@ -34,9 +34,18 @@ const appSectionPaths: Record<AppSection, string> = {
 };
 
 const inviteAcceptPath = "/accept-invite";
+const boardPathname = "/board";
 
 export function appSectionPath(section: AppSection) {
   return appSectionPaths[section];
+}
+
+export function boardPath(projectId = "") {
+  if (!projectId) {
+    return boardPathname;
+  }
+
+  return `${boardPathname}?projectId=${encodeURIComponent(projectId)}`;
 }
 
 export function appSectionFromPath(pathname: string): AppSection {
@@ -63,6 +72,30 @@ export function inviteAcceptTokenFromLocation(
   }
 
   return new URLSearchParams(location.search).get("token")?.trim() ?? "";
+}
+
+export function boardProjectIdFromLocation(
+  location: Pick<Location, "pathname" | "search">,
+) {
+  if (location.pathname !== boardPathname) {
+    return "";
+  }
+
+  return new URLSearchParams(location.search).get("projectId")?.trim() ?? "";
+}
+
+export function currentBoardProjectIdFromLocation(
+  location: Pick<Location, "pathname" | "search"> | undefined = undefined,
+) {
+  if (location) {
+    return boardProjectIdFromLocation(location);
+  }
+
+  if (typeof window === "undefined") {
+    return "";
+  }
+
+  return boardProjectIdFromLocation(window.location);
 }
 
 export function currentInviteAcceptTokenFromLocation(
