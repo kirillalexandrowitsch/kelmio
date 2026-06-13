@@ -12,6 +12,18 @@ export function useWorkflowsController() {
   const [workflowErrorsByProjectId, setWorkflowErrorsByProjectId] = useState<
     Record<string, string>
   >({});
+  const [workflowMutationError, setWorkflowMutationError] = useState("");
+  const [creatingWorkflowStatus, setCreatingWorkflowStatus] = useState(false);
+  const [updatingWorkflowStatusIds, setUpdatingWorkflowStatusIds] = useState<
+    string[]
+  >([]);
+  const [archivingWorkflowStatusIds, setArchivingWorkflowStatusIds] = useState<
+    string[]
+  >([]);
+  const [isReorderingWorkflowStatuses, setIsReorderingWorkflowStatuses] =
+    useState(false);
+  const [isSavingWorkflowTransitions, setIsSavingWorkflowTransitions] =
+    useState(false);
 
   return {
     workflowsByProjectId,
@@ -20,5 +32,17 @@ export function useWorkflowsController() {
     setLoadingWorkflowProjectIds,
     workflowErrorsByProjectId,
     setWorkflowErrorsByProjectId,
+    workflowMutationError,
+    setWorkflowMutationError,
+    creatingWorkflowStatus,
+    setCreatingWorkflowStatus,
+    updatingWorkflowStatusIds,
+    setUpdatingWorkflowStatusIds,
+    archivingWorkflowStatusIds,
+    setArchivingWorkflowStatusIds,
+    isReorderingWorkflowStatuses,
+    setIsReorderingWorkflowStatuses,
+    isSavingWorkflowTransitions,
+    setIsSavingWorkflowTransitions,
   };
 }

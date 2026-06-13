@@ -981,6 +981,242 @@ h1 {
   background: #fff8f6;
 }
 
+.workflow-settings-panel,
+.workflow-status-section,
+.workflow-transition-section,
+.workflow-archived-section {
+  display: grid;
+  gap: 12px;
+}
+
+.workflow-settings-header,
+.workflow-status-section > header,
+.workflow-transition-section > header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.workflow-settings-panel h3,
+.workflow-settings-panel h4,
+.workflow-settings-panel p {
+  margin: 0;
+}
+
+.workflow-settings-header h3 {
+  font-size: 15px;
+}
+
+.workflow-settings-header p,
+.workflow-status-section > header p,
+.workflow-transition-section > header p,
+.workflow-status-note,
+.workflow-archive-dialog p {
+  margin-top: 4px;
+  color: #657268;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.workflow-status-create-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: end;
+  gap: 8px;
+  padding: 11px;
+  border: 1px solid #dfe7e1;
+  border-radius: 10px;
+  background: #f8faf8;
+}
+
+.workflow-status-create-form h4 {
+  grid-column: 1 / -1;
+  font-size: 13px;
+}
+
+.workflow-status-create-form button {
+  grid-column: 1 / -1;
+}
+
+.workflow-status-create-form label,
+.workflow-status-card label,
+.workflow-archive-dialog label {
+  display: grid;
+  gap: 5px;
+}
+
+.workflow-status-create-form label > span,
+.workflow-status-card label > span,
+.workflow-archive-dialog label > span {
+  color: #657268;
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.workflow-status-create-form input,
+.workflow-status-create-form select,
+.workflow-status-card input,
+.workflow-status-card select,
+.workflow-archive-dialog select {
+  width: 100%;
+  min-height: 34px;
+  padding: 7px 8px;
+  border: 1px solid #c8d1cb;
+  border-radius: 7px;
+  color: #17211b;
+  background: #ffffff;
+  font-size: 12px;
+}
+
+.workflow-status-create-form input[type="color"],
+.workflow-status-card input[type="color"] {
+  min-width: 48px;
+  padding: 3px;
+}
+
+.workflow-status-list {
+  display: grid;
+  gap: 8px;
+}
+
+.workflow-status-card {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: end;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid #e6ebe7;
+  border-left: 4px solid #64748b;
+  border-radius: 9px;
+  background: #fbfcfb;
+}
+
+.workflow-status-card[draggable="true"] {
+  cursor: grab;
+}
+
+.workflow-status-key {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+  align-self: center;
+}
+
+.workflow-status-key,
+.workflow-status-actions {
+  grid-column: 1 / -1;
+}
+
+.workflow-status-key strong {
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+
+.workflow-status-key small {
+  grid-column: 2;
+  color: #7a857d;
+  font-size: 9px;
+  text-transform: uppercase;
+}
+
+.workflow-status-key .workflow-status-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
+.workflow-status-actions,
+.workflow-transition-actions,
+.workflow-archive-dialog > div {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.workflow-status-actions button {
+  min-width: 34px;
+  min-height: 34px;
+}
+
+.workflow-status-note {
+  grid-column: 1 / -1;
+}
+
+.workflow-transition-section {
+  padding-top: 4px;
+}
+
+.workflow-transition-scroll {
+  overflow-x: auto;
+  border: 1px solid #dfe7e1;
+  border-radius: 10px;
+}
+
+.workflow-transition-matrix {
+  width: 100%;
+  min-width: 620px;
+  border-collapse: collapse;
+  background: #ffffff;
+  font-size: 11px;
+}
+
+.workflow-transition-matrix th,
+.workflow-transition-matrix td {
+  min-width: 72px;
+  padding: 8px;
+  border: 1px solid #edf0ed;
+  text-align: center;
+}
+
+.workflow-transition-matrix th:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  min-width: 120px;
+  background: #f8faf8;
+  text-align: left;
+}
+
+.workflow-transition-matrix input {
+  width: 16px;
+  height: 16px;
+}
+
+.workflow-archived-section {
+  padding: 10px;
+  border: 1px dashed #c8d1cb;
+  border-radius: 9px;
+  background: #f8faf8;
+}
+
+.workflow-archived-section > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.workflow-archived-section span {
+  padding: 5px 7px;
+  border: 1px solid;
+  border-radius: 999px;
+  color: #657268;
+  font-size: 10px;
+}
+
+.workflow-archive-dialog {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #d8b5af;
+  border-radius: 10px;
+  background: #fff9f7;
+  box-shadow: 0 10px 24px rgba(80, 38, 30, 0.12);
+}
+
 .project-member-controls {
   grid-column: 1 / -1;
   align-items: end;
@@ -3191,6 +3427,22 @@ h1 {
 }
 
 @media (max-width: 640px) {
+  .workflow-status-create-form,
+  .workflow-status-card {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .workflow-status-create-form h4,
+  .workflow-status-key,
+  .workflow-status-actions,
+  .workflow-status-note {
+    grid-column: auto;
+  }
+
+  .workflow-status-actions {
+    flex-wrap: wrap;
+  }
+
   .workspace {
     padding: 20px;
   }

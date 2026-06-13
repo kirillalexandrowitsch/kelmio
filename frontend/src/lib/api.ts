@@ -14,6 +14,7 @@ import {
   type CreateTeamInviteInput,
   type CreateTeamInviteResponse,
   type CreateTeamMemberInput,
+  type CreateWorkflowStatusInput,
   type InvitePreview,
   type Issue,
   type IssueComment,
@@ -38,6 +39,8 @@ import {
   type ProjectMember,
   type ProjectRole,
   type ProjectWorkflow,
+  type ProjectWorkflowStatus,
+  type ReplaceWorkflowTransitionsInput,
   type RuntimeVersion,
   type SavedFilter,
   type Sprint,
@@ -53,6 +56,7 @@ import {
   type UpdateSavedFilterInput,
   type UpdateSprintInput,
   type UpdateTeamMemberInput,
+  type UpdateWorkflowStatusInput,
   type WorkflowStatus,
   type WorkflowStatusCategory,
 } from "./api-types";
@@ -71,6 +75,7 @@ export type {
   CurrentUser,
   CreateTeamInviteInput,
   CreateTeamInviteResponse,
+  CreateWorkflowStatusInput,
   InvitePreview,
   Issue,
   IssueActivity,
@@ -90,6 +95,8 @@ export type {
   ProjectMember,
   ProjectRole,
   ProjectWorkflow,
+  ProjectWorkflowStatus,
+  ReplaceWorkflowTransitionsInput,
   RuntimeVersion,
   SavedFilter,
   SavedIssueFilters,
@@ -108,8 +115,10 @@ export type {
   UpdateProjectMemberInput,
   UpdateSavedFilterInput,
   UpdateSprintInput,
+  UpdateWorkflowStatusInput,
   WorkflowStatus,
   WorkflowStatusCategory,
+  WorkflowTransitionInput,
 } from "./api-types";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080";
@@ -183,6 +192,77 @@ export async function getProject(projectId: string) {
 export async function getProjectWorkflow(projectId: string) {
   return request<ProjectWorkflow>(
     `/api/v1/projects/${encodeURIComponent(projectId)}/workflow`,
+  );
+}
+
+export async function createWorkflowStatus(
+  projectId: string,
+  input: CreateWorkflowStatusInput,
+) {
+  return request<ProjectWorkflowStatus>(
+    `/api/v1/projects/${encodeURIComponent(projectId)}/workflow/statuses`,
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
+}
+
+export async function updateWorkflowStatus(
+  projectId: string,
+  statusId: string,
+  input: UpdateWorkflowStatusInput,
+) {
+  return request<ProjectWorkflowStatus>(
+    `/api/v1/projects/${encodeURIComponent(projectId)}/workflow/statuses/${encodeURIComponent(
+      statusId,
+    )}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    },
+  );
+}
+
+export async function reorderWorkflowStatuses(
+  projectId: string,
+  statusIds: string[],
+) {
+  return request<ProjectWorkflow>(
+    `/api/v1/projects/${encodeURIComponent(projectId)}/workflow/statuses/order`,
+    {
+      method: "PUT",
+      body: JSON.stringify({ status_ids: statusIds }),
+    },
+  );
+}
+
+export async function archiveWorkflowStatus(
+  projectId: string,
+  statusId: string,
+  replacementStatusId: string,
+) {
+  return request<ProjectWorkflowStatus>(
+    `/api/v1/projects/${encodeURIComponent(projectId)}/workflow/statuses/${encodeURIComponent(
+      statusId,
+    )}/archive`,
+    {
+      method: "POST",
+      body: JSON.stringify({ replacement_status_id: replacementStatusId }),
+    },
+  );
+}
+
+export async function replaceWorkflowTransitions(
+  projectId: string,
+  input: ReplaceWorkflowTransitionsInput,
+) {
+  return request<ProjectWorkflow>(
+    `/api/v1/projects/${encodeURIComponent(projectId)}/workflow/transitions`,
+    {
+      method: "PUT",
+      body: JSON.stringify(input),
+    },
   );
 }
 

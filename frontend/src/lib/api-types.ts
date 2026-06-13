@@ -130,6 +130,24 @@ export type ProjectWorkflow = {
   statuses: ProjectWorkflowStatus[];
   transitions: ProjectWorkflowTransition[];
 };
+export type CreateWorkflowStatusInput = {
+  key: string;
+  name: string;
+  color: string;
+  category: WorkflowStatusCategory;
+};
+export type UpdateWorkflowStatusInput = {
+  name?: string;
+  color?: string;
+  category?: WorkflowStatusCategory;
+};
+export type WorkflowTransitionInput = {
+  from_status_id: string;
+  to_status_id: string;
+};
+export type ReplaceWorkflowTransitionsInput = {
+  transitions: WorkflowTransitionInput[];
+};
 export type IssuePriority = "low" | "medium" | "high" | "critical";
 export type IssueType = "task" | "bug" | "story" | "epic" | "subtask";
 export type IssueLinkType = "blocks" | "relates";

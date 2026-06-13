@@ -7,11 +7,19 @@ import {
   type Project,
   type ProjectMember,
   type ProjectRole,
+  type ProjectWorkflow,
+  type ProjectWorkflowStatus,
   type TeamMember,
+  type CreateWorkflowStatusInput,
+  type UpdateWorkflowStatusInput,
+  type WorkflowTransitionInput,
 } from "../../lib/api-types";
 import { PROJECT_PERMISSION_NOTE } from "../../lib/permissions";
 import { hasText } from "../../lib/validation";
 import { ProjectMembersPanel } from "./project-members-panel";
+import { WorkflowSettingsPanel } from "./workflow-settings-panel";
+
+export type ProjectDetailTab = "summary" | "members" | "workflow";
 
 type ProjectsSectionProps = {
   archivingProjectIds: string[];
@@ -23,7 +31,10 @@ type ProjectsSectionProps = {
   isCreatingProject: boolean;
   isLoadingProjectDetail: boolean;
   isLoadingProjectMembers: boolean;
+  isLoadingProjectWorkflow: boolean;
   isLoadingProjects: boolean;
+  isReorderingWorkflowStatuses: boolean;
+  isSavingWorkflowTransitions: boolean;
   onArchiveProject: (project: Project) => void;
   onCancelEditingProject: () => void;
   onCreateProject: (event: FormEvent<HTMLFormElement>) => void;
@@ -31,7 +42,20 @@ type ProjectsSectionProps = {
   onEditProjectNameChange: (value: string) => void;
   onOpenProjectBoard: (projectId: string) => void;
   onAddProjectMember: (event: FormEvent<HTMLFormElement>) => void;
-  onProjectDetailTabChange: (tab: "summary" | "members") => void;
+  onProjectDetailTabChange: (tab: ProjectDetailTab) => void;
+  onArchiveWorkflowStatus: (
+    status: ProjectWorkflowStatus,
+    replacementStatusId: string,
+  ) => Promise<boolean>;
+  onCreateWorkflowStatus: (input: CreateWorkflowStatusInput) => Promise<boolean>;
+  onReorderWorkflowStatuses: (statusIds: string[]) => Promise<boolean>;
+  onReplaceWorkflowTransitions: (
+    transitions: WorkflowTransitionInput[],
+  ) => Promise<boolean>;
+  onUpdateWorkflowStatus: (
+    status: ProjectWorkflowStatus,
+    input: UpdateWorkflowStatusInput,
+  ) => Promise<boolean>;
   onProjectMemberRoleChange: (member: ProjectMember, role: ProjectRole) => void;
   onProjectMemberRoleSelectionChange: (role: ProjectRole) => void;
   onProjectMemberUserChange: (userId: string) => void;
@@ -45,7 +69,7 @@ type ProjectsSectionProps = {
   onUpdateProject: (event: FormEvent<HTMLFormElement>, project: Project) => void;
   onViewProjectIssues: (projectId: string) => void;
   projectDescription: string;
-  projectDetailTab: "summary" | "members";
+  projectDetailTab: ProjectDetailTab;
   projectDetailError: string;
   projectFormError: string;
   projectKey: string;
@@ -54,6 +78,10 @@ type ProjectsSectionProps = {
   projectsError: string;
   projectMembers: ProjectMember[];
   projectMembersError: string;
+  projectWorkflow?: ProjectWorkflow;
+  projectWorkflowError: string;
+  archivingWorkflowStatusIds: string[];
+  creatingWorkflowStatus: boolean;
   removingProjectMemberIds: string[];
   role: CurrentUser["workspace"]["role"];
   selectedProjectMemberRole: ProjectRole;
@@ -64,6 +92,7 @@ type ProjectsSectionProps = {
   teamMembers: TeamMember[];
   updatingProjectMemberIds: string[];
   updatingProjectIds: string[];
+  updatingWorkflowStatusIds: string[];
 };
 
 export function ProjectsSection({
@@ -76,7 +105,10 @@ export function ProjectsSection({
   isCreatingProject,
   isLoadingProjectDetail,
   isLoadingProjectMembers,
+  isLoadingProjectWorkflow,
   isLoadingProjects,
+  isReorderingWorkflowStatuses,
+  isSavingWorkflowTransitions,
   onAddProjectMember,
   onArchiveProject,
   onCancelEditingProject,
@@ -85,10 +117,14 @@ export function ProjectsSection({
   onEditProjectNameChange,
   onOpenProjectBoard,
   onProjectDetailTabChange,
+  onArchiveWorkflowStatus,
+  onCreateWorkflowStatus,
   onProjectMemberRoleChange,
   onProjectMemberRoleSelectionChange,
   onProjectMemberUserChange,
+  onReorderWorkflowStatuses,
   onRemoveProjectMember,
+  onReplaceWorkflowTransitions,
   onProjectDescriptionChange,
   onProjectKeyChange,
   onProjectNameChange,
@@ -96,6 +132,7 @@ export function ProjectsSection({
   onSelectProjectDetail,
   onStartEditingProject,
   onUpdateProject,
+  onUpdateWorkflowStatus,
   onViewProjectIssues,
   projectDescription,
   projectDetailTab,
@@ -107,6 +144,10 @@ export function ProjectsSection({
   projectsError,
   projectMembers,
   projectMembersError,
+  projectWorkflow,
+  projectWorkflowError,
+  archivingWorkflowStatusIds,
+  creatingWorkflowStatus,
   removingProjectMemberIds,
   role,
   selectedProjectMemberRole,
@@ -117,6 +158,7 @@ export function ProjectsSection({
   teamMembers,
   updatingProjectMemberIds,
   updatingProjectIds,
+  updatingWorkflowStatusIds,
 }: ProjectsSectionProps) {
   const isAdmin = role === "admin";
 
@@ -339,10 +381,35 @@ export function ProjectsSection({
                   >
                     Members
                   </button>
+                  <button
+                    aria-selected={projectDetailTab === "workflow"}
+                    className={projectDetailTab === "workflow" ? "active" : ""}
+                    onClick={() => onProjectDetailTabChange("workflow")}
+                    role="tab"
+                    type="button"
+                  >
+                    Workflow
+                  </button>
                 </div>
               ) : null}
 
-              {projectDetailTab === "members" && selectedProjectDetail.can_manage ? (
+              {projectDetailTab === "workflow" && selectedProjectDetail.can_manage ? (
+                <WorkflowSettingsPanel
+                  archivingStatusIds={archivingWorkflowStatusIds}
+                  creatingStatus={creatingWorkflowStatus}
+                  error={projectWorkflowError}
+                  isLoading={isLoadingProjectWorkflow}
+                  isReordering={isReorderingWorkflowStatuses}
+                  isSavingTransitions={isSavingWorkflowTransitions}
+                  onArchiveStatus={onArchiveWorkflowStatus}
+                  onCreateStatus={onCreateWorkflowStatus}
+                  onReorderStatuses={onReorderWorkflowStatuses}
+                  onReplaceTransitions={onReplaceWorkflowTransitions}
+                  onUpdateStatus={onUpdateWorkflowStatus}
+                  updatingStatusIds={updatingWorkflowStatusIds}
+                  workflow={projectWorkflow}
+                />
+              ) : projectDetailTab === "members" && selectedProjectDetail.can_manage ? (
                 <ProjectMembersPanel
                   error={projectMembersError}
                   isLoading={isLoadingProjectMembers}

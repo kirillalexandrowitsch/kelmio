@@ -5,6 +5,7 @@ import {
   AppNotification,
   API_UNAUTHORIZED_EVENT,
   CurrentUser,
+  CreateWorkflowStatusInput,
   TeamInvite,
   Issue,
   IssueActivity,
@@ -20,15 +21,20 @@ import {
   Project,
   ProjectMember,
   ProjectRole,
+  ProjectWorkflow,
+  ProjectWorkflowStatus,
   RuntimeVersion,
   SavedFilter,
   Sprint,
   SprintStatus,
   TeamMember,
   TransitionIssueInput,
+  UpdateWorkflowStatusInput,
+  WorkflowTransitionInput,
   addIssueToSprint,
   archiveIssue,
   archiveProject,
+  archiveWorkflowStatus,
   assignIssue,
   changePassword,
   completeSprint,
@@ -42,6 +48,7 @@ import {
   createSubtask,
   createTeamInvite,
   createTeamMember,
+  createWorkflowStatus,
   deleteLabel,
   deleteIssueComment,
   deleteIssueLink,
@@ -73,6 +80,8 @@ import {
   markAllNotificationsRead,
   markNotificationRead,
   putProjectMember,
+  reorderWorkflowStatuses,
+  replaceWorkflowTransitions,
   resetTeamMemberPassword,
   revokeTeamInvite,
   removeIssueFromSprint,
@@ -84,6 +93,7 @@ import {
   updateSavedFilter,
   updateIssueComment,
   updateTeamMember,
+  updateWorkflowStatus,
   updateIssue,
   updateSprint,
 } from "./lib/api";
@@ -558,6 +568,18 @@ export function ApplicationController() {
     setLoadingWorkflowProjectIds,
     workflowErrorsByProjectId,
     setWorkflowErrorsByProjectId,
+    workflowMutationError,
+    setWorkflowMutationError,
+    creatingWorkflowStatus,
+    setCreatingWorkflowStatus,
+    updatingWorkflowStatusIds,
+    setUpdatingWorkflowStatusIds,
+    archivingWorkflowStatusIds,
+    setArchivingWorkflowStatusIds,
+    isReorderingWorkflowStatuses,
+    setIsReorderingWorkflowStatuses,
+    isSavingWorkflowTransitions,
+    setIsSavingWorkflowTransitions,
   } = useWorkflowsController();
   const {
     boardProjectId,
@@ -1091,6 +1113,12 @@ export function ApplicationController() {
     setSelectedProjectMemberRole("contributor");
     setUpdatingProjectMemberIds([]);
     setRemovingProjectMemberIds([]);
+    setWorkflowMutationError("");
+    setCreatingWorkflowStatus(false);
+    setUpdatingWorkflowStatusIds([]);
+    setArchivingWorkflowStatusIds([]);
+    setIsReorderingWorkflowStatuses(false);
+    setIsSavingWorkflowTransitions(false);
   }, [selectedProjectDetail?.id]);
 
   useEffect(() => {
@@ -1105,6 +1133,12 @@ export function ApplicationController() {
     setSelectedProjectMemberRole("contributor");
     setUpdatingProjectMemberIds([]);
     setRemovingProjectMemberIds([]);
+    setWorkflowMutationError("");
+    setCreatingWorkflowStatus(false);
+    setUpdatingWorkflowStatusIds([]);
+    setArchivingWorkflowStatusIds([]);
+    setIsReorderingWorkflowStatuses(false);
+    setIsSavingWorkflowTransitions(false);
   }, [selectedProjectDetail?.can_manage]);
 
   useEffect(() => {
@@ -1780,6 +1814,12 @@ export function ApplicationController() {
     setSelectedProjectMemberRole("contributor");
     setUpdatingProjectMemberIds([]);
     setRemovingProjectMemberIds([]);
+    setWorkflowMutationError("");
+    setCreatingWorkflowStatus(false);
+    setUpdatingWorkflowStatusIds([]);
+    setArchivingWorkflowStatusIds([]);
+    setIsReorderingWorkflowStatuses(false);
+    setIsSavingWorkflowTransitions(false);
     setTeamMembersError("");
     setTeamMemberFormError("");
     setTeamMemberEmail("");
@@ -2064,7 +2104,127 @@ export function ApplicationController() {
     }
   }
 
-  async function handleProjectDetailTabChange(tab: "summary" | "members") {
+  function syncLoadedIssuesWithWorkflow(
+    projectId: string,
+    workflow: ProjectWorkflow,
+  ) {
+    const statusesByID = new Map(
+      workflow.statuses.map((status) => [status.id, status]),
+    );
+    const statusesByKey = new Map(
+      workflow.statuses.map((status) => [status.key, status]),
+    );
+    const syncIssue = (issue: Issue) => {
+      if (issue.project_id !== projectId) {
+        return issue;
+      }
+      const status =
+        statusesByID.get(issue.workflow_status?.id) ?? statusesByKey.get(issue.status);
+      if (!status) {
+        return issue;
+      }
+      return {
+        ...issue,
+        status: status.key,
+        workflow_status: {
+          id: status.id,
+          key: status.key,
+          name: status.name,
+          color: status.color,
+          category: status.category,
+        },
+      };
+    };
+    setIssues((currentIssues) => currentIssues.map(syncIssue));
+    setBoardIssues((currentIssues) => currentIssues.map(syncIssue));
+    setDashboardSprintIssues((currentIssues) => currentIssues.map(syncIssue));
+    setSprintPlanningIssues((currentIssues) => currentIssues.map(syncIssue));
+    setIssueChildren((currentIssues) => currentIssues.map(syncIssue));
+    setSelectedIssue((currentIssue) =>
+      currentIssue ? syncIssue(currentIssue) : currentIssue,
+    );
+  }
+
+  function applyWorkflowUpdate(workflow: ProjectWorkflow) {
+    setWorkflowsByProjectId((currentWorkflows) => ({
+      ...currentWorkflows,
+      [workflow.project_id]: workflow,
+    }));
+    setWorkflowErrorsByProjectId((currentErrors) => ({
+      ...currentErrors,
+      [workflow.project_id]: "",
+    }));
+    syncLoadedIssuesWithWorkflow(workflow.project_id, workflow);
+  }
+
+  async function refreshProjectWorkflow(projectId: string) {
+    setLoadingWorkflowProjectIds((currentIds) =>
+      currentIds.includes(projectId) ? currentIds : [...currentIds, projectId],
+    );
+    setWorkflowErrorsByProjectId((currentErrors) => ({
+      ...currentErrors,
+      [projectId]: "",
+    }));
+    try {
+      const workflow = await getProjectWorkflow(projectId);
+      applyWorkflowUpdate(workflow);
+      return workflow;
+    } catch (err) {
+      setWorkflowErrorsByProjectId((currentErrors) => ({
+        ...currentErrors,
+        [projectId]: apiErrorMessage(err, "Could not load project workflow."),
+      }));
+      return null;
+    } finally {
+      setLoadingWorkflowProjectIds((currentIds) =>
+        currentIds.filter((currentId) => currentId !== projectId),
+      );
+    }
+  }
+
+  async function syncProjectIssuesAfterWorkflowArchive(projectId: string) {
+    const projectIssues = await listAllIssues({ projectId, sort: "created_desc" });
+    const issuesByID = new Map(projectIssues.map((issue) => [issue.id, issue]));
+    const syncIssue = (issue: Issue) =>
+      issue.project_id === projectId ? issuesByID.get(issue.id) ?? issue : issue;
+
+    setIssues((currentIssues) =>
+      currentIssues
+        .map(syncIssue)
+        .filter((issue) =>
+          issueMatchesFilters(
+            issue,
+            issueFilterProjectId,
+            issueFilterSprintId,
+            issueFilterStatus,
+            issueFilterWorkflowStatusId,
+            issueFilterPriority,
+            issueFilterAssigneeId,
+            issueFilterLabelId,
+            issueFilterDue,
+            issueFilterQuery,
+            today,
+          ),
+        ),
+    );
+    setBoardIssues((currentIssues) =>
+      boardProjectId === projectId ? projectIssues : currentIssues.map(syncIssue),
+    );
+    setDashboardSprintIssues((currentIssues) => currentIssues.map(syncIssue));
+    setSprintPlanningIssues((currentIssues) =>
+      selectedSprint?.project_id === projectId
+        ? projectIssues
+        : currentIssues.map(syncIssue),
+    );
+    setIssueChildren((currentIssues) => currentIssues.map(syncIssue));
+    setSelectedIssue((currentIssue) =>
+      currentIssue ? syncIssue(currentIssue) : currentIssue,
+    );
+  }
+
+  async function handleProjectDetailTabChange(
+    tab: "summary" | "members" | "workflow",
+  ) {
     if (tab === "summary") {
       setProjectDetailTab("summary");
       return;
@@ -2074,7 +2234,13 @@ export function ApplicationController() {
       return;
     }
 
-    setProjectDetailTab("members");
+    setProjectDetailTab(tab);
+    if (tab === "workflow") {
+      setWorkflowMutationError("");
+      await refreshProjectWorkflow(selectedProjectDetail.id);
+      return;
+    }
+
     setProjectMembersError("");
     setIsLoadingProjectMembers(true);
     try {
@@ -2086,6 +2252,138 @@ export function ApplicationController() {
       );
     } finally {
       setIsLoadingProjectMembers(false);
+    }
+  }
+
+  async function handleCreateWorkflowStatus(input: CreateWorkflowStatusInput) {
+    if (!selectedProjectDetail?.can_manage) {
+      return false;
+    }
+    setWorkflowMutationError("");
+    setCreatingWorkflowStatus(true);
+    try {
+      await createWorkflowStatus(selectedProjectDetail.id, input);
+      return Boolean(await refreshProjectWorkflow(selectedProjectDetail.id));
+    } catch (err) {
+      setWorkflowMutationError(
+        apiErrorMessage(err, "Could not create workflow status."),
+      );
+      return false;
+    } finally {
+      setCreatingWorkflowStatus(false);
+    }
+  }
+
+  async function handleUpdateWorkflowStatus(
+    status: ProjectWorkflowStatus,
+    input: UpdateWorkflowStatusInput,
+  ) {
+    if (!selectedProjectDetail?.can_manage) {
+      return false;
+    }
+    setWorkflowMutationError("");
+    setUpdatingWorkflowStatusIds((currentIds) => [
+      ...currentIds.filter((id) => id !== status.id),
+      status.id,
+    ]);
+    try {
+      await updateWorkflowStatus(selectedProjectDetail.id, status.id, input);
+      return Boolean(await refreshProjectWorkflow(selectedProjectDetail.id));
+    } catch (err) {
+      setWorkflowMutationError(
+        apiErrorMessage(err, "Could not update workflow status."),
+      );
+      return false;
+    } finally {
+      setUpdatingWorkflowStatusIds((currentIds) =>
+        currentIds.filter((id) => id !== status.id),
+      );
+    }
+  }
+
+  async function handleReorderWorkflowStatuses(statusIds: string[]) {
+    if (!selectedProjectDetail?.can_manage) {
+      return false;
+    }
+    setWorkflowMutationError("");
+    setIsReorderingWorkflowStatuses(true);
+    try {
+      applyWorkflowUpdate(
+        await reorderWorkflowStatuses(selectedProjectDetail.id, statusIds),
+      );
+      return true;
+    } catch (err) {
+      setWorkflowMutationError(
+        apiErrorMessage(err, "Could not reorder workflow statuses."),
+      );
+      return false;
+    } finally {
+      setIsReorderingWorkflowStatuses(false);
+    }
+  }
+
+  async function handleReplaceWorkflowTransitions(
+    transitions: WorkflowTransitionInput[],
+  ) {
+    if (!selectedProjectDetail?.can_manage) {
+      return false;
+    }
+    setWorkflowMutationError("");
+    setIsSavingWorkflowTransitions(true);
+    try {
+      applyWorkflowUpdate(
+        await replaceWorkflowTransitions(selectedProjectDetail.id, { transitions }),
+      );
+      return true;
+    } catch (err) {
+      setWorkflowMutationError(
+        apiErrorMessage(err, "Could not update workflow transitions."),
+      );
+      return false;
+    } finally {
+      setIsSavingWorkflowTransitions(false);
+    }
+  }
+
+  async function handleArchiveWorkflowStatus(
+    status: ProjectWorkflowStatus,
+    replacementStatusId: string,
+  ) {
+    if (!selectedProjectDetail?.can_manage) {
+      return false;
+    }
+    setWorkflowMutationError("");
+    setArchivingWorkflowStatusIds((currentIds) => [
+      ...currentIds.filter((id) => id !== status.id),
+      status.id,
+    ]);
+    try {
+      await archiveWorkflowStatus(
+        selectedProjectDetail.id,
+        status.id,
+        replacementStatusId,
+      );
+      const workflow = await refreshProjectWorkflow(selectedProjectDetail.id);
+      try {
+        await syncProjectIssuesAfterWorkflowArchive(selectedProjectDetail.id);
+      } catch (err) {
+        setWorkflowMutationError(
+          apiErrorMessage(
+            err,
+            "Status was archived, but project issues could not be refreshed.",
+          ),
+        );
+      }
+      return Boolean(workflow);
+    } catch (err) {
+      setWorkflowMutationError(
+        apiErrorMessage(err, "Could not archive workflow status."),
+      );
+      return false;
+    } finally {
+      setArchivingWorkflowStatusIds((currentIds) =>
+        currentIds.filter((id) => id !== status.id),
+      );
     }
   }
 
@@ -4371,7 +4669,9 @@ export function ApplicationController() {
 
         <ProjectsSection
           archivingProjectIds={archivingProjectIds}
+          archivingWorkflowStatusIds={archivingWorkflowStatusIds}
           canCreateProject={canCreateProject}
+          creatingWorkflowStatus={creatingWorkflowStatus}
           editProjectDescription={editProjectDescription}
           editProjectName={editProjectName}
           editingProjectId={editingProjectId}
@@ -4379,13 +4679,20 @@ export function ApplicationController() {
           isCreatingProject={isCreatingProject}
           isLoadingProjectDetail={isLoadingProjectDetail}
           isLoadingProjectMembers={isLoadingProjectMembers}
+          isLoadingProjectWorkflow={loadingWorkflowProjectIds.includes(
+            selectedProjectDetail?.id ?? "",
+          )}
           isLoadingProjects={isLoadingProjects}
+          isReorderingWorkflowStatuses={isReorderingWorkflowStatuses}
+          isSavingWorkflowTransitions={isSavingWorkflowTransitions}
           onAddProjectMember={handleAddProjectMember}
           onArchiveProject={(project) => {
             void handleArchiveProject(project);
           }}
+          onArchiveWorkflowStatus={handleArchiveWorkflowStatus}
           onCancelEditingProject={cancelEditingProject}
           onCreateProject={handleCreateProject}
+          onCreateWorkflowStatus={handleCreateWorkflowStatus}
           onEditProjectDescriptionChange={setEditProjectDescription}
           onEditProjectNameChange={setEditProjectName}
           onOpenProjectBoard={(projectId) => {
@@ -4402,6 +4709,8 @@ export function ApplicationController() {
           onRemoveProjectMember={(member) => {
             void handleRemoveProjectMember(member);
           }}
+          onReorderWorkflowStatuses={handleReorderWorkflowStatuses}
+          onReplaceWorkflowTransitions={handleReplaceWorkflowTransitions}
           onProjectDescriptionChange={setProjectDescription}
           onProjectKeyChange={setProjectKey}
           onProjectNameChange={setProjectName}
@@ -4415,6 +4724,7 @@ export function ApplicationController() {
           onUpdateProject={(event, project) => {
             void handleUpdateProject(event, project);
           }}
+          onUpdateWorkflowStatus={handleUpdateWorkflowStatus}
           onViewProjectIssues={(projectId) => {
             setIssueFilterProjectId(projectId);
             navigateToSection("issues");
@@ -4429,6 +4739,14 @@ export function ApplicationController() {
           projectsError={projectsError}
           projectMembers={projectMembers}
           projectMembersError={projectMembersError}
+          projectWorkflow={
+            workflowsByProjectId[selectedProjectDetail?.id ?? ""]
+          }
+          projectWorkflowError={
+            workflowMutationError ||
+            workflowErrorsByProjectId[selectedProjectDetail?.id ?? ""] ||
+            ""
+          }
           removingProjectMemberIds={removingProjectMemberIds}
           role={user.workspace.role}
           selectedProjectMemberRole={selectedProjectMemberRole}
@@ -4439,6 +4757,7 @@ export function ApplicationController() {
           teamMembers={teamMembers}
           updatingProjectMemberIds={updatingProjectMemberIds}
           updatingProjectIds={updatingProjectIds}
+          updatingWorkflowStatusIds={updatingWorkflowStatusIds}
         />
 
         <SprintsSection

@@ -423,7 +423,9 @@ test("notifications expose per-item and mark-all actions", async () => {
 function projectsProps(selectedProjectDetail: Project) {
   return {
     archivingProjectIds: [],
+    archivingWorkflowStatusIds: [],
     canCreateProject: true,
+    creatingWorkflowStatus: false,
     editProjectDescription: "",
     editProjectName: "",
     editingProjectId: "",
@@ -431,11 +433,16 @@ function projectsProps(selectedProjectDetail: Project) {
     isCreatingProject: false,
     isLoadingProjectDetail: false,
     isLoadingProjectMembers: false,
+    isLoadingProjectWorkflow: false,
     isLoadingProjects: false,
+    isReorderingWorkflowStatuses: false,
+    isSavingWorkflowTransitions: false,
     onAddProjectMember: vi.fn(preventSubmit),
     onArchiveProject: vi.fn(),
+    onArchiveWorkflowStatus: vi.fn(async () => true),
     onCancelEditingProject: vi.fn(),
     onCreateProject: vi.fn(preventSubmit),
+    onCreateWorkflowStatus: vi.fn(async () => true),
     onEditProjectDescriptionChange: vi.fn(),
     onEditProjectNameChange: vi.fn(),
     onOpenProjectBoard: vi.fn(),
@@ -446,11 +453,14 @@ function projectsProps(selectedProjectDetail: Project) {
     onProjectMemberRoleSelectionChange: vi.fn(),
     onProjectMemberUserChange: vi.fn(),
     onProjectNameChange: vi.fn(),
+    onReorderWorkflowStatuses: vi.fn(async () => true),
     onRemoveProjectMember: vi.fn(),
+    onReplaceWorkflowTransitions: vi.fn(async () => true),
     onSelectIssue: vi.fn(),
     onSelectProjectDetail: vi.fn(),
     onStartEditingProject: vi.fn(),
     onUpdateProject: vi.fn(preventSubmit),
+    onUpdateWorkflowStatus: vi.fn(async () => true),
     onViewProjectIssues: vi.fn(),
     projectDescription: "",
     projectDetailError: "",
@@ -459,6 +469,8 @@ function projectsProps(selectedProjectDetail: Project) {
     projectKey: "",
     projectMembers: [projectMember],
     projectMembersError: "",
+    projectWorkflow: undefined,
+    projectWorkflowError: "",
     projectName: "",
     projects: [selectedProjectDetail],
     projectsError: "",
@@ -472,6 +484,7 @@ function projectsProps(selectedProjectDetail: Project) {
     teamMembers: [teamMember],
     updatingProjectIds: [],
     updatingProjectMemberIds: [],
+    updatingWorkflowStatusIds: [],
   };
 }
 
@@ -482,6 +495,8 @@ test("project details expose members tab only to project managers", async () => 
 
   await user.click(screen.getByRole("tab", { name: "Members" }));
   assert.equal(managerProps.onProjectDetailTabChange.mock.calls[0]?.[0], "members");
+  await user.click(screen.getByRole("tab", { name: "Workflow" }));
+  assert.equal(managerProps.onProjectDetailTabChange.mock.calls[1]?.[0], "workflow");
 
   const viewerProject: Project = {
     ...project,
@@ -498,6 +513,7 @@ test("project details expose members tab only to project managers", async () => 
   );
 
   assert.equal(screen.queryByRole("tab", { name: "Members" }), null);
+  assert.equal(screen.queryByRole("tab", { name: "Workflow" }), null);
   assert.ok(screen.getByText("Viewer access"));
   assert.ok(screen.getByText(/This project is read-only/));
 });

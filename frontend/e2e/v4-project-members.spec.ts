@@ -53,6 +53,7 @@ test("V4 project members UI: admin and lead manage access while viewer is read-o
     await logoutViaApi(page);
     await login(page, lead.username, lead.password);
     await openProjectMembers(page, projectName);
+    await expect(page.getByRole("tab", { name: "Workflow" })).toBeVisible();
 
     const viewerCard = projectMemberCard(page, viewer.email);
     await viewerCard
@@ -69,6 +70,7 @@ test("V4 project members UI: admin and lead manage access while viewer is read-o
     await login(page, viewer.username, viewer.password);
     await openProjectDetail(page, projectName);
     await expect(page.getByRole("tab", { name: "Members" })).toHaveCount(0);
+    await expect(page.getByRole("tab", { name: "Workflow" })).toHaveCount(0);
     await expect(page.getByText("Viewer access")).toBeVisible();
     await expect(page.getByText(/This project is read-only/)).toBeVisible();
 
