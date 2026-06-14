@@ -3,7 +3,10 @@ import { type FormEvent } from "react";
 import { FormError } from "../../components/form-feedback";
 import {
   type CurrentUser,
+  type AutomationRule,
+  type CreateAutomationRuleInput,
   type Issue,
+  type Label,
   type Project,
   type ProjectMember,
   type ProjectRole,
@@ -18,8 +21,9 @@ import { PROJECT_PERMISSION_NOTE } from "../../lib/permissions";
 import { hasText } from "../../lib/validation";
 import { ProjectMembersPanel } from "./project-members-panel";
 import { WorkflowSettingsPanel } from "./workflow-settings-panel";
+import { AutomationSettingsPanel } from "./automation-settings-panel";
 
-export type ProjectDetailTab = "summary" | "members" | "workflow";
+export type ProjectDetailTab = "summary" | "members" | "workflow" | "automation";
 
 type ProjectsSectionProps = {
   archivingProjectIds: string[];
@@ -32,6 +36,9 @@ type ProjectsSectionProps = {
   isLoadingProjectDetail: boolean;
   isLoadingProjectMembers: boolean;
   isLoadingProjectWorkflow: boolean;
+  isLoadingAutomationRules: boolean;
+  isCreatingAutomationRule: boolean;
+  isReorderingAutomationRules: boolean;
   isLoadingProjects: boolean;
   isReorderingWorkflowStatuses: boolean;
   isSavingWorkflowTransitions: boolean;
@@ -46,6 +53,13 @@ type ProjectsSectionProps = {
   onArchiveWorkflowStatus: (
     status: ProjectWorkflowStatus,
     replacementStatusId: string,
+  ) => Promise<boolean>;
+  onCreateAutomationRule: (input: CreateAutomationRuleInput) => Promise<boolean>;
+  onDeleteAutomationRule: (rule: AutomationRule) => Promise<boolean>;
+  onReorderAutomationRules: (ruleIds: string[]) => Promise<boolean>;
+  onUpdateAutomationRule: (
+    rule: AutomationRule,
+    input: CreateAutomationRuleInput | { is_enabled: boolean },
   ) => Promise<boolean>;
   onCreateWorkflowStatus: (input: CreateWorkflowStatusInput) => Promise<boolean>;
   onReorderWorkflowStatuses: (statusIds: string[]) => Promise<boolean>;
@@ -80,6 +94,9 @@ type ProjectsSectionProps = {
   projectMembersError: string;
   projectWorkflow?: ProjectWorkflow;
   projectWorkflowError: string;
+  automationRules: AutomationRule[];
+  automationRulesError: string;
+  deletingAutomationRuleIds: string[];
   archivingWorkflowStatusIds: string[];
   creatingWorkflowStatus: boolean;
   removingProjectMemberIds: string[];
@@ -93,6 +110,8 @@ type ProjectsSectionProps = {
   updatingProjectMemberIds: string[];
   updatingProjectIds: string[];
   updatingWorkflowStatusIds: string[];
+  updatingAutomationRuleIds: string[];
+  labels: Label[];
 };
 
 export function ProjectsSection({
@@ -106,6 +125,9 @@ export function ProjectsSection({
   isLoadingProjectDetail,
   isLoadingProjectMembers,
   isLoadingProjectWorkflow,
+  isLoadingAutomationRules,
+  isCreatingAutomationRule,
+  isReorderingAutomationRules,
   isLoadingProjects,
   isReorderingWorkflowStatuses,
   isSavingWorkflowTransitions,
@@ -118,6 +140,10 @@ export function ProjectsSection({
   onOpenProjectBoard,
   onProjectDetailTabChange,
   onArchiveWorkflowStatus,
+  onCreateAutomationRule,
+  onDeleteAutomationRule,
+  onReorderAutomationRules,
+  onUpdateAutomationRule,
   onCreateWorkflowStatus,
   onProjectMemberRoleChange,
   onProjectMemberRoleSelectionChange,
@@ -146,6 +172,9 @@ export function ProjectsSection({
   projectMembersError,
   projectWorkflow,
   projectWorkflowError,
+  automationRules,
+  automationRulesError,
+  deletingAutomationRuleIds,
   archivingWorkflowStatusIds,
   creatingWorkflowStatus,
   removingProjectMemberIds,
@@ -159,6 +188,8 @@ export function ProjectsSection({
   updatingProjectMemberIds,
   updatingProjectIds,
   updatingWorkflowStatusIds,
+  updatingAutomationRuleIds,
+  labels,
 }: ProjectsSectionProps) {
   const isAdmin = role === "admin";
 
@@ -390,10 +421,37 @@ export function ProjectsSection({
                   >
                     Workflow
                   </button>
+                  <button
+                    aria-selected={projectDetailTab === "automation"}
+                    className={projectDetailTab === "automation" ? "active" : ""}
+                    onClick={() => onProjectDetailTabChange("automation")}
+                    role="tab"
+                    type="button"
+                  >
+                    Automation
+                  </button>
                 </div>
               ) : null}
 
-              {projectDetailTab === "workflow" && selectedProjectDetail.can_manage ? (
+              {projectDetailTab === "automation" && selectedProjectDetail.can_manage ? (
+                <AutomationSettingsPanel
+                  creatingRule={isCreatingAutomationRule}
+                  deletingRuleIds={deletingAutomationRuleIds}
+                  error={automationRulesError}
+                  isLoading={isLoadingAutomationRules}
+                  isReordering={isReorderingAutomationRules}
+                  labels={labels}
+                  members={projectMembers}
+                  onCreateRule={onCreateAutomationRule}
+                  onDeleteRule={onDeleteAutomationRule}
+                  onReorderRules={onReorderAutomationRules}
+                  onUpdateRule={onUpdateAutomationRule}
+                  rules={automationRules}
+                  teamMembers={teamMembers}
+                  updatingRuleIds={updatingAutomationRuleIds}
+                  workflow={projectWorkflow}
+                />
+              ) : projectDetailTab === "workflow" && selectedProjectDetail.can_manage ? (
                 <WorkflowSettingsPanel
                   archivingStatusIds={archivingWorkflowStatusIds}
                   creatingStatus={creatingWorkflowStatus}

@@ -984,14 +984,23 @@ h1 {
 .workflow-settings-panel,
 .workflow-status-section,
 .workflow-transition-section,
-.workflow-archived-section {
+.workflow-archived-section,
+.automation-settings-panel,
+.automation-rule-section,
+.automation-rule-editor,
+.automation-item-section {
   display: grid;
   gap: 12px;
 }
 
 .workflow-settings-header,
 .workflow-status-section > header,
-.workflow-transition-section > header {
+.workflow-transition-section > header,
+.automation-settings-header,
+.automation-rule-section > header,
+.automation-rule-editor > header,
+.automation-item-section > header,
+.automation-rule-card > header {
   display: flex;
   align-items: start;
   justify-content: space-between;
@@ -1000,11 +1009,19 @@ h1 {
 
 .workflow-settings-panel h3,
 .workflow-settings-panel h4,
-.workflow-settings-panel p {
+.workflow-settings-panel p,
+.automation-settings-panel h3,
+.automation-settings-panel h4,
+.automation-settings-panel h5,
+.automation-settings-panel p {
   margin: 0;
 }
 
 .workflow-settings-header h3 {
+  font-size: 15px;
+}
+
+.automation-settings-header h3 {
   font-size: 15px;
 }
 
@@ -1017,6 +1034,182 @@ h1 {
   color: #657268;
   font-size: 12px;
   line-height: 1.45;
+}
+
+.automation-settings-header p,
+.automation-rule-section > header p,
+.automation-rule-card > header p,
+.automation-item-section > header p {
+  margin-top: 4px;
+  color: #657268;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.automation-rule-editor {
+  padding: 11px;
+  border: 1px solid #dfe7e1;
+  border-radius: 10px;
+  background: #f8faf8;
+}
+
+.automation-rule-editor > header h4,
+.automation-rule-section > header h4 {
+  font-size: 13px;
+}
+
+.automation-rule-basics {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+}
+
+.automation-rule-basics label {
+  display: grid;
+  gap: 5px;
+}
+
+.automation-rule-basics label > span {
+  color: #657268;
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.automation-rule-basics input,
+.automation-rule-basics select,
+.automation-item-row select {
+  width: 100%;
+  min-height: 34px;
+  padding: 7px 8px;
+  border: 1px solid #c8d1cb;
+  border-radius: 7px;
+  color: #17211b;
+  background: #ffffff;
+  font-size: 12px;
+}
+
+.automation-enabled-field {
+  display: flex !important;
+  grid-column: 1 / -1;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  justify-content: start;
+}
+
+.automation-enabled-field input {
+  width: 15px;
+  min-height: 15px;
+  accent-color: #4e795d;
+}
+
+.automation-item-section {
+  padding: 9px;
+  border: 1px solid #e6ebe7;
+  border-radius: 9px;
+  background: #ffffff;
+}
+
+.automation-item-section h5 {
+  font-size: 12px;
+}
+
+.automation-item-list,
+.automation-rule-list {
+  display: grid;
+  gap: 8px;
+}
+
+.automation-item-row {
+  display: grid;
+  grid-template-columns: minmax(130px, 0.8fr) minmax(160px, 1fr) auto auto auto;
+  gap: 6px;
+}
+
+.automation-item-row button,
+.automation-rule-actions button {
+  min-height: 34px;
+}
+
+.automation-rule-card {
+  display: grid;
+  gap: 10px;
+  padding: 11px;
+  border: 1px solid #e6ebe7;
+  border-left: 4px solid #4e795d;
+  border-radius: 9px;
+  background: #fbfcfb;
+}
+
+.automation-rule-card[draggable="true"] {
+  cursor: grab;
+}
+
+.automation-rule-card > header h4 {
+  font-size: 13px;
+}
+
+.automation-rule-state {
+  padding: 5px 7px;
+  border: 1px solid #c8d1cb;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 850;
+}
+
+.automation-rule-state.enabled {
+  border-color: #b8d0c0;
+  color: #315d40;
+  background: #edf7ef;
+}
+
+.automation-rule-state.disabled {
+  color: #7a554e;
+  background: #fff8f6;
+}
+
+.automation-rule-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.automation-rule-summary > div {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  padding: 8px;
+  border-radius: 7px;
+  background: #f2f6f3;
+}
+
+.automation-rule-summary strong {
+  color: #4e5c54;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.automation-rule-summary span,
+.automation-disabled-reason {
+  color: #657268;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.automation-disabled-reason {
+  padding: 7px 8px;
+  border: 1px solid #e1c7c2;
+  border-radius: 7px;
+  color: #93483e;
+  background: #fff8f6;
+}
+
+.automation-rule-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 .workflow-status-create-form {
@@ -3428,7 +3621,10 @@ h1 {
 
 @media (max-width: 640px) {
   .workflow-status-create-form,
-  .workflow-status-card {
+  .workflow-status-card,
+  .automation-rule-basics,
+  .automation-rule-summary,
+  .automation-item-row {
     grid-template-columns: minmax(0, 1fr);
   }
 
@@ -3441,6 +3637,10 @@ h1 {
 
   .workflow-status-actions {
     flex-wrap: wrap;
+  }
+
+  .automation-enabled-field {
+    grid-column: auto;
   }
 
   .workspace {

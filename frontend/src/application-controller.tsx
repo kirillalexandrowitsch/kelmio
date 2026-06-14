@@ -3,9 +3,11 @@ import "./styles.css";
 import {
   ApiError,
   AppNotification,
+  AutomationRule,
   API_UNAUTHORIZED_EVENT,
   CurrentUser,
   CreateWorkflowStatusInput,
+  CreateAutomationRuleInput,
   TeamInvite,
   Issue,
   IssueActivity,
@@ -49,11 +51,13 @@ import {
   createTeamInvite,
   createTeamMember,
   createWorkflowStatus,
+  createAutomationRule,
   deleteLabel,
   deleteIssueComment,
   deleteIssueLink,
   deleteProjectMember,
   deleteSavedFilter,
+  deleteAutomationRule,
   getIssue,
   getCurrentUser,
   getProject,
@@ -70,6 +74,7 @@ import {
   listLabels,
   listNotifications,
   listProjectMembers,
+  listAutomationRules,
   listProjects,
   listSavedFilters,
   listSprints,
@@ -81,6 +86,7 @@ import {
   markNotificationRead,
   putProjectMember,
   reorderWorkflowStatuses,
+  reorderAutomationRules,
   replaceWorkflowTransitions,
   resetTeamMemberPassword,
   revokeTeamInvite,
@@ -94,6 +100,7 @@ import {
   updateIssueComment,
   updateTeamMember,
   updateWorkflowStatus,
+  updateAutomationRule,
   updateIssue,
   updateSprint,
 } from "./lib/api";
@@ -155,6 +162,7 @@ import { useNotificationsController } from "./controllers/use-notifications-cont
 import { useSprintsController } from "./controllers/use-sprints-controller";
 import { useWorkflowsController } from "./controllers/use-workflows-controller";
 import { useBoardController } from "./controllers/use-board-controller";
+import { useAutomationsController } from "./controllers/use-automations-controller";
 import {
   activeWorkflowStatuses,
   allowedTransitionStatuses,
@@ -581,6 +589,22 @@ export function ApplicationController() {
     isSavingWorkflowTransitions,
     setIsSavingWorkflowTransitions,
   } = useWorkflowsController();
+  const {
+    automationRules,
+    setAutomationRules,
+    automationRulesError,
+    setAutomationRulesError,
+    isLoadingAutomationRules,
+    setIsLoadingAutomationRules,
+    isCreatingAutomationRule,
+    setIsCreatingAutomationRule,
+    updatingAutomationRuleIds,
+    setUpdatingAutomationRuleIds,
+    deletingAutomationRuleIds,
+    setDeletingAutomationRuleIds,
+    isReorderingAutomationRules,
+    setIsReorderingAutomationRules,
+  } = useAutomationsController();
   const {
     boardProjectId,
     setBoardProjectId,
@@ -1119,6 +1143,13 @@ export function ApplicationController() {
     setArchivingWorkflowStatusIds([]);
     setIsReorderingWorkflowStatuses(false);
     setIsSavingWorkflowTransitions(false);
+    setAutomationRules([]);
+    setAutomationRulesError("");
+    setIsLoadingAutomationRules(false);
+    setIsCreatingAutomationRule(false);
+    setUpdatingAutomationRuleIds([]);
+    setDeletingAutomationRuleIds([]);
+    setIsReorderingAutomationRules(false);
   }, [selectedProjectDetail?.id]);
 
   useEffect(() => {
@@ -1139,6 +1170,13 @@ export function ApplicationController() {
     setArchivingWorkflowStatusIds([]);
     setIsReorderingWorkflowStatuses(false);
     setIsSavingWorkflowTransitions(false);
+    setAutomationRules([]);
+    setAutomationRulesError("");
+    setIsLoadingAutomationRules(false);
+    setIsCreatingAutomationRule(false);
+    setUpdatingAutomationRuleIds([]);
+    setDeletingAutomationRuleIds([]);
+    setIsReorderingAutomationRules(false);
   }, [selectedProjectDetail?.can_manage]);
 
   useEffect(() => {
@@ -1820,6 +1858,13 @@ export function ApplicationController() {
     setArchivingWorkflowStatusIds([]);
     setIsReorderingWorkflowStatuses(false);
     setIsSavingWorkflowTransitions(false);
+    setAutomationRules([]);
+    setAutomationRulesError("");
+    setIsLoadingAutomationRules(false);
+    setIsCreatingAutomationRule(false);
+    setUpdatingAutomationRuleIds([]);
+    setDeletingAutomationRuleIds([]);
+    setIsReorderingAutomationRules(false);
     setTeamMembersError("");
     setTeamMemberFormError("");
     setTeamMemberEmail("");
@@ -2223,7 +2268,7 @@ export function ApplicationController() {
   }
 
   async function handleProjectDetailTabChange(
-    tab: "summary" | "members" | "workflow",
+    tab: "summary" | "members" | "workflow" | "automation",
   ) {
     if (tab === "summary") {
       setProjectDetailTab("summary");
@@ -2238,6 +2283,31 @@ export function ApplicationController() {
     if (tab === "workflow") {
       setWorkflowMutationError("");
       await refreshProjectWorkflow(selectedProjectDetail.id);
+      return;
+    }
+
+    if (tab === "automation") {
+      setAutomationRulesError("");
+      setWorkflowMutationError("");
+      setProjectMembersError("");
+      setIsLoadingAutomationRules(true);
+      setIsLoadingProjectMembers(true);
+      try {
+        const [rulesResponse, membersResponse] = await Promise.all([
+          listAutomationRules(selectedProjectDetail.id),
+          listProjectMembers(selectedProjectDetail.id),
+          refreshProjectWorkflow(selectedProjectDetail.id),
+        ]);
+        setAutomationRules(rulesResponse.automation_rules);
+        setProjectMembers(membersResponse.members);
+      } catch (err) {
+        setAutomationRulesError(
+          apiErrorMessage(err, "Could not load automation settings."),
+        );
+      } finally {
+        setIsLoadingAutomationRules(false);
+        setIsLoadingProjectMembers(false);
+      }
       return;
     }
 
@@ -2384,6 +2454,112 @@ export function ApplicationController() {
       setArchivingWorkflowStatusIds((currentIds) =>
         currentIds.filter((id) => id !== status.id),
       );
+    }
+  }
+
+  async function handleCreateAutomationRule(input: CreateAutomationRuleInput) {
+    if (!selectedProjectDetail?.can_manage) {
+      return false;
+    }
+    setAutomationRulesError("");
+    setIsCreatingAutomationRule(true);
+    try {
+      const rule = await createAutomationRule(selectedProjectDetail.id, input);
+      setAutomationRules((currentRules) => [...currentRules, rule]);
+      return true;
+    } catch (err) {
+      setAutomationRulesError(
+        apiErrorMessage(err, "Could not create automation rule."),
+      );
+      return false;
+    } finally {
+      setIsCreatingAutomationRule(false);
+    }
+  }
+
+  async function handleUpdateAutomationRule(
+    rule: AutomationRule,
+    input: CreateAutomationRuleInput | { is_enabled: boolean },
+  ) {
+    if (!selectedProjectDetail?.can_manage) {
+      return false;
+    }
+    setAutomationRulesError("");
+    setUpdatingAutomationRuleIds((currentIds) => [
+      ...currentIds.filter((id) => id !== rule.id),
+      rule.id,
+    ]);
+    try {
+      const updatedRule = await updateAutomationRule(
+        selectedProjectDetail.id,
+        rule.id,
+        input,
+      );
+      setAutomationRules((currentRules) =>
+        currentRules.map((currentRule) =>
+          currentRule.id === updatedRule.id ? updatedRule : currentRule,
+        ),
+      );
+      return true;
+    } catch (err) {
+      setAutomationRulesError(
+        apiErrorMessage(err, "Could not update automation rule."),
+      );
+      return false;
+    } finally {
+      setUpdatingAutomationRuleIds((currentIds) =>
+        currentIds.filter((id) => id !== rule.id),
+      );
+    }
+  }
+
+  async function handleDeleteAutomationRule(rule: AutomationRule) {
+    if (!selectedProjectDetail?.can_manage) {
+      return false;
+    }
+    setAutomationRulesError("");
+    setDeletingAutomationRuleIds((currentIds) => [
+      ...currentIds.filter((id) => id !== rule.id),
+      rule.id,
+    ]);
+    try {
+      await deleteAutomationRule(selectedProjectDetail.id, rule.id);
+      setAutomationRules((currentRules) =>
+        currentRules.filter((currentRule) => currentRule.id !== rule.id),
+      );
+      return true;
+    } catch (err) {
+      setAutomationRulesError(
+        apiErrorMessage(err, "Could not delete automation rule."),
+      );
+      return false;
+    } finally {
+      setDeletingAutomationRuleIds((currentIds) =>
+        currentIds.filter((id) => id !== rule.id),
+      );
+    }
+  }
+
+  async function handleReorderAutomationRules(ruleIds: string[]) {
+    if (!selectedProjectDetail?.can_manage) {
+      return false;
+    }
+    setAutomationRulesError("");
+    setIsReorderingAutomationRules(true);
+    try {
+      const response = await reorderAutomationRules(
+        selectedProjectDetail.id,
+        ruleIds,
+      );
+      setAutomationRules(response.automation_rules);
+      return true;
+    } catch (err) {
+      setAutomationRulesError(
+        apiErrorMessage(err, "Could not reorder automation rules."),
+      );
+      return false;
+    } finally {
+      setIsReorderingAutomationRules(false);
     }
   }
 
@@ -4668,10 +4844,13 @@ export function ApplicationController() {
         />
 
         <ProjectsSection
+          automationRules={automationRules}
+          automationRulesError={automationRulesError}
           archivingProjectIds={archivingProjectIds}
           archivingWorkflowStatusIds={archivingWorkflowStatusIds}
           canCreateProject={canCreateProject}
           creatingWorkflowStatus={creatingWorkflowStatus}
+          deletingAutomationRuleIds={deletingAutomationRuleIds}
           editProjectDescription={editProjectDescription}
           editProjectName={editProjectName}
           editingProjectId={editingProjectId}
@@ -4682,17 +4861,22 @@ export function ApplicationController() {
           isLoadingProjectWorkflow={loadingWorkflowProjectIds.includes(
             selectedProjectDetail?.id ?? "",
           )}
+          isLoadingAutomationRules={isLoadingAutomationRules}
+          isCreatingAutomationRule={isCreatingAutomationRule}
           isLoadingProjects={isLoadingProjects}
           isReorderingWorkflowStatuses={isReorderingWorkflowStatuses}
+          isReorderingAutomationRules={isReorderingAutomationRules}
           isSavingWorkflowTransitions={isSavingWorkflowTransitions}
           onAddProjectMember={handleAddProjectMember}
           onArchiveProject={(project) => {
             void handleArchiveProject(project);
           }}
           onArchiveWorkflowStatus={handleArchiveWorkflowStatus}
+          onCreateAutomationRule={handleCreateAutomationRule}
           onCancelEditingProject={cancelEditingProject}
           onCreateProject={handleCreateProject}
           onCreateWorkflowStatus={handleCreateWorkflowStatus}
+          onDeleteAutomationRule={handleDeleteAutomationRule}
           onEditProjectDescriptionChange={setEditProjectDescription}
           onEditProjectNameChange={setEditProjectName}
           onOpenProjectBoard={(projectId) => {
@@ -4710,6 +4894,7 @@ export function ApplicationController() {
             void handleRemoveProjectMember(member);
           }}
           onReorderWorkflowStatuses={handleReorderWorkflowStatuses}
+          onReorderAutomationRules={handleReorderAutomationRules}
           onReplaceWorkflowTransitions={handleReplaceWorkflowTransitions}
           onProjectDescriptionChange={setProjectDescription}
           onProjectKeyChange={setProjectKey}
@@ -4725,6 +4910,7 @@ export function ApplicationController() {
             void handleUpdateProject(event, project);
           }}
           onUpdateWorkflowStatus={handleUpdateWorkflowStatus}
+          onUpdateAutomationRule={handleUpdateAutomationRule}
           onViewProjectIssues={(projectId) => {
             setIssueFilterProjectId(projectId);
             navigateToSection("issues");
@@ -4747,6 +4933,7 @@ export function ApplicationController() {
             workflowErrorsByProjectId[selectedProjectDetail?.id ?? ""] ||
             ""
           }
+          labels={labels}
           removingProjectMemberIds={removingProjectMemberIds}
           role={user.workspace.role}
           selectedProjectMemberRole={selectedProjectMemberRole}
@@ -4758,6 +4945,7 @@ export function ApplicationController() {
           updatingProjectMemberIds={updatingProjectMemberIds}
           updatingProjectIds={updatingProjectIds}
           updatingWorkflowStatusIds={updatingWorkflowStatusIds}
+          updatingAutomationRuleIds={updatingAutomationRuleIds}
         />
 
         <SprintsSection

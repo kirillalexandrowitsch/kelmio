@@ -24,7 +24,7 @@ export function useWorkspaceAdminController() {
   const [projectDetailError, setProjectDetailError] = useState("");
   const [isLoadingProjectDetail, setIsLoadingProjectDetail] = useState(false);
   const [projectDetailTab, setProjectDetailTab] = useState<
-    "summary" | "members" | "workflow"
+    "summary" | "members" | "workflow" | "automation"
   >("summary");
   const [projectMembers, setProjectMembers] = useState<ProjectMember[]>([]);
   const [projectMembersError, setProjectMembersError] = useState("");

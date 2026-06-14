@@ -422,10 +422,13 @@ test("notifications expose per-item and mark-all actions", async () => {
 
 function projectsProps(selectedProjectDetail: Project) {
   return {
+    automationRules: [],
+    automationRulesError: "",
     archivingProjectIds: [],
     archivingWorkflowStatusIds: [],
     canCreateProject: true,
     creatingWorkflowStatus: false,
+    deletingAutomationRuleIds: [],
     editProjectDescription: "",
     editProjectName: "",
     editingProjectId: "",
@@ -434,15 +437,20 @@ function projectsProps(selectedProjectDetail: Project) {
     isLoadingProjectDetail: false,
     isLoadingProjectMembers: false,
     isLoadingProjectWorkflow: false,
+    isLoadingAutomationRules: false,
+    isCreatingAutomationRule: false,
     isLoadingProjects: false,
     isReorderingWorkflowStatuses: false,
+    isReorderingAutomationRules: false,
     isSavingWorkflowTransitions: false,
     onAddProjectMember: vi.fn(preventSubmit),
     onArchiveProject: vi.fn(),
     onArchiveWorkflowStatus: vi.fn(async () => true),
+    onCreateAutomationRule: vi.fn(async () => true),
     onCancelEditingProject: vi.fn(),
     onCreateProject: vi.fn(preventSubmit),
     onCreateWorkflowStatus: vi.fn(async () => true),
+    onDeleteAutomationRule: vi.fn(async () => true),
     onEditProjectDescriptionChange: vi.fn(),
     onEditProjectNameChange: vi.fn(),
     onOpenProjectBoard: vi.fn(),
@@ -454,6 +462,7 @@ function projectsProps(selectedProjectDetail: Project) {
     onProjectMemberUserChange: vi.fn(),
     onProjectNameChange: vi.fn(),
     onReorderWorkflowStatuses: vi.fn(async () => true),
+    onReorderAutomationRules: vi.fn(async () => true),
     onRemoveProjectMember: vi.fn(),
     onReplaceWorkflowTransitions: vi.fn(async () => true),
     onSelectIssue: vi.fn(),
@@ -461,6 +470,7 @@ function projectsProps(selectedProjectDetail: Project) {
     onStartEditingProject: vi.fn(),
     onUpdateProject: vi.fn(preventSubmit),
     onUpdateWorkflowStatus: vi.fn(async () => true),
+    onUpdateAutomationRule: vi.fn(async () => true),
     onViewProjectIssues: vi.fn(),
     projectDescription: "",
     projectDetailError: "",
@@ -471,6 +481,7 @@ function projectsProps(selectedProjectDetail: Project) {
     projectMembersError: "",
     projectWorkflow: undefined,
     projectWorkflowError: "",
+    labels: [],
     projectName: "",
     projects: [selectedProjectDetail],
     projectsError: "",
@@ -485,6 +496,7 @@ function projectsProps(selectedProjectDetail: Project) {
     updatingProjectIds: [],
     updatingProjectMemberIds: [],
     updatingWorkflowStatusIds: [],
+    updatingAutomationRuleIds: [],
   };
 }
 
@@ -497,6 +509,8 @@ test("project details expose members tab only to project managers", async () => 
   assert.equal(managerProps.onProjectDetailTabChange.mock.calls[0]?.[0], "members");
   await user.click(screen.getByRole("tab", { name: "Workflow" }));
   assert.equal(managerProps.onProjectDetailTabChange.mock.calls[1]?.[0], "workflow");
+  await user.click(screen.getByRole("tab", { name: "Automation" }));
+  assert.equal(managerProps.onProjectDetailTabChange.mock.calls[2]?.[0], "automation");
 
   const viewerProject: Project = {
     ...project,
@@ -514,6 +528,7 @@ test("project details expose members tab only to project managers", async () => 
 
   assert.equal(screen.queryByRole("tab", { name: "Members" }), null);
   assert.equal(screen.queryByRole("tab", { name: "Workflow" }), null);
+  assert.equal(screen.queryByRole("tab", { name: "Automation" }), null);
   assert.ok(screen.getByText("Viewer access"));
   assert.ok(screen.getByText(/This project is read-only/));
 });

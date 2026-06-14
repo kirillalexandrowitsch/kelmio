@@ -1,4 +1,6 @@
 import {
+  type AutomationRule,
+  type CreateAutomationRuleInput,
   type AcceptInviteResponse,
   type AcceptTeamInviteInput,
   type AppNotification,
@@ -29,6 +31,7 @@ import {
   type ListLabelsResponse,
   type ListNotificationsResponse,
   type ListProjectMembersResponse,
+  type ListAutomationRulesResponse,
   type ListProjectsResponse,
   type ListSavedFiltersResponse,
   type ListSprintsResponse,
@@ -57,6 +60,7 @@ import {
   type UpdateSprintInput,
   type UpdateTeamMemberInput,
   type UpdateWorkflowStatusInput,
+  type UpdateAutomationRuleInput,
   type WorkflowStatus,
   type WorkflowStatusCategory,
 } from "./api-types";
@@ -68,6 +72,10 @@ import {
 } from "./csrf";
 import { appendPaginationParams, collectPaginatedItems } from "./pagination";
 export type {
+  AutomationAction,
+  AutomationCondition,
+  AutomationRule,
+  AutomationTriggerType,
   AcceptInviteResponse,
   AcceptTeamInviteInput,
   AppNotification,
@@ -76,6 +84,7 @@ export type {
   CreateTeamInviteInput,
   CreateTeamInviteResponse,
   CreateWorkflowStatusInput,
+  CreateAutomationRuleInput,
   InvitePreview,
   Issue,
   IssueActivity,
@@ -116,6 +125,7 @@ export type {
   UpdateSavedFilterInput,
   UpdateSprintInput,
   UpdateWorkflowStatusInput,
+  UpdateAutomationRuleInput,
   WorkflowStatus,
   WorkflowStatusCategory,
   WorkflowTransitionInput,
@@ -289,6 +299,47 @@ export async function archiveProject(projectId: string) {
 export async function listProjectMembers(projectId: string) {
   return request<ListProjectMembersResponse>(
     `/api/v1/projects/${encodeURIComponent(projectId)}/members`,
+  );
+}
+
+export async function listAutomationRules(projectId: string) {
+  return request<ListAutomationRulesResponse>(
+    `/api/v1/projects/${encodeURIComponent(projectId)}/automation-rules`,
+  );
+}
+
+export async function createAutomationRule(
+  projectId: string,
+  input: CreateAutomationRuleInput,
+) {
+  return request<AutomationRule>(
+    `/api/v1/projects/${encodeURIComponent(projectId)}/automation-rules`,
+    { method: "POST", body: JSON.stringify(input) },
+  );
+}
+
+export async function updateAutomationRule(
+  projectId: string,
+  ruleId: string,
+  input: UpdateAutomationRuleInput,
+) {
+  return request<AutomationRule>(
+    `/api/v1/projects/${encodeURIComponent(projectId)}/automation-rules/${encodeURIComponent(ruleId)}`,
+    { method: "PATCH", body: JSON.stringify(input) },
+  );
+}
+
+export async function deleteAutomationRule(projectId: string, ruleId: string) {
+  await request<void>(
+    `/api/v1/projects/${encodeURIComponent(projectId)}/automation-rules/${encodeURIComponent(ruleId)}`,
+    { method: "DELETE" },
+  );
+}
+
+export async function reorderAutomationRules(projectId: string, ruleIds: string[]) {
+  return request<ListAutomationRulesResponse>(
+    `/api/v1/projects/${encodeURIComponent(projectId)}/automation-rules/order`,
+    { method: "PUT", body: JSON.stringify({ rule_ids: ruleIds }) },
   );
 }
 

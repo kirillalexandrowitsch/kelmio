@@ -148,6 +148,46 @@ export type WorkflowTransitionInput = {
 export type ReplaceWorkflowTransitionsInput = {
   transitions: WorkflowTransitionInput[];
 };
+export type AutomationTriggerType =
+  | "issue_created"
+  | "status_changed"
+  | "assignee_changed"
+  | "priority_changed";
+export type AutomationCondition =
+  | { type: "issue_type"; value: IssueType }
+  | { type: "workflow_status"; workflow_status_id: string }
+  | { type: "priority"; value: IssuePriority }
+  | { type: "assignee"; user_id: string | null }
+  | { type: "reporter"; user_id: string }
+  | { type: "label"; label_id: string };
+export type AutomationAction =
+  | { type: "change_workflow_status"; workflow_status_id: string }
+  | { type: "change_assignee"; user_id: string | null }
+  | { type: "change_priority"; value: IssuePriority }
+  | { type: "add_label"; label_id: string }
+  | { type: "remove_label"; label_id: string };
+export type AutomationRule = {
+  id: string;
+  project_id: string;
+  name: string;
+  trigger_type: AutomationTriggerType;
+  conditions: AutomationCondition[];
+  actions: AutomationAction[];
+  position: number;
+  is_enabled: boolean;
+  disabled_reason: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+};
+export type CreateAutomationRuleInput = {
+  name: string;
+  trigger_type: AutomationTriggerType;
+  conditions: AutomationCondition[];
+  actions: AutomationAction[];
+  is_enabled?: boolean;
+};
+export type UpdateAutomationRuleInput = Partial<CreateAutomationRuleInput>;
 export type IssuePriority = "low" | "medium" | "high" | "critical";
 export type IssueType = "task" | "bug" | "story" | "epic" | "subtask";
 export type IssueLinkType = "blocks" | "relates";
@@ -303,6 +343,10 @@ export type ListProjectsResponse = {
 
 export type ListProjectMembersResponse = {
   members: ProjectMember[];
+};
+
+export type ListAutomationRulesResponse = {
+  automation_rules: AutomationRule[];
 };
 
 export type ListTeamMembersResponse = {
