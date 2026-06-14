@@ -1,5 +1,5 @@
 import { FormError } from "../../components/form-feedback";
-import { type IssueActivity, type TeamMember } from "../../lib/api-types";
+import { type IssueActivity, type Label, type TeamMember } from "../../lib/api-types";
 import { activityDescription, activityTitle } from "../../lib/activity-view";
 import { formatDateTime } from "../../lib/formatting";
 
@@ -7,6 +7,7 @@ type IssueActivitySectionProps = {
   activity: IssueActivity[];
   activityError: string;
   isLoadingActivity: boolean;
+  labels: Label[];
   teamMembers: TeamMember[];
 };
 
@@ -14,6 +15,7 @@ export function IssueActivitySection({
   activity,
   activityError,
   isLoadingActivity,
+  labels,
   teamMembers,
 }: IssueActivitySectionProps) {
   return (
@@ -33,7 +35,7 @@ export function IssueActivitySection({
       {activity.length > 0 ? (
         <div className="activity-list">
           {activity.map((activityItem) => {
-            const description = activityDescription(activityItem, teamMembers);
+            const description = activityDescription(activityItem, teamMembers, labels);
 
             return (
               <article className="activity-card" key={activityItem.id}>

@@ -266,6 +266,34 @@ func NewHandler(db *pgxpool.Pool, authHandler *auth.Handler, notificationService
 	}
 }
 
+func (h *Handler) executeAutomations(ctx context.Context, tx pgx.Tx, user auth.CurrentUser, issueID string, triggerType string) (issueResponse, error) {
+	result, err := h.automations.Execute(ctx, tx, automations.ExecuteRequest{
+		WorkspaceID: user.WorkspaceID, IssueID: issueID, TriggerType: triggerType, InitiatedByUserID: user.ID,
+	})
+	if err != nil {
+		return issueResponse{}, err
+	}
+
+	issue, err := getIssueInTx(ctx, tx, user.WorkspaceID, issueID)
+	if err != nil {
+		return issueResponse{}, err
+	}
+	if h.notifications == nil || len(result.ChangedFields) == 0 {
+		return issue, nil
+	}
+	if err := h.notifications.NotifyAutomationChanges(ctx, tx, user.WorkspaceID, user.ID, notificationIssueContext(issue), notifications.AutomationChanges{
+		AppliedRuleNames: result.AppliedRuleNames,
+		ChangedFields:    result.ChangedFields,
+		FromStatus:       result.FromStatus,
+		ToStatus:         result.ToStatus,
+		FromAssigneeID:   result.FromAssigneeID,
+		ToAssigneeID:     result.ToAssigneeID,
+	}); err != nil {
+		return issueResponse{}, err
+	}
+	return issue, nil
+}
+
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/issues", h.list)
 	mux.HandleFunc("POST /api/v1/issues", h.create)
@@ -1639,12 +1667,7 @@ func (h *Handler) createIssue(ctx context.Context, user auth.CurrentUser, input 
 	if err := insertIssueActivity(ctx, tx, issue.ID, user.ID, "issue_created", activityPayload); err != nil {
 		return issueResponse{}, err
 	}
-	if err := h.automations.Execute(ctx, tx, automations.ExecuteRequest{
-		WorkspaceID: user.WorkspaceID, IssueID: issue.ID, TriggerType: "issue_created", InitiatedByUserID: user.ID,
-	}); err != nil {
-		return issueResponse{}, err
-	}
-	issue, err = getIssueInTx(ctx, tx, user.WorkspaceID, issue.ID)
+	issue, err = h.executeAutomations(ctx, tx, user, issue.ID, "issue_created")
 	if err != nil {
 		return issueResponse{}, err
 	}
@@ -1794,12 +1817,7 @@ func (h *Handler) updateIssue(ctx context.Context, user auth.CurrentUser, issueI
 		}
 	}
 	if previous.Priority != issue.Priority {
-		if err := h.automations.Execute(ctx, tx, automations.ExecuteRequest{
-			WorkspaceID: user.WorkspaceID, IssueID: issue.ID, TriggerType: "priority_changed", InitiatedByUserID: user.ID,
-		}); err != nil {
-			return issueResponse{}, err
-		}
-		issue, err = getIssueInTx(ctx, tx, user.WorkspaceID, issue.ID)
+		issue, err = h.executeAutomations(ctx, tx, user, issue.ID, "priority_changed")
 		if err != nil {
 			return issueResponse{}, err
 		}
@@ -2338,12 +2356,7 @@ func (h *Handler) transitionIssueStatus(ctx context.Context, user auth.CurrentUs
 		}); err != nil {
 			return issueResponse{}, err
 		}
-		if err := h.automations.Execute(ctx, tx, automations.ExecuteRequest{
-			WorkspaceID: user.WorkspaceID, IssueID: issue.ID, TriggerType: "status_changed", InitiatedByUserID: user.ID,
-		}); err != nil {
-			return issueResponse{}, err
-		}
-		issue, err = getIssueInTx(ctx, tx, user.WorkspaceID, issue.ID)
+		issue, err = h.executeAutomations(ctx, tx, user, issue.ID, "status_changed")
 		if err != nil {
 			return issueResponse{}, err
 		}
@@ -2452,12 +2465,7 @@ func (h *Handler) assignIssue(ctx context.Context, user auth.CurrentUser, issueI
 		}); err != nil {
 			return issueResponse{}, err
 		}
-		if err := h.automations.Execute(ctx, tx, automations.ExecuteRequest{
-			WorkspaceID: user.WorkspaceID, IssueID: issue.ID, TriggerType: "assignee_changed", InitiatedByUserID: user.ID,
-		}); err != nil {
-			return issueResponse{}, err
-		}
-		issue, err = getIssueInTx(ctx, tx, user.WorkspaceID, issue.ID)
+		issue, err = h.executeAutomations(ctx, tx, user, issue.ID, "assignee_changed")
 		if err != nil {
 			return issueResponse{}, err
 		}

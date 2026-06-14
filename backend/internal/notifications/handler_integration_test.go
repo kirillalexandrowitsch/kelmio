@@ -42,6 +42,16 @@ func TestNotificationServiceIntegration(t *testing.T) {
 	if err := service.NotifySprintEvent(ctx, db, seed.workspaceID, seed.actor.ID, seed.sprint, TypeSprintStarted); err != nil {
 		t.Fatalf("notify sprint started: %v", err)
 	}
+	if err := service.NotifyAutomationChanges(ctx, db, seed.workspaceID, seed.actor.ID, seed.issue, AutomationChanges{
+		AppliedRuleNames: []string{"Route issue", "Assign reviewer"},
+		ChangedFields:    []string{"status", "assignee"},
+		FromStatus:       "todo",
+		ToStatus:         "review",
+		FromAssigneeID:   "",
+		ToAssigneeID:     seed.assignee.ID,
+	}); err != nil {
+		t.Fatalf("notify automation changes: %v", err)
+	}
 	outsiderNotifications, err := service.List(ctx, db, outsider)
 	if err != nil {
 		t.Fatalf("list outsider notifications: %v", err)
@@ -59,6 +69,12 @@ func TestNotificationServiceIntegration(t *testing.T) {
 	}
 	if !hasNotificationType(assigneeNotifications, TypeIssueMentioned) {
 		t.Fatalf("assignee notifications missing mention: %#v", assigneeNotifications)
+	}
+	if !hasNotificationType(assigneeNotifications, TypeIssueAutomationAssigned) {
+		t.Fatalf("assignee notifications missing automation assignment: %#v", assigneeNotifications)
+	}
+	if hasNotificationType(assigneeNotifications, TypeIssueAutomationStatusChanged) {
+		t.Fatalf("assignee automation assignment did not take priority: %#v", assigneeNotifications)
 	}
 	if hasDuplicateCommentNotification(assigneeNotifications, seed.commentID) {
 		t.Fatalf("assignee received duplicate comment notification: %#v", assigneeNotifications)
@@ -95,6 +111,21 @@ func TestNotificationServiceIntegration(t *testing.T) {
 	}
 	if !hasNotificationType(reporterNotifications, TypeIssueCommented) {
 		t.Fatalf("reporter notifications missing direct comment: %#v", reporterNotifications)
+	}
+	if !hasNotificationType(reporterNotifications, TypeIssueAutomationStatusChanged) {
+		t.Fatalf("reporter notifications missing automation status change: %#v", reporterNotifications)
+	}
+	var automationActorCount int
+	if err := db.QueryRow(ctx, `
+		SELECT count(*)::int
+		FROM notifications
+		WHERE notification_type IN ('issue_automation_assigned', 'issue_automation_status_changed')
+			AND actor_id IS NOT NULL
+	`).Scan(&automationActorCount); err != nil {
+		t.Fatalf("count automation notification actors: %v", err)
+	}
+	if automationActorCount != 0 {
+		t.Fatalf("automation notifications with actors = %d, want 0", automationActorCount)
 	}
 
 	actorCount, err := service.UnreadCount(ctx, db, seed.actor)

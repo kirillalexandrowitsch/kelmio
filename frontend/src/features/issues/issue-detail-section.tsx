@@ -351,6 +351,7 @@ export function IssueDetailSection({
               activity={activity}
               activityError={activityError}
               isLoadingActivity={isLoadingActivity}
+              labels={labels}
               teamMembers={teamMembers}
             />
           </div>

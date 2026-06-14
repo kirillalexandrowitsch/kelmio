@@ -42,6 +42,33 @@ func TestCommentNotificationRecipientsNoSelfNotification(t *testing.T) {
 	}
 }
 
+func TestAutomationNotificationRecipientsPrioritizeAssignment(t *testing.T) {
+	t.Parallel()
+	got := automationNotificationRecipients("actor", "reporter", "assignee", AutomationChanges{
+		FromStatus:     "todo",
+		ToStatus:       "blocked",
+		FromAssigneeID: "",
+		ToAssigneeID:   "assignee",
+	})
+	want := []automationRecipient{
+		{UserID: "assignee", NotificationType: TypeIssueAutomationAssigned},
+		{UserID: "reporter", NotificationType: TypeIssueAutomationStatusChanged},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("recipients = %#v, want %#v", got, want)
+	}
+}
+
+func TestAutomationNotificationRecipientsExcludeInitiatorAndFinalNoOps(t *testing.T) {
+	t.Parallel()
+	got := automationNotificationRecipients("actor", "actor", "actor", AutomationChanges{
+		FromStatus: "todo", ToStatus: "todo", FromAssigneeID: "other", ToAssigneeID: "actor",
+	})
+	if len(got) != 0 {
+		t.Fatalf("recipients = %#v, want none", got)
+	}
+}
+
 func TestCommentPreview(t *testing.T) {
 	t.Parallel()
 

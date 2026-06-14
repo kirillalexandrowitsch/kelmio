@@ -115,6 +115,19 @@ func main() {
 		logger.Error("ensure demo project failed", "error", err)
 		os.Exit(1)
 	}
+	if err := ensureProjectMembership(ctx, tx, projectID, adminID, "lead"); err != nil {
+		logger.Error("ensure admin project role failed", "error", err)
+		os.Exit(1)
+	}
+	if err := ensureProjectMembership(ctx, tx, projectID, demoMemberID, "contributor"); err != nil {
+		logger.Error("ensure demo member project role failed", "error", err)
+		os.Exit(1)
+	}
+	workflowStatusIDs, err := ensureDemoWorkflow(ctx, tx, projectID)
+	if err != nil {
+		logger.Error("ensure V4 demo workflow failed", "error", err)
+		os.Exit(1)
+	}
 
 	frontendLabelID, err := ensureLabel(ctx, tx, workspaceID, "frontend", "#4e795d")
 	if err != nil {
@@ -258,6 +271,28 @@ func main() {
 			DueOffsetDays: &nextSprint,
 			LabelIDs:      []string{backendLabelID},
 		},
+		{
+			Number:      11,
+			Title:       "Review configurable workflow rollout",
+			Description: "V4 demo story in a custom workflow status with an automation-assigned reviewer.",
+			IssueType:   "story",
+			Status:      "review",
+			Priority:    "high",
+			StoryPoints: 5,
+			AssigneeID:  demoMemberID,
+			LabelIDs:    []string{frontendLabelID, backendLabelID},
+		},
+		{
+			Number:      12,
+			Title:       "Fix critical V4 workflow blocker",
+			Description: "Critical V4 demo bug moved to blocked by a synchronous automation rule.",
+			IssueType:   "bug",
+			Status:      "blocked",
+			Priority:    "critical",
+			StoryPoints: 3,
+			AssigneeID:  adminID,
+			LabelIDs:    []string{bugLabelID, backendLabelID},
+		},
 	}
 
 	issueIDs := make(map[int]string, len(issues))
@@ -373,6 +408,8 @@ func main() {
 		{IssueNumber: 8, SprintID: activeSprintID},
 		{IssueNumber: 9, SprintID: activeSprintID},
 		{IssueNumber: 10, SprintID: nextSprintID},
+		{IssueNumber: 11, SprintID: activeSprintID},
+		{IssueNumber: 12, SprintID: activeSprintID},
 	} {
 		if err := ensureIssueSprint(ctx, tx, issueIDs[assignment.IssueNumber], assignment.SprintID); err != nil {
 			logger.Error("ensure issue sprint failed", "issue_number", assignment.IssueNumber, "error", err)
@@ -437,6 +474,43 @@ func main() {
 		os.Exit(1)
 	}
 
+	if err := ensureAutomationRule(ctx, tx, projectID, adminID, "Critical bugs move to blocked", "issue_created",
+		[]map[string]any{{"type": "issue_type", "value": "bug"}, {"type": "priority", "value": "critical"}},
+		[]map[string]any{{"type": "change_workflow_status", "workflow_status_id": workflowStatusIDs["blocked"]}}, 100); err != nil {
+		logger.Error("ensure critical bug automation failed", "error", err)
+		os.Exit(1)
+	}
+	if err := ensureAutomationRule(ctx, tx, projectID, adminID, "Review work assigns demo member", "status_changed",
+		[]map[string]any{{"type": "workflow_status", "workflow_status_id": workflowStatusIDs["review"]}},
+		[]map[string]any{{"type": "change_assignee", "user_id": demoMemberID}}, 200); err != nil {
+		logger.Error("ensure review assignment automation failed", "error", err)
+		os.Exit(1)
+	}
+	if err := ensureSeedIssueActivity(ctx, tx, issueIDs[11], "automation_applied", map[string]string{
+		"seed_key":             "v4_seed:demo-11:automation_applied:review-assignee",
+		"rule_name":            "Review work assigns demo member",
+		"trigger_type":         "status_changed",
+		"initiated_by_user_id": adminID,
+		"changed_fields":       "assignee",
+		"from_assignee_id":     "",
+		"to_assignee_id":       demoMemberID,
+	}); err != nil {
+		logger.Error("ensure V4 review automation activity failed", "error", err)
+		os.Exit(1)
+	}
+	if err := ensureSeedIssueActivity(ctx, tx, issueIDs[12], "automation_applied", map[string]string{
+		"seed_key":             "v4_seed:demo-12:automation_applied:critical-blocked",
+		"rule_name":            "Critical bugs move to blocked",
+		"trigger_type":         "issue_created",
+		"initiated_by_user_id": adminID,
+		"changed_fields":       "status",
+		"from_status":          "todo",
+		"to_status":            "blocked",
+	}); err != nil {
+		logger.Error("ensure V4 blocker automation activity failed", "error", err)
+		os.Exit(1)
+	}
+
 	if err := resetSeedNotifications(ctx, tx, workspaceID); err != nil {
 		logger.Error("reset seed notifications failed", "error", err)
 		os.Exit(1)
@@ -472,6 +546,28 @@ func main() {
 		"preview":  "@demo_member Can you verify the active sprint planning flow before QA?",
 	}); err != nil {
 		logger.Error("ensure demo member mention notification failed", "error", err)
+		os.Exit(1)
+	}
+	if err := ensureNotification(ctx, tx, workspaceID, demoMemberID, "", issueIDs[11], "issue_automation_assigned", map[string]string{
+		"seed_key":              "v4_seed:demo_member:automation_assigned:demo-11",
+		"message":               "automation assigned you to an issue",
+		"automation_rule_names": "Review work assigns demo member",
+		"changed_fields":        "assignee",
+		"from_assignee_id":      "",
+		"to_assignee_id":        demoMemberID,
+	}); err != nil {
+		logger.Error("ensure demo member automation assignment notification failed", "error", err)
+		os.Exit(1)
+	}
+	if err := ensureNotification(ctx, tx, workspaceID, adminID, "", issueIDs[12], "issue_automation_status_changed", map[string]string{
+		"seed_key":              "v4_seed:admin:automation_status:demo-12",
+		"message":               "automation changed issue status",
+		"automation_rule_names": "Critical bugs move to blocked",
+		"changed_fields":        "status",
+		"from_status":           "todo",
+		"to_status":             "blocked",
+	}); err != nil {
+		logger.Error("ensure admin automation status notification failed", "error", err)
 		os.Exit(1)
 	}
 
@@ -557,7 +653,7 @@ func ensureProject(ctx context.Context, tx pgx.Tx, workspaceID string, createdBy
 	var projectID string
 	if err := tx.QueryRow(ctx, `
 		INSERT INTO projects (workspace_id, key, name, description, created_by)
-		VALUES ($1, 'DEMO', 'Demo Project', 'Seeded project with tasks for local V1 and V2 testing.', $2)
+		VALUES ($1, 'DEMO', 'Demo Project', 'Seeded project with tasks for local V1 through V4 testing.', $2)
 		ON CONFLICT (workspace_id, key) DO UPDATE SET
 			name = EXCLUDED.name,
 			description = EXCLUDED.description,
@@ -568,6 +664,71 @@ func ensureProject(ctx context.Context, tx pgx.Tx, workspaceID string, createdBy
 	}
 
 	return projectID, nil
+}
+
+func ensureProjectMembership(ctx context.Context, tx pgx.Tx, projectID string, userID string, role string) error {
+	_, err := tx.Exec(ctx, `
+		INSERT INTO project_members (project_id, user_id, role)
+		VALUES ($1, $2, $3)
+		ON CONFLICT (project_id, user_id) DO UPDATE SET
+			role = EXCLUDED.role,
+			updated_at = now()
+	`, projectID, userID, role)
+	return err
+}
+
+func ensureDemoWorkflow(ctx context.Context, tx pgx.Tx, projectID string) (map[string]string, error) {
+	statuses := []struct {
+		Key      string
+		Name     string
+		Color    string
+		Category string
+		Position int
+	}{
+		{Key: "backlog", Name: "Backlog", Color: "#64748b", Category: "backlog", Position: 100},
+		{Key: "todo", Name: "Todo", Color: "#3b82f6", Category: "todo", Position: 200},
+		{Key: "in_progress", Name: "In progress", Color: "#f59e0b", Category: "in_progress", Position: 300},
+		{Key: "review", Name: "Ready for review", Color: "#0ea5e9", Category: "in_progress", Position: 400},
+		{Key: "blocked", Name: "Blocked", Color: "#dc2626", Category: "in_progress", Position: 500},
+		{Key: "done", Name: "Done", Color: "#16a34a", Category: "done", Position: 600},
+	}
+	statusIDs := make(map[string]string, len(statuses))
+	for _, status := range statuses {
+		var statusID string
+		if err := tx.QueryRow(ctx, `
+			INSERT INTO project_workflow_statuses (project_id, key, name, color, category, position)
+			VALUES ($1, $2, $3, $4, $5, $6)
+			ON CONFLICT (project_id, key) DO UPDATE SET
+				name = EXCLUDED.name,
+				color = EXCLUDED.color,
+				category = EXCLUDED.category,
+				position = EXCLUDED.position,
+				archived_at = NULL,
+				updated_at = now()
+			RETURNING id::text
+		`, projectID, status.Key, status.Name, status.Color, status.Category, status.Position).Scan(&statusID); err != nil {
+			return nil, err
+		}
+		statusIDs[status.Key] = statusID
+	}
+
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO project_workflow_transitions (project_id, from_status_id, to_status_id)
+		SELECT $1, source.id, target.id
+		FROM project_workflow_statuses source
+		CROSS JOIN project_workflow_statuses target
+		WHERE source.project_id = $1
+			AND target.project_id = $1
+			AND source.archived_at IS NULL
+			AND target.archived_at IS NULL
+			AND source.key = ANY($2)
+			AND target.key = ANY($2)
+			AND source.id <> target.id
+		ON CONFLICT DO NOTHING
+	`, projectID, []string{"backlog", "todo", "in_progress", "review", "blocked", "done"}); err != nil {
+		return nil, err
+	}
+	return statusIDs, nil
 }
 
 func ensureLabel(ctx context.Context, tx pgx.Tx, workspaceID string, name string, color string) (string, error) {
@@ -791,11 +952,60 @@ func ensureSavedFilter(ctx context.Context, tx pgx.Tx, workspaceID string, userI
 	return err
 }
 
+func ensureAutomationRule(
+	ctx context.Context,
+	tx pgx.Tx,
+	projectID string,
+	createdBy string,
+	name string,
+	triggerType string,
+	conditions []map[string]any,
+	actions []map[string]any,
+	position int,
+) error {
+	conditionsJSON, err := json.Marshal(conditions)
+	if err != nil {
+		return err
+	}
+	actionsJSON, err := json.Marshal(actions)
+	if err != nil {
+		return err
+	}
+	command, err := tx.Exec(ctx, `
+		UPDATE automation_rules
+		SET trigger_type = $3,
+			conditions = $4::jsonb,
+			actions = $5::jsonb,
+			position = $6,
+			is_enabled = true,
+			disabled_reason = NULL,
+			updated_at = now()
+		WHERE project_id = $1
+			AND name = $2
+	`, projectID, name, triggerType, string(conditionsJSON), string(actionsJSON), position)
+	if err != nil {
+		return err
+	}
+	if command.RowsAffected() > 0 {
+		return nil
+	}
+	_, err = tx.Exec(ctx, `
+		INSERT INTO automation_rules (
+			project_id, name, trigger_type, conditions, actions, position, is_enabled, created_by
+		)
+		VALUES ($1, $2, $3, $4::jsonb, $5::jsonb, $6, true, $7)
+	`, projectID, name, triggerType, string(conditionsJSON), string(actionsJSON), position, createdBy)
+	return err
+}
+
 func resetSeedNotifications(ctx context.Context, tx pgx.Tx, workspaceID string) error {
 	_, err := tx.Exec(ctx, `
 		DELETE FROM notifications
 		WHERE workspace_id = $1
-			AND payload->>'seed_key' LIKE 'v2_seed:%'
+			AND (
+				payload->>'seed_key' LIKE 'v2_seed:%'
+				OR payload->>'seed_key' LIKE 'v4_seed:%'
+			)
 	`, workspaceID)
 
 	return err
@@ -820,6 +1030,10 @@ func ensureNotification(
 	if issueID != "" {
 		notificationIssueID = issueID
 	}
+	var notificationActorID any
+	if actorID != "" {
+		notificationActorID = actorID
+	}
 
 	_, err = tx.Exec(ctx, `
 		INSERT INTO notifications (
@@ -831,7 +1045,7 @@ func ensureNotification(
 			payload
 		)
 		VALUES ($1, $2, $3, $4::uuid, $5, $6::jsonb)
-	`, workspaceID, userID, actorID, notificationIssueID, notificationType, string(payloadJSON))
+	`, workspaceID, userID, notificationActorID, notificationIssueID, notificationType, string(payloadJSON))
 
 	return err
 }
@@ -877,6 +1091,27 @@ func ensureIssueActivity(
 		)
 	`, issueID, action, actorID, string(payloadJSON))
 
+	return err
+}
+
+func ensureSeedIssueActivity(ctx context.Context, tx pgx.Tx, issueID string, action string, payload map[string]string) error {
+	seedKey := payload["seed_key"]
+	if _, err := tx.Exec(ctx, `
+		DELETE FROM activity_log
+		WHERE entity_type = 'issue'
+			AND entity_id = $1
+			AND payload->>'seed_key' = $2
+	`, issueID, seedKey); err != nil {
+		return err
+	}
+	payloadJSON, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+	_, err = tx.Exec(ctx, `
+		INSERT INTO activity_log (entity_type, entity_id, action, actor_id, payload)
+		VALUES ('issue', $1, $2, NULL, $3::jsonb)
+	`, issueID, action, string(payloadJSON))
 	return err
 }
 

@@ -198,6 +198,8 @@ export type NotificationType =
   | "issue_assigned"
   | "issue_mentioned"
   | "issue_commented"
+  | "issue_automation_assigned"
+  | "issue_automation_status_changed"
   | "sprint_started"
   | "sprint_completed";
 

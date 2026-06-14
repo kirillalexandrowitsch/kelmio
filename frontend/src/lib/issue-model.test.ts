@@ -51,7 +51,7 @@ function makeIssue(overrides: Partial<Issue> = {}): Issue {
 
 test("labels known and unknown statuses for display", () => {
   assert.equal(statusLabel("in_progress"), "In progress");
-  assert.equal(statusLabel("custom_status"), "custom_status");
+  assert.equal(statusLabel("custom_status"), "Custom status");
 });
 
 test("extracts issue label ids in display order", () => {

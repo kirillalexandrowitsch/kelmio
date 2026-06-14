@@ -306,6 +306,20 @@ func TestPostgresMigrationsCreateCoreSchema(t *testing.T) {
 	`, "integration@example.com", "integration", "hash", "Integration User").Scan(&userID); err != nil {
 		t.Fatalf("insert user: %v", err)
 	}
+	for _, notificationType := range []string{"issue_automation_assigned", "issue_automation_status_changed"} {
+		if _, err := db.Exec(ctx, `
+			INSERT INTO notifications (workspace_id, user_id, notification_type)
+			VALUES ($1, $2, $3)
+		`, workspaceID, userID, notificationType); err != nil {
+			t.Fatalf("insert %s notification: %v", notificationType, err)
+		}
+	}
+	if _, err := db.Exec(ctx, `
+		INSERT INTO notifications (workspace_id, user_id, notification_type)
+		VALUES ($1, $2, 'invalid_type')
+	`, workspaceID, userID); err == nil {
+		t.Fatal("expected invalid notification type to be rejected")
+	}
 
 	var projectID string
 	if err := db.QueryRow(ctx, `
@@ -843,8 +857,8 @@ func TestProjectWorkflowMigrationBackfillsLegacyIssues(t *testing.T) {
 	if err != nil {
 		t.Fatalf("apply workflow migration: %v", err)
 	}
-	if len(applied) != 4 || applied[0].Version != 11 || applied[1].Version != 12 || applied[2].Version != 13 || applied[3].Version != 14 {
-		t.Fatalf("post-legacy migrations applied = %#v, want versions 11 through 14", applied)
+	if len(applied) != 5 || applied[0].Version != 11 || applied[1].Version != 12 || applied[2].Version != 13 || applied[3].Version != 14 || applied[4].Version != 15 {
+		t.Fatalf("post-legacy migrations applied = %#v, want versions 11 through 15", applied)
 	}
 
 	var workflowStatuses int

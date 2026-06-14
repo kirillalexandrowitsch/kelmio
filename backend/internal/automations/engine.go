@@ -23,6 +23,15 @@ type ExecuteRequest struct {
 	InitiatedByUserID string
 }
 
+type ExecuteResult struct {
+	AppliedRuleNames []string
+	ChangedFields    []string
+	FromStatus       string
+	ToStatus         string
+	FromAssigneeID   string
+	ToAssigneeID     string
+}
+
 type runtimeIssue struct {
 	IssueID          string
 	ProjectID        string
@@ -55,16 +64,17 @@ func NewEngine() *Engine {
 	return &Engine{}
 }
 
-func (e *Engine) Execute(ctx context.Context, tx pgx.Tx, request ExecuteRequest) error {
+func (e *Engine) Execute(ctx context.Context, tx pgx.Tx, request ExecuteRequest) (ExecuteResult, error) {
 	snapshot, err := loadRuntimeIssue(ctx, tx, request.WorkspaceID, request.IssueID)
 	if err != nil {
-		return err
+		return ExecuteResult{}, err
 	}
 	rules, err := loadRuntimeRules(ctx, tx, snapshot.ProjectID, request.TriggerType)
 	if err != nil {
-		return err
+		return ExecuteResult{}, err
 	}
 	current := cloneRuntimeIssue(snapshot)
+	appliedRuleNames := make([]string, 0, len(rules))
 	for _, rule := range rules {
 		if !matchesConditions(snapshot, rule.Conditions) {
 			continue
@@ -72,7 +82,7 @@ func (e *Engine) Execute(ctx context.Context, tx pgx.Tx, request ExecuteRequest)
 		before := cloneRuntimeIssue(current)
 		for _, action := range rule.Actions {
 			if err := applyAction(ctx, tx, &current, action); err != nil {
-				return fmt.Errorf("%w: rule %s: %v", ErrActionFailed, rule.ID, err)
+				return ExecuteResult{}, fmt.Errorf("%w: rule %s: %v", ErrActionFailed, rule.ID, err)
 			}
 		}
 		payload := automationActivityPayload(rule, request, before, current)
@@ -80,10 +90,11 @@ func (e *Engine) Execute(ctx context.Context, tx pgx.Tx, request ExecuteRequest)
 			continue
 		}
 		if err := insertAutomationActivity(ctx, tx, request.IssueID, payload); err != nil {
-			return err
+			return ExecuteResult{}, err
 		}
+		appliedRuleNames = append(appliedRuleNames, rule.Name)
 	}
-	return nil
+	return automationExecuteResult(snapshot, current, appliedRuleNames), nil
 }
 
 func loadRuntimeIssue(ctx context.Context, tx pgx.Tx, workspaceID string, issueID string) (runtimeIssue, error) {
@@ -398,6 +409,28 @@ func automationActivityPayload(rule runtimeRule, request ExecuteRequest, before 
 	}
 	payload["changed_fields"] = strings.Join(changedFields, ",")
 	return payload
+}
+
+func automationExecuteResult(before runtimeIssue, after runtimeIssue, appliedRuleNames []string) ExecuteResult {
+	result := ExecuteResult{AppliedRuleNames: append([]string(nil), appliedRuleNames...)}
+	if before.WorkflowStatusID != after.WorkflowStatusID {
+		result.ChangedFields = append(result.ChangedFields, "status")
+		result.FromStatus = before.Status
+		result.ToStatus = after.Status
+	}
+	if before.AssigneeID != after.AssigneeID {
+		result.ChangedFields = append(result.ChangedFields, "assignee")
+		result.FromAssigneeID = before.AssigneeID
+		result.ToAssigneeID = after.AssigneeID
+	}
+	if before.Priority != after.Priority {
+		result.ChangedFields = append(result.ChangedFields, "priority")
+	}
+	added, removed := changedLabels(before.LabelIDs, after.LabelIDs)
+	if len(added) > 0 || len(removed) > 0 {
+		result.ChangedFields = append(result.ChangedFields, "labels")
+	}
+	return result
 }
 
 func insertAutomationActivity(ctx context.Context, tx pgx.Tx, issueID string, payload map[string]string) error {

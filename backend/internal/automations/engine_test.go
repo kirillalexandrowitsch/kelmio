@@ -81,6 +81,40 @@ func TestAutomationActivityPayloadOmitsNoOpRule(t *testing.T) {
 	}
 }
 
+func TestAutomationExecuteResultTracksOnlyFinalChanges(t *testing.T) {
+	t.Parallel()
+	before := runtimeIssue{
+		Status: "todo", WorkflowStatusID: testUUID, Priority: "medium", AssigneeID: "",
+		LabelIDs: map[string]bool{testUUID: true},
+	}
+	after := runtimeIssue{
+		Status: "todo", WorkflowStatusID: testUUID, Priority: "critical", AssigneeID: otherTestUUID,
+		LabelIDs: map[string]bool{otherTestUUID: true},
+	}
+	result := automationExecuteResult(before, after, []string{"First rule", "Later rule"})
+	if !reflect.DeepEqual(result.AppliedRuleNames, []string{"First rule", "Later rule"}) {
+		t.Fatalf("applied rules = %#v", result.AppliedRuleNames)
+	}
+	if !reflect.DeepEqual(result.ChangedFields, []string{"assignee", "priority", "labels"}) {
+		t.Fatalf("changed fields = %#v", result.ChangedFields)
+	}
+	if result.FromStatus != "" || result.ToStatus != "" {
+		t.Fatalf("reverted status leaked into result: %#v", result)
+	}
+	if result.FromAssigneeID != "" || result.ToAssigneeID != otherTestUUID {
+		t.Fatalf("assignee result = %#v", result)
+	}
+}
+
+func TestAutomationExecuteResultIsEmptyForFinalNoOp(t *testing.T) {
+	t.Parallel()
+	issue := runtimeIssue{Status: "todo", WorkflowStatusID: testUUID, Priority: "medium", LabelIDs: map[string]bool{}}
+	result := automationExecuteResult(issue, cloneRuntimeIssue(issue), nil)
+	if len(result.ChangedFields) != 0 || len(result.AppliedRuleNames) != 0 {
+		t.Fatalf("no-op result = %#v", result)
+	}
+}
+
 func TestChangedLabelsIsStable(t *testing.T) {
 	t.Parallel()
 	added, removed := changedLabels(

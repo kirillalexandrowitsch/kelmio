@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import { test } from "vitest";
 
 import {
+  notificationActor,
   notificationDescription,
+  notificationPreview,
   notificationTitle,
   unreadBadgeLabel,
 } from "./notification-view.ts";
@@ -50,6 +52,40 @@ test("formats notification titles", () => {
       makeNotification({ notification_type: "sprint_completed" }),
     ),
     "Admin completed a sprint",
+  );
+  const automation = makeNotification({
+    actor_id: null,
+    actor_display_name: null,
+    notification_type: "issue_automation_assigned",
+  });
+  assert.equal(notificationActor(automation), "Automation");
+  assert.equal(notificationTitle(automation), "Automation assigned you an issue");
+  assert.equal(
+    notificationTitle(
+      makeNotification({ notification_type: "issue_automation_status_changed" }),
+    ),
+    "Automation changed issue status",
+  );
+});
+
+test("formats automation notification previews", () => {
+  assert.equal(
+    notificationPreview(
+      makeNotification({
+        notification_type: "issue_automation_status_changed",
+        payload: { from_status: "todo", to_status: "review" },
+      }),
+    ),
+    "Todo -> Review",
+  );
+  assert.equal(
+    notificationPreview(
+      makeNotification({
+        notification_type: "issue_automation_assigned",
+        payload: { automation_rule_names: "Assign reviewer" },
+      }),
+    ),
+    "Assign reviewer",
   );
 });
 

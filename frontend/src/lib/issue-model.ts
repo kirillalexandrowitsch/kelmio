@@ -133,7 +133,12 @@ export function issueMatchesFilters(
 }
 
 export function statusLabel(status: string) {
-  return columns.find((column) => column.status === status)?.title ?? status;
+  return (
+    columns.find((column) => column.status === status)?.title ??
+    status
+      .replaceAll("_", " ")
+      .replace(/^\w/, (character) => character.toUpperCase())
+  );
 }
 
 export function issueLabelIds(issue: Issue) {

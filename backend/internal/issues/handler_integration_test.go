@@ -420,6 +420,85 @@ func TestIssueAutomationIntegration(t *testing.T) {
 	}
 }
 
+func TestIssueAutomationNotificationsAreAtomicIntegration(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	db := newIssueIntegrationDB(t, ctx)
+	handler := NewHandler(db, nil, notifications.NewService())
+	user, projectID := seedIssueIntegrationWorkspace(t, ctx, db)
+
+	var targetID string
+	if err := db.QueryRow(ctx, `
+		INSERT INTO users (email, username, password_hash, display_name)
+		VALUES ('automation-recipient@example.com', 'automation_recipient', 'hash', 'Automation Recipient')
+		RETURNING id::text
+	`).Scan(&targetID); err != nil {
+		t.Fatalf("create automation recipient: %v", err)
+	}
+	if _, err := db.Exec(ctx, `
+		INSERT INTO workspace_members (workspace_id, user_id, role) VALUES ($1, $2, 'member')
+	`, user.WorkspaceID, targetID); err != nil {
+		t.Fatalf("grant automation recipient workspace access: %v", err)
+	}
+	if _, err := db.Exec(ctx, `
+		INSERT INTO project_members (project_id, user_id, role) VALUES ($1, $2, 'contributor')
+	`, projectID, targetID); err != nil {
+		t.Fatalf("grant automation recipient project access: %v", err)
+	}
+	insertIssueAutomationRule(t, ctx, db, projectID, user.ID, 100, "Assign recipient", "issue_created",
+		`[]`, fmt.Sprintf(`[{"type":"change_assignee","user_id":%q}]`, targetID))
+
+	issue, err := handler.createIssue(ctx, user, normalizedCreateIssue{
+		ProjectID: projectID, Title: "Notify atomically", IssueType: "task", Status: "todo", Priority: "medium",
+	})
+	if err != nil {
+		t.Fatalf("create automated notification issue: %v", err)
+	}
+	if stringOrEmpty(issue.AssigneeID) != targetID {
+		t.Fatalf("automated assignee = %v, want %s", issue.AssigneeID, targetID)
+	}
+	var notificationType string
+	var actorIsNull bool
+	if err := db.QueryRow(ctx, `
+		SELECT notification_type, actor_id IS NULL
+		FROM notifications
+		WHERE issue_id = $1 AND user_id = $2
+	`, issue.ID, targetID).Scan(&notificationType, &actorIsNull); err != nil {
+		t.Fatalf("load automation notification: %v", err)
+	}
+	if notificationType != notifications.TypeIssueAutomationAssigned || !actorIsNull {
+		t.Fatalf("automation notification = %s/null:%t", notificationType, actorIsNull)
+	}
+
+	if _, err := db.Exec(ctx, `ALTER TABLE notifications DROP CONSTRAINT notifications_notification_type_check`); err != nil {
+		t.Fatalf("drop automation notification constraint: %v", err)
+	}
+	if _, err := db.Exec(ctx, `
+		ALTER TABLE notifications ADD CONSTRAINT notifications_notification_type_check CHECK (
+			notification_type IN ('issue_assigned', 'issue_mentioned', 'issue_commented', 'sprint_started', 'sprint_completed')
+		) NOT VALID
+	`); err != nil {
+		t.Fatalf("restrict notification types: %v", err)
+	}
+	var beforeCount int
+	if err := db.QueryRow(ctx, `SELECT count(*)::int FROM issues WHERE project_id = $1`, projectID).Scan(&beforeCount); err != nil {
+		t.Fatalf("count issues before notification rollback: %v", err)
+	}
+	if _, err := handler.createIssue(ctx, user, normalizedCreateIssue{
+		ProjectID: projectID, Title: "Rollback notification failure", IssueType: "task", Status: "todo", Priority: "medium",
+	}); err == nil {
+		t.Fatal("expected automation notification insert failure")
+	}
+	var afterCount int
+	if err := db.QueryRow(ctx, `SELECT count(*)::int FROM issues WHERE project_id = $1`, projectID).Scan(&afterCount); err != nil {
+		t.Fatalf("count issues after notification rollback: %v", err)
+	}
+	if afterCount != beforeCount {
+		t.Fatalf("issue count after notification failure = %d, want %d", afterCount, beforeCount)
+	}
+}
+
 func TestIssueLinksIntegration(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()

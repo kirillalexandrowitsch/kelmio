@@ -22,11 +22,13 @@ import (
 )
 
 const (
-	TypeIssueAssigned   = "issue_assigned"
-	TypeIssueMentioned  = "issue_mentioned"
-	TypeIssueCommented  = "issue_commented"
-	TypeSprintStarted   = "sprint_started"
-	TypeSprintCompleted = "sprint_completed"
+	TypeIssueAssigned                = "issue_assigned"
+	TypeIssueMentioned               = "issue_mentioned"
+	TypeIssueCommented               = "issue_commented"
+	TypeIssueAutomationAssigned      = "issue_automation_assigned"
+	TypeIssueAutomationStatusChanged = "issue_automation_status_changed"
+	TypeSprintStarted                = "sprint_started"
+	TypeSprintCompleted              = "sprint_completed"
 )
 
 var uuidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
@@ -77,6 +79,15 @@ type SprintContext struct {
 	ProjectKey string
 }
 
+type AutomationChanges struct {
+	AppliedRuleNames []string
+	ChangedFields    []string
+	FromStatus       string
+	ToStatus         string
+	FromAssigneeID   string
+	ToAssigneeID     string
+}
+
 type listNotificationsResponse struct {
 	Notifications []Notification `json:"notifications"`
 	NextCursor    *string        `json:"next_cursor"`
@@ -96,6 +107,11 @@ type notificationInput struct {
 }
 
 type commentRecipient struct {
+	UserID           string
+	NotificationType string
+}
+
+type automationRecipient struct {
 	UserID           string
 	NotificationType string
 }
@@ -337,6 +353,45 @@ func (s *Service) NotifyIssueAssigned(ctx context.Context, db DBTX, workspaceID 
 	})
 }
 
+func (s *Service) NotifyAutomationChanges(ctx context.Context, db DBTX, workspaceID string, initiatedByUserID string, issue IssueContext, changes AutomationChanges) error {
+	recipients := automationNotificationRecipients(initiatedByUserID, issue.ReporterID, issue.AssigneeID, changes)
+	for _, recipient := range recipients {
+		canRead, err := userCanReadProject(ctx, db, workspaceID, issue.ProjectID, recipient.UserID)
+		if err != nil {
+			return err
+		}
+		if !canRead {
+			continue
+		}
+
+		payload := issuePayload(issue, map[string]string{
+			"automation_rule_names": strings.Join(changes.AppliedRuleNames, ", "),
+			"changed_fields":        strings.Join(changes.ChangedFields, ","),
+		})
+		switch recipient.NotificationType {
+		case TypeIssueAutomationAssigned:
+			payload["message"] = "automation assigned you to an issue"
+			payload["from_assignee_id"] = changes.FromAssigneeID
+			payload["to_assignee_id"] = changes.ToAssigneeID
+		case TypeIssueAutomationStatusChanged:
+			payload["message"] = "automation changed issue status"
+			payload["from_status"] = changes.FromStatus
+			payload["to_status"] = changes.ToStatus
+		}
+
+		if err := s.insert(ctx, db, notificationInput{
+			WorkspaceID:      workspaceID,
+			UserID:           recipient.UserID,
+			IssueID:          issue.ID,
+			NotificationType: recipient.NotificationType,
+			Payload:          payload,
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (s *Service) NotifyIssueComment(ctx context.Context, db DBTX, workspaceID string, actorID string, issueID string, commentID string, body string) error {
 	issue, err := issueContext(ctx, db, workspaceID, issueID)
 	if err != nil {
@@ -465,6 +520,10 @@ func (s *Service) insert(ctx context.Context, db DBTX, input notificationInput) 
 	if input.IssueID != "" {
 		issueID = input.IssueID
 	}
+	var actorID any
+	if input.ActorID != "" {
+		actorID = input.ActorID
+	}
 
 	_, err = db.Exec(ctx, `
 		INSERT INTO notifications (
@@ -476,7 +535,7 @@ func (s *Service) insert(ctx context.Context, db DBTX, input notificationInput) 
 			payload
 		)
 		VALUES ($1, $2, $3, $4, $5, $6::jsonb)
-	`, input.WorkspaceID, input.UserID, input.ActorID, issueID, input.NotificationType, string(encodedPayload))
+	`, input.WorkspaceID, input.UserID, actorID, issueID, input.NotificationType, string(encodedPayload))
 	return err
 }
 
@@ -527,6 +586,34 @@ func commentNotificationRecipients(actorID string, reporterID string, assigneeID
 		})
 	}
 
+	return recipients
+}
+
+func automationNotificationRecipients(initiatedByUserID string, reporterID string, finalAssigneeID string, changes AutomationChanges) []automationRecipient {
+	recipients := make([]automationRecipient, 0, 2)
+	seen := make(map[string]bool, 2)
+
+	if changes.FromAssigneeID != changes.ToAssigneeID && finalAssigneeID != "" && finalAssigneeID != initiatedByUserID {
+		seen[finalAssigneeID] = true
+		recipients = append(recipients, automationRecipient{
+			UserID:           finalAssigneeID,
+			NotificationType: TypeIssueAutomationAssigned,
+		})
+	}
+
+	if changes.FromStatus == changes.ToStatus {
+		return recipients
+	}
+	for _, userID := range []string{reporterID, finalAssigneeID} {
+		if userID == "" || userID == initiatedByUserID || seen[userID] {
+			continue
+		}
+		seen[userID] = true
+		recipients = append(recipients, automationRecipient{
+			UserID:           userID,
+			NotificationType: TypeIssueAutomationStatusChanged,
+		})
+	}
 	return recipients
 }
 

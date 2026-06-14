@@ -54,8 +54,8 @@ func TestAutomationRulesMigrationConstraintsAndCascade(t *testing.T) {
 	if err != nil {
 		t.Fatalf("apply migrations: %v", err)
 	}
-	if len(applied) != 14 || applied[len(applied)-1].Version != 14 {
-		t.Fatalf("applied migrations = %#v, want through version 14", applied)
+	if len(applied) != 15 || applied[len(applied)-1].Version != 15 {
+		t.Fatalf("applied migrations = %#v, want through version 15", applied)
 	}
 
 	var workspaceID, userID, projectID string

@@ -49,8 +49,39 @@ test("formats known and unknown activity titles", () => {
     "Linked issue",
   );
   assert.equal(
+    activityTitle(makeActivity({ action: "automation_applied" })),
+    "Automation applied",
+  );
+  assert.equal(
     activityTitle(makeActivity({ action: "custom_action" })),
     "custom action",
+  );
+});
+
+test("formats readable automation changes with missing dependency fallbacks", () => {
+  assert.equal(
+    activityDescription(
+      makeActivity({
+        action: "automation_applied",
+        actor_id: null,
+        actor_display_name: null,
+        payload: {
+          rule_name: "Route critical work",
+          changed_fields: "status,assignee,priority,labels",
+          from_status: "todo",
+          to_status: "review",
+          from_assignee_id: "",
+          to_assignee_id: "missing-user",
+          from_priority: "medium",
+          to_priority: "critical",
+          added_label_ids: "label-1,missing-label",
+          removed_label_ids: "",
+        },
+      }),
+      members,
+      [{ id: "label-1", name: "bug", color: "#dc2626" }],
+    ),
+    "Route critical work · status Todo -> Review; assignee Unassigned -> Missing member; priority Medium -> Critical; labels +bug, +Missing label",
   );
 });
 
