@@ -7,6 +7,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"team-task-tracker/backend/internal/auth"
+	"team-task-tracker/backend/internal/automations"
 )
 
 type rowScanner interface {
@@ -186,6 +187,9 @@ func (h *Handler) deleteProjectMember(
 	}
 	if commandTag.RowsAffected() != 1 {
 		return errProjectMemberNotFound
+	}
+	if err := automations.DisableRulesForProjectUser(ctx, tx, projectID, userID); err != nil {
+		return err
 	}
 	return tx.Commit(ctx)
 }

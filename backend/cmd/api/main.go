@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"team-task-tracker/backend/internal/auth"
+	"team-task-tracker/backend/internal/automations"
 	"team-task-tracker/backend/internal/config"
 	"team-task-tracker/backend/internal/csrf"
 	"team-task-tracker/backend/internal/database"
@@ -78,6 +79,9 @@ func main() {
 
 	workflowsHandler := workflows.NewHandler(db, authHandler)
 	workflowsHandler.RegisterRoutes(mux)
+
+	automationsHandler := automations.NewHandler(db, authHandler)
+	automationsHandler.RegisterRoutes(mux)
 
 	issuesHandler := issues.NewHandler(db, authHandler, notificationService)
 	issuesHandler.RegisterRoutes(mux)

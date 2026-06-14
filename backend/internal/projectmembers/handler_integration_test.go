@@ -113,6 +113,36 @@ func TestProjectMemberLifecycleIntegration(t *testing.T) {
 	if access.ProjectRole != "contributor" || !access.CanRead || access.CanManage {
 		t.Fatalf("contributor access = %#v", access)
 	}
+	var contributorRuleID string
+	if err := db.QueryRow(ctx, `
+		INSERT INTO automation_rules (
+			project_id, name, trigger_type, conditions, actions, position, created_by
+		)
+		VALUES (
+			$1, 'Contributor dependency', 'assignee_changed', '[]'::jsonb,
+			jsonb_build_array(jsonb_build_object('type', 'change_assignee', 'user_id', $2::text)),
+			100,
+			$3
+		)
+		RETURNING id::text
+	`, users.ProjectID, users.Contributor.ID, users.Admin.ID).Scan(&contributorRuleID); err != nil {
+		t.Fatalf("insert contributor automation rule: %v", err)
+	}
+	if err := handler.deleteProjectMember(ctx, users.Admin, users.ProjectID, users.Contributor.ID); err != nil {
+		t.Fatalf("delete project member for automation invalidation: %v", err)
+	}
+	var contributorRuleEnabled bool
+	var contributorRuleReason *string
+	if err := db.QueryRow(ctx, `
+		SELECT is_enabled, disabled_reason
+		FROM automation_rules
+		WHERE id = $1
+	`, contributorRuleID).Scan(&contributorRuleEnabled, &contributorRuleReason); err != nil {
+		t.Fatalf("load contributor automation rule: %v", err)
+	}
+	if contributorRuleEnabled || contributorRuleReason == nil || *contributorRuleReason != "project_access_removed" {
+		t.Fatalf("contributor automation rule = enabled:%v reason:%v", contributorRuleEnabled, contributorRuleReason)
+	}
 	if err := handler.deleteProjectMember(ctx, users.Admin, users.ProjectID, users.Admin.ID); err != nil {
 		t.Fatalf("delete workspace admin project row: %v", err)
 	}

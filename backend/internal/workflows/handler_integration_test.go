@@ -124,12 +124,40 @@ func TestWorkflowLifecycleIntegration(t *testing.T) {
 		t.Fatalf("empty transition graph = %#v, want none", workflow.Transitions)
 	}
 
+	var statusRuleID string
+	if err := db.QueryRow(ctx, `
+		INSERT INTO automation_rules (
+			project_id, name, trigger_type, conditions, actions, position, created_by
+		)
+		VALUES (
+			$1, 'Archived status dependency', 'status_changed',
+			jsonb_build_array(jsonb_build_object('type', 'workflow_status', 'workflow_status_id', $2::text)),
+			'[{"type":"change_priority","value":"high"}]'::jsonb,
+			100,
+			$3
+		)
+		RETURNING id::text
+	`, projectID, review.ID, admin.ID).Scan(&statusRuleID); err != nil {
+		t.Fatalf("insert status automation rule: %v", err)
+	}
 	archivedReview, err := handler.archiveWorkflowStatus(ctx, admin, projectID, review.ID, doneID)
 	if err != nil {
 		t.Fatalf("archive unused custom status: %v", err)
 	}
 	if archivedReview.ArchivedAt == nil {
 		t.Fatal("expected archived custom status")
+	}
+	var statusRuleEnabled bool
+	var statusRuleReason *string
+	if err := db.QueryRow(ctx, `
+		SELECT is_enabled, disabled_reason
+		FROM automation_rules
+		WHERE id = $1
+	`, statusRuleID).Scan(&statusRuleEnabled, &statusRuleReason); err != nil {
+		t.Fatalf("load archived status automation rule: %v", err)
+	}
+	if statusRuleEnabled || statusRuleReason == nil || *statusRuleReason != "workflow_status_unavailable" {
+		t.Fatalf("archived status automation rule = enabled:%v reason:%v", statusRuleEnabled, statusRuleReason)
 	}
 	if _, err := handler.updateWorkflowStatus(ctx, admin.WorkspaceID, projectID, review.ID, normalizedUpdateStatus{
 		Name: "Archived review", HasName: true,

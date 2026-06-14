@@ -16,6 +16,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"team-task-tracker/backend/internal/auth"
+	"team-task-tracker/backend/internal/automations"
 )
 
 var emailPattern = regexp.MustCompile(`^[^@\s]+@[^@\s]+\.[^@\s]+$`)
@@ -459,6 +460,9 @@ func (h *Handler) updateWorkspaceMember(ctx context.Context, actor auth.CurrentU
 		`, member.ID); err != nil {
 			return memberResponse{}, err
 		}
+	}
+	if err := automations.DisableRulesForWorkspaceUser(ctx, tx, actor.WorkspaceID, member.ID); err != nil {
+		return memberResponse{}, err
 	}
 
 	if err := tx.Commit(ctx); err != nil {

@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 
 	"team-task-tracker/backend/internal/auth"
+	"team-task-tracker/backend/internal/automations"
 	"team-task-tracker/backend/internal/projectaccess"
 )
 
@@ -287,6 +288,9 @@ func (h *Handler) archiveWorkflowStatus(
 		if errors.Is(err, pgx.ErrNoRows) {
 			return statusResponse{}, errStatusNotFound
 		}
+		return statusResponse{}, err
+	}
+	if err := automations.DisableRulesForWorkflowStatus(ctx, tx, projectID, statusID); err != nil {
 		return statusResponse{}, err
 	}
 	if err := tx.Commit(ctx); err != nil {

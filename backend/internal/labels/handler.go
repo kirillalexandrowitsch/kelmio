@@ -15,6 +15,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"team-task-tracker/backend/internal/auth"
+	"team-task-tracker/backend/internal/automations"
 )
 
 var colorPattern = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
@@ -163,13 +164,25 @@ func (h *Handler) delete(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) deleteLabel(ctx context.Context, workspaceID string, labelID string) error {
+	tx, err := h.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
 	var deletedLabelID string
-	return h.db.QueryRow(ctx, `
+	if err := tx.QueryRow(ctx, `
 		DELETE FROM labels
 		WHERE id = $1
 			AND workspace_id = $2
 		RETURNING id::text
-	`, labelID, workspaceID).Scan(&deletedLabelID)
+	`, labelID, workspaceID).Scan(&deletedLabelID); err != nil {
+		return err
+	}
+	if err := automations.DisableRulesForLabel(ctx, tx, workspaceID, labelID); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
 }
 
 func (h *Handler) requireUser(w http.ResponseWriter, r *http.Request) (auth.CurrentUser, bool) {
