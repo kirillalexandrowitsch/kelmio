@@ -14,8 +14,10 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"team-task-tracker/backend/internal/auth"
+	"team-task-tracker/backend/internal/automations"
 	"team-task-tracker/backend/internal/database"
 	"team-task-tracker/backend/internal/migrations"
+	"team-task-tracker/backend/internal/notifications"
 	"team-task-tracker/backend/internal/pagination"
 )
 
@@ -209,6 +211,212 @@ func TestIssueWorkflowStatusesIntegration(t *testing.T) {
 	}
 	if len(filtered) != 3 {
 		t.Fatalf("workflow status filter returned %d issues, want 3", len(filtered))
+	}
+}
+
+func TestIssueAutomationIntegration(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	db := newIssueIntegrationDB(t, ctx)
+	handler := NewHandler(db, nil, notifications.NewService())
+	user, projectID := seedIssueIntegrationWorkspace(t, ctx, db)
+
+	var todoID, inProgressID, doneID, labelID, notificationTargetID string
+	if err := db.QueryRow(ctx, `SELECT id::text FROM project_workflow_statuses WHERE project_id = $1 AND key = 'todo'`, projectID).Scan(&todoID); err != nil {
+		t.Fatalf("load todo status: %v", err)
+	}
+	if err := db.QueryRow(ctx, `SELECT id::text FROM project_workflow_statuses WHERE project_id = $1 AND key = 'in_progress'`, projectID).Scan(&inProgressID); err != nil {
+		t.Fatalf("load in progress status: %v", err)
+	}
+	if err := db.QueryRow(ctx, `SELECT id::text FROM project_workflow_statuses WHERE project_id = $1 AND key = 'done'`, projectID).Scan(&doneID); err != nil {
+		t.Fatalf("load done status: %v", err)
+	}
+	if err := db.QueryRow(ctx, `
+		INSERT INTO labels (workspace_id, name, color) VALUES ($1, 'automated', '#123456') RETURNING id::text
+	`, user.WorkspaceID).Scan(&labelID); err != nil {
+		t.Fatalf("create automation label: %v", err)
+	}
+	if err := db.QueryRow(ctx, `
+		INSERT INTO users (email, username, password_hash, display_name)
+		VALUES ('automation-target@example.com', 'automation_target', 'hash', 'Automation Target')
+		RETURNING id::text
+	`).Scan(&notificationTargetID); err != nil {
+		t.Fatalf("create automation notification target: %v", err)
+	}
+	if _, err := db.Exec(ctx, `
+		INSERT INTO workspace_members (workspace_id, user_id, role) VALUES ($1, $2, 'member')
+	`, user.WorkspaceID, notificationTargetID); err != nil {
+		t.Fatalf("add automation notification target to workspace: %v", err)
+	}
+	if _, err := db.Exec(ctx, `
+		INSERT INTO project_members (project_id, user_id, role) VALUES ($1, $2, 'contributor')
+	`, projectID, notificationTargetID); err != nil {
+		t.Fatalf("add automation notification target to project: %v", err)
+	}
+
+	insertIssueAutomationRule(t, ctx, db, projectID, user.ID, 100, "Create first", "issue_created",
+		`[{"type":"issue_type","value":"bug"},{"type":"priority","value":"medium"}]`,
+		fmt.Sprintf(`[{"type":"change_priority","value":"high"},{"type":"change_assignee","user_id":%q},{"type":"add_label","label_id":%q}]`, user.ID, labelID))
+	insertIssueAutomationRule(t, ctx, db, projectID, user.ID, 200, "Frozen snapshot does not match", "issue_created",
+		`[{"type":"priority","value":"high"}]`, `[{"type":"change_priority","value":"low"}]`)
+	insertIssueAutomationRule(t, ctx, db, projectID, user.ID, 300, "Create later wins", "issue_created",
+		`[{"type":"priority","value":"medium"}]`, `[{"type":"change_priority","value":"critical"}]`)
+	insertIssueAutomationRule(t, ctx, db, projectID, user.ID, 400, "No priority cascade", "priority_changed",
+		`[{"type":"priority","value":"critical"}]`, `[{"type":"change_priority","value":"low"}]`)
+	insertIssueAutomationRule(t, ctx, db, projectID, user.ID, 500, "Direct priority", "priority_changed",
+		`[{"type":"priority","value":"high"}]`, `[{"type":"change_priority","value":"low"}]`)
+	insertIssueAutomationRule(t, ctx, db, projectID, user.ID, 550, "Remove label", "priority_changed",
+		`[{"type":"priority","value":"high"}]`, fmt.Sprintf(`[{"type":"remove_label","label_id":%q}]`, labelID))
+	insertIssueAutomationRule(t, ctx, db, projectID, user.ID, 600, "Direct status", "status_changed",
+		fmt.Sprintf(`[{"type":"workflow_status","workflow_status_id":%q}]`, inProgressID),
+		fmt.Sprintf(`[{"type":"change_workflow_status","workflow_status_id":%q}]`, doneID))
+	insertIssueAutomationRule(t, ctx, db, projectID, user.ID, 700, "No assignee cascade", "assignee_changed",
+		fmt.Sprintf(`[{"type":"assignee","user_id":%q}]`, user.ID), `[{"type":"change_priority","value":"low"}]`)
+	insertIssueAutomationRule(t, ctx, db, projectID, user.ID, 750, "Override direct assignment", "assignee_changed",
+		fmt.Sprintf(`[{"type":"assignee","user_id":%q}]`, notificationTargetID), `[{"type":"change_assignee","user_id":null}]`)
+
+	issue, err := handler.createIssue(ctx, user, normalizedCreateIssue{
+		ProjectID: projectID, Title: "Automated bug", IssueType: "bug", Status: "todo", Priority: "medium",
+	})
+	if err != nil {
+		t.Fatalf("create automated issue: %v", err)
+	}
+	if issue.Priority != "critical" || stringOrEmpty(issue.AssigneeID) != user.ID || len(issue.Labels) != 1 {
+		t.Fatalf("created automated issue = %#v", issue)
+	}
+
+	updated, err := handler.updateIssue(ctx, user, issue.ID, normalizedUpdateIssue{
+		Title: issue.Title, Description: issue.Description, IssueType: issue.IssueType,
+		Priority: "high", StoryPoints: issue.StoryPoints,
+	})
+	if err != nil {
+		t.Fatalf("update automated issue: %v", err)
+	}
+	if updated.Priority != "low" {
+		t.Fatalf("updated priority = %q, want low", updated.Priority)
+	}
+	if len(updated.Labels) != 0 {
+		t.Fatalf("updated labels = %#v, want removed automation label", updated.Labels)
+	}
+
+	transitioned, err := handler.transitionIssueStatus(ctx, user, issue.ID, normalizedTransitionIssue{WorkflowStatusID: inProgressID})
+	if err != nil {
+		t.Fatalf("transition automated issue: %v", err)
+	}
+	if transitioned.WorkflowStatus.ID != doneID || transitioned.Status != "done" {
+		t.Fatalf("automated transition = %#v", transitioned.WorkflowStatus)
+	}
+
+	if _, err := handler.assignIssue(ctx, user, issue.ID, ""); err != nil {
+		t.Fatalf("clear automated assignee: %v", err)
+	}
+	assigned, err := handler.assignIssue(ctx, user, issue.ID, user.ID)
+	if err != nil {
+		t.Fatalf("assign automated issue: %v", err)
+	}
+	if assigned.Priority != "low" {
+		t.Fatalf("assigned automated priority = %q, want low", assigned.Priority)
+	}
+	overridden, err := handler.assignIssue(ctx, user, issue.ID, notificationTargetID)
+	if err != nil {
+		t.Fatalf("assign notification target: %v", err)
+	}
+	if overridden.AssigneeID != nil {
+		t.Fatalf("overridden assignee = %v, want nil", overridden.AssigneeID)
+	}
+	var assignmentNotifications int
+	if err := db.QueryRow(ctx, `
+		SELECT count(*)::int FROM notifications
+		WHERE user_id = $1 AND issue_id = $2 AND notification_type = 'issue_assigned'
+	`, notificationTargetID, issue.ID).Scan(&assignmentNotifications); err != nil {
+		t.Fatalf("count suppressed assignment notifications: %v", err)
+	}
+	if assignmentNotifications != 0 {
+		t.Fatalf("assignment notifications = %d, want 0", assignmentNotifications)
+	}
+
+	var automationActivityCount, systemActivityCount int
+	if err := db.QueryRow(ctx, `
+		SELECT
+			count(*) FILTER (WHERE action = 'automation_applied')::int,
+			count(*) FILTER (WHERE action = 'automation_applied' AND actor_id IS NULL)::int
+		FROM activity_log WHERE entity_type = 'issue' AND entity_id = $1
+	`, issue.ID).Scan(&automationActivityCount, &systemActivityCount); err != nil {
+		t.Fatalf("count automation activity: %v", err)
+	}
+	if automationActivityCount != 6 || systemActivityCount != automationActivityCount {
+		t.Fatalf("automation activities = %d/%d, want six System entries and no entry for no-op rule", automationActivityCount, systemActivityCount)
+	}
+
+	insertIssueAutomationRule(t, ctx, db, projectID, user.ID, 800, "Fail create atomically", "issue_created",
+		`[]`, fmt.Sprintf(`[{"type":"change_workflow_status","workflow_status_id":%q}]`, doneID))
+	if _, err := db.Exec(ctx, `
+		DELETE FROM project_workflow_transitions
+		WHERE project_id = $1 AND from_status_id = $2 AND to_status_id = $3
+	`, projectID, todoID, doneID); err != nil {
+		t.Fatalf("remove automation transition: %v", err)
+	}
+	var beforeCount int
+	if err := db.QueryRow(ctx, `SELECT count(*)::int FROM issues WHERE project_id = $1`, projectID).Scan(&beforeCount); err != nil {
+		t.Fatalf("count issues before rollback: %v", err)
+	}
+	if _, err := handler.createIssue(ctx, user, normalizedCreateIssue{
+		ProjectID: projectID, Title: "Must rollback", IssueType: "task", Status: "todo", Priority: "medium",
+	}); !errors.Is(err, automations.ErrActionFailed) {
+		t.Fatalf("failed automation error = %v, want action failed", err)
+	}
+	var afterCount int
+	if err := db.QueryRow(ctx, `SELECT count(*)::int FROM issues WHERE project_id = $1`, projectID).Scan(&afterCount); err != nil {
+		t.Fatalf("count issues after rollback: %v", err)
+	}
+	if afterCount != beforeCount {
+		t.Fatalf("issue count after failed automation = %d, want %d", afterCount, beforeCount)
+	}
+
+	if _, err := db.Exec(ctx, `UPDATE automation_rules SET is_enabled = false WHERE project_id = $1 AND name = 'Fail create atomically'`, projectID); err != nil {
+		t.Fatalf("disable transition failure rule: %v", err)
+	}
+	var unavailableLabelID string
+	if err := db.QueryRow(ctx, `
+		INSERT INTO labels (workspace_id, name, color) VALUES ($1, 'unavailable', '#654321') RETURNING id::text
+	`, user.WorkspaceID).Scan(&unavailableLabelID); err != nil {
+		t.Fatalf("create unavailable label: %v", err)
+	}
+	insertIssueAutomationRule(t, ctx, db, projectID, user.ID, 900, "Unavailable label", "issue_created",
+		`[]`, fmt.Sprintf(`[{"type":"add_label","label_id":%q}]`, unavailableLabelID))
+	if _, err := db.Exec(ctx, `DELETE FROM labels WHERE id = $1`, unavailableLabelID); err != nil {
+		t.Fatalf("delete unavailable label: %v", err)
+	}
+	if _, err := handler.createIssue(ctx, user, normalizedCreateIssue{
+		ProjectID: projectID, Title: "Missing label must rollback", IssueType: "task", Status: "todo", Priority: "medium",
+	}); !errors.Is(err, automations.ErrActionFailed) {
+		t.Fatalf("unavailable label error = %v, want action failed", err)
+	}
+
+	if _, err := db.Exec(ctx, `UPDATE automation_rules SET is_enabled = false WHERE project_id = $1 AND name = 'Unavailable label'`, projectID); err != nil {
+		t.Fatalf("disable unavailable label rule: %v", err)
+	}
+	insertIssueAutomationRule(t, ctx, db, projectID, user.ID, 1000, "Unavailable user", "issue_created",
+		`[]`, fmt.Sprintf(`[{"type":"change_assignee","user_id":%q}]`, notificationTargetID))
+	if _, err := db.Exec(ctx, `UPDATE users SET is_active = false WHERE id = $1`, notificationTargetID); err != nil {
+		t.Fatalf("deactivate unavailable user: %v", err)
+	}
+	if _, err := handler.createIssue(ctx, user, normalizedCreateIssue{
+		ProjectID: projectID, Title: "Missing user must rollback", IssueType: "task", Status: "todo", Priority: "medium",
+	}); !errors.Is(err, automations.ErrActionFailed) {
+		t.Fatalf("unavailable user error = %v, want action failed", err)
+	}
+
+	if _, err := db.Exec(ctx, `UPDATE automation_rules SET is_enabled = false WHERE project_id = $1 AND name = 'Unavailable user'`, projectID); err != nil {
+		t.Fatalf("disable unavailable user rule: %v", err)
+	}
+	insertIssueAutomationRule(t, ctx, db, projectID, user.ID, 1100, "Invalid stored action", "issue_created",
+		`[]`, `[{"type":"unknown"}]`)
+	if _, err := handler.createIssue(ctx, user, normalizedCreateIssue{
+		ProjectID: projectID, Title: "Invalid rule must rollback", IssueType: "task", Status: "todo", Priority: "medium",
+	}); !errors.Is(err, automations.ErrActionFailed) {
+		t.Fatalf("invalid stored action error = %v, want action failed", err)
 	}
 }
 
@@ -598,6 +806,29 @@ func seedIssueIntegrationWorkspace(t *testing.T, ctx context.Context, db *pgxpoo
 		WorkspaceID: workspaceID,
 		Role:        "admin",
 	}, projectID
+}
+
+func insertIssueAutomationRule(
+	t *testing.T,
+	ctx context.Context,
+	db *pgxpool.Pool,
+	projectID string,
+	createdBy string,
+	position int,
+	name string,
+	triggerType string,
+	conditions string,
+	actions string,
+) {
+	t.Helper()
+	if _, err := db.Exec(ctx, `
+		INSERT INTO automation_rules (
+			project_id, name, trigger_type, conditions, actions, position, created_by
+		)
+		VALUES ($1, $2, $3, $4::jsonb, $5::jsonb, $6, $7)
+	`, projectID, name, triggerType, conditions, actions, position, createdBy); err != nil {
+		t.Fatalf("insert automation rule %q: %v", name, err)
+	}
 }
 
 func expectIssueParent(t *testing.T, issue issueResponse, want string) {

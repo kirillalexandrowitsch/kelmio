@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"team-task-tracker/backend/internal/auth"
+	"team-task-tracker/backend/internal/automations"
 	"team-task-tracker/backend/internal/notifications"
 	"team-task-tracker/backend/internal/pagination"
 	"team-task-tracker/backend/internal/projectaccess"
@@ -47,6 +48,7 @@ var errCommentForbidden = errors.New("comment update is forbidden")
 type Handler struct {
 	db            *pgxpool.Pool
 	auth          *auth.Handler
+	automations   *automations.Engine
 	notifications *notifications.Service
 }
 
@@ -259,6 +261,7 @@ func NewHandler(db *pgxpool.Pool, authHandler *auth.Handler, notificationService
 	return &Handler{
 		db:            db,
 		auth:          authHandler,
+		automations:   automations.NewEngine(),
 		notifications: notificationService,
 	}
 }
@@ -334,6 +337,9 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 
 	issue, err := h.createIssue(ctx, user, input)
 	if err != nil {
+		if h.writeAutomationError(w, err) {
+			return
+		}
 		if h.writeProjectAccessError(w, err) {
 			return
 		}
@@ -423,6 +429,9 @@ func (h *Handler) update(w http.ResponseWriter, r *http.Request) {
 
 	issue, err := h.updateIssue(ctx, user, issueID, input)
 	if err != nil {
+		if h.writeAutomationError(w, err) {
+			return
+		}
 		if h.writeProjectAccessError(w, err) {
 			return
 		}
@@ -519,6 +528,9 @@ func (h *Handler) createSubtask(w http.ResponseWriter, r *http.Request) {
 
 	issue, err := h.createIssue(ctx, user, input)
 	if err != nil {
+		if h.writeAutomationError(w, err) {
+			return
+		}
 		if h.writeProjectAccessError(w, err) {
 			return
 		}
@@ -776,6 +788,9 @@ func (h *Handler) transition(w http.ResponseWriter, r *http.Request) {
 
 	issue, err := h.transitionIssueStatus(ctx, user, issueID, status)
 	if err != nil {
+		if h.writeAutomationError(w, err) {
+			return
+		}
 		if h.writeProjectAccessError(w, err) {
 			return
 		}
@@ -828,6 +843,9 @@ func (h *Handler) assign(w http.ResponseWriter, r *http.Request) {
 
 	issue, err := h.assignIssue(ctx, user, issueID, assigneeID)
 	if err != nil {
+		if h.writeAutomationError(w, err) {
+			return
+		}
 		if h.writeProjectAccessError(w, err) {
 			return
 		}
@@ -1621,6 +1639,15 @@ func (h *Handler) createIssue(ctx context.Context, user auth.CurrentUser, input 
 	if err := insertIssueActivity(ctx, tx, issue.ID, user.ID, "issue_created", activityPayload); err != nil {
 		return issueResponse{}, err
 	}
+	if err := h.automations.Execute(ctx, tx, automations.ExecuteRequest{
+		WorkspaceID: user.WorkspaceID, IssueID: issue.ID, TriggerType: "issue_created", InitiatedByUserID: user.ID,
+	}); err != nil {
+		return issueResponse{}, err
+	}
+	issue, err = getIssueInTx(ctx, tx, user.WorkspaceID, issue.ID)
+	if err != nil {
+		return issueResponse{}, err
+	}
 
 	if err := tx.Commit(ctx); err != nil {
 		return issueResponse{}, err
@@ -1763,6 +1790,17 @@ func (h *Handler) updateIssue(ctx context.Context, user auth.CurrentUser, issueI
 		if err := insertIssueActivity(ctx, tx, issue.ID, user.ID, "issue_updated", map[string]string{
 			"fields": strings.Join(changedFields, ","),
 		}); err != nil {
+			return issueResponse{}, err
+		}
+	}
+	if previous.Priority != issue.Priority {
+		if err := h.automations.Execute(ctx, tx, automations.ExecuteRequest{
+			WorkspaceID: user.WorkspaceID, IssueID: issue.ID, TriggerType: "priority_changed", InitiatedByUserID: user.ID,
+		}); err != nil {
+			return issueResponse{}, err
+		}
+		issue, err = getIssueInTx(ctx, tx, user.WorkspaceID, issue.ID)
+		if err != nil {
 			return issueResponse{}, err
 		}
 	}
@@ -2300,6 +2338,15 @@ func (h *Handler) transitionIssueStatus(ctx context.Context, user auth.CurrentUs
 		}); err != nil {
 			return issueResponse{}, err
 		}
+		if err := h.automations.Execute(ctx, tx, automations.ExecuteRequest{
+			WorkspaceID: user.WorkspaceID, IssueID: issue.ID, TriggerType: "status_changed", InitiatedByUserID: user.ID,
+		}); err != nil {
+			return issueResponse{}, err
+		}
+		issue, err = getIssueInTx(ctx, tx, user.WorkspaceID, issue.ID)
+		if err != nil {
+			return issueResponse{}, err
+		}
 	}
 
 	if err := tx.Commit(ctx); err != nil {
@@ -2405,7 +2452,16 @@ func (h *Handler) assignIssue(ctx context.Context, user auth.CurrentUser, issueI
 		}); err != nil {
 			return issueResponse{}, err
 		}
-		if h.notifications != nil && current != "" {
+		if err := h.automations.Execute(ctx, tx, automations.ExecuteRequest{
+			WorkspaceID: user.WorkspaceID, IssueID: issue.ID, TriggerType: "assignee_changed", InitiatedByUserID: user.ID,
+		}); err != nil {
+			return issueResponse{}, err
+		}
+		issue, err = getIssueInTx(ctx, tx, user.WorkspaceID, issue.ID)
+		if err != nil {
+			return issueResponse{}, err
+		}
+		if h.notifications != nil && current != "" && stringOrEmpty(issue.AssigneeID) == current {
 			if err := h.notifications.NotifyIssueAssigned(ctx, tx, user.WorkspaceID, user.ID, notificationIssueContext(issue), current); err != nil {
 				return issueResponse{}, err
 			}
@@ -2898,5 +2954,13 @@ func (h *Handler) writeProjectAccessError(w http.ResponseWriter, err error) bool
 		return false
 	}
 	writeError(w, http.StatusForbidden, "forbidden", "project write access is required")
+	return true
+}
+
+func (h *Handler) writeAutomationError(w http.ResponseWriter, err error) bool {
+	if !errors.Is(err, automations.ErrActionFailed) {
+		return false
+	}
+	writeError(w, http.StatusConflict, "automation_action_failed", "automation action could not be applied")
 	return true
 }

@@ -1,14 +1,32 @@
 package issues
 
 import (
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"team-task-tracker/backend/internal/auth"
+	"team-task-tracker/backend/internal/automations"
 )
 
 const testIssueID = "6d5257d4-002e-44da-8925-d9108699c504"
 const testTargetIssueID = "f2d59348-61a3-491a-9eb1-5aec91fbdf1e"
+
+func TestWriteAutomationError(t *testing.T) {
+	t.Parallel()
+	response := httptest.NewRecorder()
+	if handled := (&Handler{}).writeAutomationError(response, fmt.Errorf("%w: unavailable label", automations.ErrActionFailed)); !handled {
+		t.Fatal("expected automation error to be handled")
+	}
+	if response.Code != http.StatusConflict {
+		t.Fatalf("status = %d, want 409", response.Code)
+	}
+	if body := response.Body.String(); !strings.Contains(body, `"code":"automation_action_failed"`) {
+		t.Fatalf("body = %s", body)
+	}
+}
 
 func TestNormalizeCreateIssueDefaults(t *testing.T) {
 	t.Parallel()
