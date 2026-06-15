@@ -2,193 +2,394 @@
 
 ## 1. Product Direction
 
-V1-V4 сформировали стабильную основу бесплатного task tracker для небольших
-команд:
+V1-V4 сформировали стабильную основу: task tracking, agile planning,
+production-like self-hosted foundation, project workflows, project permissions
+и synchronous automation.
 
-- V1 закрыла базовый task tracking;
-- V2 добавила planning workflow;
-- V3 подготовила production-ready self-hosted foundation;
-- V4 добавила project workflows, project roles и automation.
+Долгосрочная цель Team Task Tracker: создать оригинальный localhost-only
+продукт с функциональным паритетом Jira family по состоянию на **15 июня 2026
+года**.
 
-Следующая цель продукта: последовательно закрыть обязательные возможности
-Jira-подобного продукта для команд примерно до 50-100 пользователей, не
-копируя весь Jira Cloud, Jira Service Management или Atlassian Marketplace.
+Целевой scope включает Jira platform, Jira Software, Jira Service Management,
+Jira Product Discovery, Assets, встроенные automation, reports, forms,
+administration и provider-neutral AI-equivalent.
 
-До полного закрытия продукта запланированы еще шесть версий: V5-V10.
-Ориентировочная оценка: 80-120 небольших проверяемых коммитов.
+Проект сохраняет собственные название, интерфейс, архитектуру и исходный код.
+Функциональный паритет не означает копирование бренда, UX или proprietary
+реализации Atlassian.
 
-V5-V9 разрабатываются, тестируются и полностью проверяются на localhost.
-Hosting provider, реальный домен, production deployment и pilot выбираются и
-выполняются только в V10 на основе фактических требований готового продукта.
+До полного закрытия продукта запланированы V5-V24. Ориентировочная оценка:
+**300-450 небольших проверяемых коммитов**. Полнота измеряется через
+[Jira family capability baseline](jira-family-capability-baseline.md).
 
 ## 2. Product Principles
 
 - Go backend, React + TypeScript frontend, PostgreSQL и Docker остаются
   обязательной технологической основой.
-- Modular monolith сохраняется, пока реальная нагрузка не докажет необходимость
-  другого подхода.
+- Modular monolith сохраняется, пока измеримая сложность не докажет
+  необходимость выделения runtime-компонента.
+- Приложение и весь release QA остаются воспроизводимыми на localhost.
+- Production-like Compose используется для security, reliability и operations
+  QA, а не как обязательство реального deployment.
 - Каждая версия имеет отдельный planning document, небольшие коммиты и финальный
   QA release-gate.
+- Каждый version plan ссылается на capability IDs из baseline.
 - Новые возможности не должны ломать завершенные V1-V4 workflows.
-- Бесплатный self-hosted сценарий остается основным направлением продукта.
-- До V10 не добавляется hosting-specific runtime или deployment configuration.
-- Реальная эксплуатация не объявляется готовой без проверенных backup, restore,
-  upgrade, rollback, monitoring и security procedures.
+- Optional внешние integrations поддерживают реальные credentials, но имеют
+  локальные mocks для полного QA.
+- AI capabilities остаются provider-neutral и должны иметь детерминированный
+  localhost test mode.
 
-## 3. V5: Account Recovery And Operations Foundation
+## 3. Product Boundary
 
-Цель V5: закрыть недостающие account recovery и operational foundations,
-которые можно надежно разработать и проверить локально до реального deployment.
+### Входит в целевой функциональный паритет
 
-Основные результаты:
+- Jira platform и Jira Software;
+- Jira Service Management;
+- Jira Product Discovery;
+- Assets и configuration management;
+- multi-organization и multi-workspace administration;
+- significant built-in administration, automation, reporting, forms и AI
+  scenarios;
+- responsive PWA вместо отдельных native mobile applications.
 
-- generic SMTP configuration и локальная Mailpit-среда;
-- durable email outbox и отдельный delivery worker;
-- password reset API и UI;
-- invite email delivery и resend flow;
-- email delivery diagnostics;
-- Prometheus application metrics;
-- локальные Prometheus, Grafana и Alertmanager;
-- scheduled backup runner, retention и автоматический restore drill;
-- полный V1-V5 regression и operations QA.
+### Не входит
 
-После V5 приложение имеет проверенные механизмы восстановления доступа,
-доставки системных писем и локально воспроизводимый operations baseline.
+- Confluence, Jira Align, Loom, Trello, Bitbucket и другие отдельные продукты;
+- Atlassian Marketplace и паритет со сторонними приложениями;
+- Atlassian branding, source code и визуальная копия интерфейса;
+- SaaS billing, managed multi-tenant cloud и real hosting provider;
+- public deployment и production pilot;
+- infrastructure scale, data residency и compliance certifications Atlassian
+  Cloud;
+- возможности Jira, появившиеся после snapshot 15 июня 2026 года, если они не
+  приняты отдельным решением.
 
-## 4. V6: Flexible Work Items And Search
+## 4. V5: Account Recovery And Operations Foundation
 
-Цель V6: сделать модель задач и поиск сопоставимыми с основным Jira workflow.
-
-Основные результаты:
-
-- custom fields и настраиваемые issue layouts;
-- components и releases/versions;
-- issue templates;
-- advanced search/query builder;
-- bulk issue operations;
-- CSV import/export;
-- сохранение совместимости workflow, automation и permissions.
-
-После V6 команды могут адаптировать задачи под собственные процессы и работать
-с большими наборами данных без ручного редактирования каждой задачи.
-
-## 5. V7: Planning And Reports
-
-Цель V7: закрыть planning, estimation и reporting для небольшой engineering
-команды.
+Цель V5: закрыть account recovery и надежную локальную operations foundation.
 
 Основные результаты:
 
-- timeline/roadmap view;
-- calendar view;
-- burndown, burnup, velocity и cumulative flow reports;
-- sprint reports;
-- capacity planning;
-- расширенная dashboard analytics;
-- time estimates и базовый time tracking.
+- generic SMTP configuration и Mailpit;
+- durable email outbox и delivery worker;
+- password reset и invite email delivery;
+- email diagnostics;
+- Prometheus metrics, Grafana и Alertmanager;
+- scheduled backups, retention и automated restore drill.
 
-После V7 продукт поддерживает регулярное планирование, прогнозирование и анализ
-результатов команды.
+Capability groups: `PLAT-004`, `PLAT-005`.
 
-## 6. V8: Collaboration And Integrations
+## 5. V6: Organizations, Multi-Workspace And Identity Administration
 
-Цель V8: встроить task tracker в ежедневную работу команды и внешние developer
-workflows.
+Цель V6: превратить single-workspace foundation в локальную Jira-family
+platform с несколькими изолированными организациями и workspaces.
 
 Основные результаты:
 
-- file attachments через локальное или S3-compatible object storage;
-- watchers;
-- email notifications;
+- organization и workspace lifecycle;
+- global, organization и workspace administration;
+- groups, directories и reusable role assignments;
+- workspace switching и isolation;
+- safe migration существующего workspace;
+- organization-aware seed, backup и audit foundation.
+
+Capability groups: `PLAT-006`, `PLAT-007`.
+
+## 6. V7: Configurable Work Items, Fields And Schemes
+
+Цель V7: сделать модель work items и workflows конфигурируемой на уровне Jira.
+
+Основные результаты:
+
+- configurable work types и hierarchy schemes;
+- typed custom fields и field contexts;
+- create/edit/view screens и layouts;
+- field configuration schemes;
+- reusable workflow schemes;
+- transition conditions, validators и post-functions.
+
+Capability groups: `WORK-004`-`WORK-007`.
+
+## 7. V8: Advanced Search, Filters, Bulk Operations And Data Exchange
+
+Цель V8: обеспечить эффективную работу с большими наборами work items.
+
+Основные результаты:
+
+- advanced query language и visual query builder;
+- shared filters, permissions и subscriptions;
+- bulk edit, transition, move, archive и delete;
+- CSV import/export и field mapping;
+- saved searches для новых configurable fields;
+- search performance и large-result QA.
+
+Capability groups: `SEARCH-002`-`SEARCH-005`.
+
+## 8. V9: Advanced Boards, Backlogs And Agile Configuration
+
+Цель V9: закрыть configurable Scrum и Kanban workflows.
+
+Основные результаты:
+
+- несколько boards на основе saved queries;
+- configurable columns, swimlanes, quick filters и card layouts;
+- issue ranking;
+- WIP limits;
+- Kanban backlog;
+- board estimation и working-day configuration.
+
+Capability groups: `AGILE-003`-`AGILE-005`.
+
+## 9. V10: Releases, Components And Delivery Tracking
+
+Цель V10: связать планирование work items с release и engineering delivery.
+
+Основные результаты:
+
+- components и component ownership;
+- versions, releases и release notes;
+- release readiness и unresolved-work checks;
+- development information для commits, branches и pull requests;
+- build и deployment status;
+- provider-neutral delivery integration contracts.
+
+Capability groups: `AGILE-006`, `AGILE-007`.
+
+## 10. V11: Plans, Goals, Capacity And Portfolio Planning
+
+Цель V11: добавить cross-project и portfolio-level planning.
+
+Основные результаты:
+
+- cross-project plans и dependency timeline;
+- initiatives и configurable hierarchy levels;
+- goals и outcome alignment;
+- teams, capacity и estimates;
+- scenario planning;
+- plan permissions, saved views и exports.
+
+Capability groups: `PLAN-002`-`PLAN-004`.
+
+## 11. V12: Reports, Dashboards And Analytics
+
+Цель V12: закрыть Jira-like reporting и decision support.
+
+Основные результаты:
+
+- burndown, burnup, velocity, sprint и cumulative-flow reports;
+- control, cycle-time и release reports;
+- configurable dashboards и gadgets;
+- cross-project analytics;
+- scheduled report exports;
+- permission-aware reporting datasets.
+
+Capability groups: `REPORT-001`-`REPORT-003`.
+
+## 12. V13: Collaboration, Rich Content, Forms And Notifications
+
+Цель V13: сделать приложение полноценной collaboration platform.
+
+Основные результаты:
+
+- rich text, attachments и media;
+- watchers, votes, reactions и sharing;
+- configurable forms;
+- durable email notifications и user preferences;
 - real-time updates;
-- API tokens;
-- webhooks;
-- базовые GitHub/GitLab и Slack integrations.
+- reusable list, board, calendar и timeline views.
 
-После V8 пользователи получают необходимые события и могут связывать задачи с
-основными collaboration и development tools.
+Capability groups: `PLAT-008`, `COLLAB-002`-`COLLAB-006`.
 
-## 7. V9: Administration Security And Scale Readiness
+## 13. V14: Enterprise Automation And Rule Platform
 
-Цель V9: подготовить продукт к безопасной эксплуатации несколькими небольшими
-командами и более серьезным deployment-сценариям.
+Цель V14: расширить project automation до reusable organization-level rule
+platform.
 
 Основные результаты:
 
-- workspace audit log;
-- расширенные admin tools;
-- более детальные permissions и security controls;
-- optional OIDC/SSO;
-- distributed-ready sessions и rate limits;
-- external PostgreSQL compatibility;
-- load testing и performance budgets;
-- data retention и disaster-recovery procedures.
+- organization/global rules и templates;
+- scheduled, webhook и service triggers;
+- branching и related-entity actions;
+- smart values и expressions;
+- execution audit log, diagnostics и limits;
+- safe rule migration и conflict handling.
 
-После V9 продукт имеет проверенную administrative, security и scale readiness,
-но реальный deployment и pilot все еще остаются задачей V10.
+Capability groups: `AUTO-002`-`AUTO-004`.
 
-## 8. V10: Deployment Pilot And Final Product Closure
+## 14. V15: Developer Platform, APIs, Webhooks And Integrations
 
-Цель V10: выбрать подходящую hosting platform, развернуть готовый продукт и
-подтвердить его качество в реальной эксплуатации.
+Цель V15: предоставить стабильный integration и extension surface.
 
 Основные результаты:
 
-- выбор hosting provider по фактическим runtime, database, storage, monitoring и
-  budget requirements;
-- real domain и production deployment;
-- deploy/update/rollback automation;
-- scheduled production backups и restore drill;
-- production monitoring, alerts и incident workflow;
-- responsive/PWA polish;
+- scoped API tokens;
+- documented versioned REST API;
+- signed webhooks с retries и diagnostics;
+- GitHub, GitLab и Slack integrations;
+- localhost integration mocks;
+- selected extension contracts без Marketplace parity.
+
+Capability groups: `DEV-001`-`DEV-004`.
+
+## 15. V16: Service Management Request Portal, Queues And SLAs
+
+Цель V16: реализовать основу Jira Service Management.
+
+Основные результаты:
+
+- customer portal и request types;
+- configurable request forms;
+- agent workspace и queues;
+- customers, organizations и request participants;
+- approvals;
+- SLA goals, calendars, pause states и breach handling.
+
+Capability groups: `JSM-001`-`JSM-004`.
+
+## 16. V17: Service Management Incidents, Problems, Changes And On-Call
+
+Цель V17: закрыть основные ITSM operational workflows.
+
+Основные результаты:
+
+- incident и major incident management;
+- responders, timelines и post-incident reviews;
+- problem management и known workarounds;
+- change management, risk и approvals;
+- services и ownership;
+- on-call schedules, alerts и escalation policies.
+
+Capability groups: `JSM-005`-`JSM-007`.
+
+## 17. V18: Assets And Configuration Management
+
+Цель V18: реализовать Assets-equivalent для ITAM и configuration context.
+
+Основные результаты:
+
+- object schemas, types, attributes и references;
+- object lifecycle, history и permissions;
+- AQL-equivalent search;
+- import mappings и scheduled synchronization;
+- links между assets, services, requests, incidents и changes;
+- asset reports и dashboards.
+
+Capability groups: `ASSET-001`-`ASSET-004`.
+
+## 18. V19: Knowledge Management And Self-Service
+
+Цель V19: добавить встроенную knowledge base и service self-help.
+
+Основные результаты:
+
+- knowledge spaces и article lifecycle;
+- authoring, review, publishing и permissions;
+- portal search и article suggestions;
+- request deflection;
+- feedback и knowledge analytics;
+- links между knowledge, requests, incidents и problems.
+
+Capability groups: `KNOW-001`-`KNOW-003`.
+
+## 19. V20: Product Discovery, Ideas, Insights And Roadmaps
+
+Цель V20: закрыть Jira Product Discovery workflows.
+
+Основные результаты:
+
+- ideas, hierarchies, archive и merge;
+- insights, feedback и delivery links;
+- custom fields, formulas и prioritization;
+- list, board, matrix, timeline и roadmap views;
+- view publishing и stakeholder permissions;
+- discovery import/export.
+
+Capability groups: `JPD-001`-`JPD-005`.
+
+## 20. V21: Governance, Security, Audit And Administration
+
+Цель V21: завершить Jira-family administrative и governance controls.
+
+Основные результаты:
+
+- global permissions и reusable permission schemes;
+- issue security levels;
+- organization audit log;
+- retention и compliance-ready exports;
+- optional OIDC/SSO и session policies;
+- sandboxes, configuration export/import и safe change workflows.
+
+Capability groups: `WORK-008`, `GOV-001`-`GOV-004`.
+
+## 21. V22: AI Assistance, Intelligent Search And Virtual Agent
+
+Цель V22: предоставить provider-neutral equivalents значимых Jira AI scenarios.
+
+Основные результаты:
+
+- AI provider configuration и deterministic localhost mock mode;
+- work summarization и drafting;
+- natural-language actions с permission checks;
+- cross-domain intelligent search;
+- assisted triage и prioritization;
+- virtual service agent и knowledge-assisted self-service.
+
+Capability groups: `SEARCH-006`, `AI-001`-`AI-003`.
+
+## 22. V23: PWA, Accessibility, Localization, Performance And Scale QA
+
+Цель V23: завершить пользовательское качество и доказать устойчивость полного
+локального продукта.
+
+Основные результаты:
+
+- responsive installable PWA;
 - accessibility и keyboard navigation;
 - localization foundation;
-- large-dataset performance profiling;
-- полный security и dependency audit;
-- pilot минимум с 2-3 реальными командами;
-- финальные operations, support, upgrade и rollback guides;
-- полный V1-V10 regression и production QA.
+- locale-aware formatting;
+- large-dataset profiling и performance budgets;
+- concurrency, recovery и long-running stability QA.
 
-Только после V10 продукт может быть объявлен полностью завершенной
-Jira-альтернативой для небольших команд.
+Capability groups: `UX-001`-`UX-004`.
 
-## 9. Definition Of Project Closure
+## 23. V24: Final Jira Family Parity Audit And Closure
 
-Проект считается функционально закрытым, когда выполнены все условия:
+Цель V24: доказать полный functional parity выбранного snapshot и закрыть
+проектную разработку.
 
-1. V1-V10 Definition of Done полностью выполнены.
-2. Приложение работает на реальном сервере и домене.
-3. Минимум 2-3 реальные команды прошли pilot без известных blocker bugs.
-4. Основные issue, workflow, planning, reporting и integration workflows
-   подтверждены реальными пользователями.
-5. Production monitoring и alerts проверены контролируемым incident drill.
-6. Backup, restore, upgrade и rollback регулярно воспроизводятся.
-7. Security, dependency, accessibility и performance audits не имеют
+Основные результаты:
+
+- audit каждой included capability;
+- устранение blocker/polish defects без расширения snapshot;
+- полный V1-V24 automated и manual regression;
+- security, dependency, accessibility и performance audit;
+- финальные localhost operations, upgrade, rollback и recovery guides;
+- зафиксированный capability baseline без незакрытых included entries.
+
+Capability group: `CLOSE-001`.
+
+## 24. Definition Of Project Closure
+
+Проект считается функционально закрытым после V24, когда:
+
+1. Все included capabilities baseline имеют статус `complete`.
+2. Нет capability со статусом `planned`, `in_progress` или `deferred`.
+3. V1-V24 Definition of Done полностью выполнены.
+4. Полный automated и manual V1-V24 QA зеленый.
+5. Backup, restore, upgrade, rollback и recovery локально воспроизводимы.
+6. Security, dependency, accessibility и performance audits не имеют
    незакрытых blocker/high-severity проблем.
-8. Полный automated и manual V1-V10 QA зеленый.
-9. Документация позволяет новому администратору развернуть, обновить,
-   диагностировать и восстановить приложение.
-10. Дальнейшая работа преимущественно состоит из поддержки, исправления багов и
-    необязательных улучшений, а не разработки обязательных функций.
+7. Optional реальные integrations имеют рабочие adapters и localhost mocks.
+8. AI capabilities работают provider-neutral и имеют deterministic test mode.
+9. Документация соответствует фактическим setup, administration и workflows.
+10. Нет известных blocker bugs во включенном Jira-family snapshot.
 
-## 10. Explicit Product Boundary
+Реальный deployment, hosting provider, public domain и production pilot не
+являются условиями закрытия проекта.
 
-Даже после V10 проект не обязан копировать:
+## 25. Decision For Next Step
 
-- весь Jira Cloud;
-- Jira Service Management;
-- Atlassian Marketplace;
-- enterprise compliance для регулируемых отраслей;
-- SaaS billing;
-- managed multi-tenant cloud;
-- AI/Rovo;
-- неограниченную enterprise scalability.
-
-Эти направления могут быть запланированы только после полного закрытия
-основного продукта и подтвержденной потребности реальных пользователей.
-
-## 11. Decision For Next Step
-
-Следующий этап: выполнить `docs/v5-plan.md` по одному небольшому проверяемому
-коммиту. До V10 все новые возможности должны оставаться полностью
-воспроизводимыми и проверяемыми на localhost.
+Следующий этап: выполнить [V5 plan](v5-plan.md) по одному небольшому
+проверяемому коммиту. Первый runtime-коммит:
+`Add SMTP config and Mailpit development stack`.
