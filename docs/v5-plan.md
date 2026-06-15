@@ -6,9 +6,9 @@ V1-V4 закрыли task tracking, planning, production-ready self-hosted found
 project workflows, project permissions и synchronous automation.
 
 Цель V5: добавить account recovery и локально воспроизводимую operations
-foundation до начала более крупных Jira-like product features.
+foundation для долгосрочного Jira family functional-parity roadmap.
 
-V5 должна дать небольшой команде и администратору:
+V5 должна дать пользователям и администраторам:
 
 - безопасное восстановление пароля через email token;
 - автоматическую доставку invite email и повторную отправку приглашения;
@@ -20,8 +20,12 @@ V5 должна дать небольшой команде и администр
 - полный localhost QA всех operations flows.
 
 Ключевой принцип V5: все новые operations capabilities должны быть
-provider-neutral и полностью проверяться на localhost. Hosting platform,
-реальный deployment, домен и production pilot остаются V10.
+provider-neutral и полностью проверяться на localhost. Реальный hosting,
+public deployment, домен и production pilot не входят в целевую модель
+проекта.
+
+V5 закрывает capabilities `PLAT-004` и `PLAT-005` из
+[Jira family capability baseline](jira-family-capability-baseline.md).
 
 ## 2. V5 Boundary
 
@@ -49,10 +53,8 @@ provider-neutral и полностью проверяться на localhost. Ho
 
 ### Что сознательно не входит в V5
 
-- реальный hosting provider;
-- реальный domain или public deployment;
-- hosting-specific configuration;
-- production pilot;
+- реальный hosting provider, domain или public deployment;
+- hosting-specific configuration и production pilot;
 - общие email notifications для issue/comment/sprint событий;
 - user-configurable notification preferences;
 - custom fields;
@@ -96,7 +98,7 @@ V5 сохраняет текущую архитектуру:
 - auth: server-side sessions;
 - frontend: React + TypeScript + Vite;
 - local runtime: Docker Compose;
-- existing production-compatible runtime: Docker Compose и Caddy.
+- existing production-like QA runtime: Docker Compose и Caddy.
 
 ### Что можно добавить в V5
 
@@ -111,8 +113,7 @@ V5 сохраняет текущую архитектуру:
 
 ### Что не нужно делать в V5
 
-- выбирать hosting provider;
-- строить provider-specific deployment;
+- выбирать hosting provider или строить provider-specific deployment;
 - добавлять Redis или message broker;
 - отправлять email непосредственно из HTTP handler;
 - хранить raw password reset или invite tokens в database;
@@ -530,7 +531,7 @@ V5 полностью завершена, когда:
 - считать backup успешным без restore verification;
 - retention ошибочно удаляет последний usable backup;
 - monitoring profile усложняет базовый localhost flow;
-- начать hosting-specific работу до V10;
+- начать hosting-specific или public deployment работу;
 - расширить V5 до общих email notifications и потерять управляемый scope.
 
 ## 13. Proposed Commit Order
@@ -557,5 +558,6 @@ V5 полностью завершена, когда:
 Следующий шаг после фиксации этого документа: реализовать commit
 `Add SMTP config and Mailpit development stack`.
 
-До V10 проект продолжает разрабатываться и проверяться на localhost. Hosting
-provider, реальный deployment и production pilot не входят в V5.
+После V5 проект продолжает разрабатываться и проверяться на localhost по
+roadmap V6-V24. Hosting provider, реальный deployment и production pilot не
+входят в критерии закрытия проекта.
