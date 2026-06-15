@@ -29,9 +29,10 @@ func TestSavedFilterLifecycleIntegration(t *testing.T) {
 	created, err := handler.createSavedFilter(ctx, user, normalizedCreateSavedFilter{
 		Name: "My Work",
 		Filters: map[string]string{
-			"sort":      "created_desc",
-			"status":    "todo",
-			"projectId": testUUID,
+			"sort":             "created_desc",
+			"status":           "review",
+			"projectId":        testUUID,
+			"workflowStatusId": testUUID,
 		},
 	})
 	if err != nil {
@@ -40,8 +41,11 @@ func TestSavedFilterLifecycleIntegration(t *testing.T) {
 	if created.Name != "My Work" {
 		t.Fatalf("created name = %q, want My Work", created.Name)
 	}
-	if created.Filters["status"] != "todo" {
-		t.Fatalf("created status = %q, want todo", created.Filters["status"])
+	if created.Filters["status"] != "review" {
+		t.Fatalf("created status = %q, want review", created.Filters["status"])
+	}
+	if created.Filters["workflowStatusId"] != testUUID {
+		t.Fatalf("created workflowStatusId = %q, want %q", created.Filters["workflowStatusId"], testUUID)
 	}
 
 	if _, err := handler.createSavedFilter(ctx, user, normalizedCreateSavedFilter{

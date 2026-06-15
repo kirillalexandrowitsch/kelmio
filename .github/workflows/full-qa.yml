@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   full-qa:
-    name: V1 V2 V3 full QA
+    name: V1 V2 V3 V4 full QA
     runs-on: ubuntu-latest
     timeout-minutes: 60
 

@@ -390,6 +390,35 @@ test("planned sprint exposes the start action and locks complete", async () => {
       .querySelectorAll("option").length,
     2,
   );
+
+  rerender(
+    <SprintsSection
+      {...props}
+      canUpdateSprint={false}
+      projects={[{ ...project, project_role: "viewer", can_write: false }]}
+      selectedSprint={{ ...sprint, status: "active" }}
+      selectedSprintIssues={[sprintIssue]}
+      selectedSprintWorkflow={{
+        project_id: project.id,
+        statuses: [doneStatus, reviewStatus],
+        transitions: [
+          {
+            from_status_id: reviewStatus.id,
+            to_status_id: doneStatus.id,
+            created_at: "2026-06-07T00:00:00Z",
+          },
+        ],
+      }}
+    />,
+  );
+
+  assert.ok(
+    screen.getByText("This sprint board is read-only for your project role."),
+  );
+  assert.equal(
+    screen.getByLabelText("Status for DEMO-1").hasAttribute("disabled"),
+    true,
+  );
 });
 
 test("notifications expose per-item and mark-all actions", async () => {
@@ -418,6 +447,35 @@ test("notifications expose per-item and mark-all actions", async () => {
   assert.equal(onOpenIssue.mock.calls[0]?.[0], notification);
   assert.equal(onMarkRead.mock.calls[0]?.[0], notification);
   assert.equal(onMarkAllRead.mock.calls.length, 1);
+});
+
+test("notifications present automation actor and final change preview", () => {
+  render(
+    <NotificationsSection
+      error=""
+      isActive
+      isLoading={false}
+      notifications={[
+        {
+          ...notification,
+          actor_id: null,
+          actor_display_name: null,
+          notification_type: "issue_automation_status_changed",
+          payload: {
+            from_status: "todo",
+            to_status: "review",
+          },
+        },
+      ]}
+      onMarkAllRead={vi.fn()}
+      onMarkRead={vi.fn()}
+      onOpenIssue={vi.fn()}
+      unreadCount={1}
+    />,
+  );
+
+  assert.ok(screen.getByRole("heading", { name: "Automation changed issue status" }));
+  assert.ok(screen.getByText("Todo -> Review"));
 });
 
 function projectsProps(selectedProjectDetail: Project) {

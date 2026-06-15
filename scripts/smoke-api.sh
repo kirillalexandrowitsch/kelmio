@@ -75,6 +75,10 @@ api_get_with_jar() {
 	curl -fsS -b "$1" "$API_BASE_URL$2"
 }
 
+api_get_status_with_jar() {
+	curl -sS -o /dev/null -w '%{http_code}' -b "$1" "$API_BASE_URL$2"
+}
+
 api_status() {
 	curl -sS -o /dev/null -w '%{http_code}' -b "$COOKIE_JAR" "$API_BASE_URL$1"
 }
@@ -111,6 +115,15 @@ api_post_with_jar() {
 
 api_post_status_with_jar() {
 	curl -sS -o /dev/null -w '%{http_code}' -b "$1" -c "$1" \
+		-H "Content-Type: application/json" \
+		-H "X-CSRF-Token: $(csrf_token_for_jar "$1")" \
+		-d "$3" \
+		"$API_BASE_URL$2"
+}
+
+api_put_with_jar() {
+	curl -fsS -b "$1" \
+		-X PUT \
 		-H "Content-Type: application/json" \
 		-H "X-CSRF-Token: $(csrf_token_for_jar "$1")" \
 		-d "$3" \
@@ -181,6 +194,14 @@ ADMIN_USER_ID="$(api_get "/api/v1/auth/me" | json_value 'data.user.id')"
 printf 'Checking team members\n'
 api_get "/api/v1/team/members" | json_value "data.members.some((member) => member.id === \"$ADMIN_USER_ID\" && member.role === \"admin\")" >/dev/null
 api_get "/api/v1/users" | json_value "data.users.some((user) => user.id === \"$ADMIN_USER_ID\" && user.role === \"admin\")" >/dev/null
+MEMBER_USER_ID="$(api_get "/api/v1/team/members" | json_value "data.members.find((member) => member.username === \"$MEMBER_LOGIN\").id")"
+
+printf 'Checking V4 seeded workflow roles automation and issues\n'
+DEMO_PROJECT_ID="$(api_get "/api/v1/projects" | json_value 'data.projects.find((project) => project.key === "DEMO").id')"
+api_get "/api/v1/projects/$DEMO_PROJECT_ID/workflow" | json_value 'data.statuses.filter((status) => status.key === "review" && status.archived_at === null).length === 1' >/dev/null
+api_get "/api/v1/projects/$DEMO_PROJECT_ID/members" | json_value "data.members.some((member) => member.user_id === \"$ADMIN_USER_ID\" && member.role === \"lead\") && data.members.some((member) => member.user_id === \"$MEMBER_USER_ID\" && member.role === \"contributor\")" >/dev/null
+api_get "/api/v1/projects/$DEMO_PROJECT_ID/automation-rules" | json_value 'data.automation_rules.filter((rule) => rule.name === "Critical bugs move to blocked").length === 1 && data.automation_rules.filter((rule) => rule.name === "Review work assigns demo member").length === 1' >/dev/null
+api_get "/api/v1/issues?project_id=$DEMO_PROJECT_ID" | json_value 'data.issues.filter((issue) => issue.issue_key === "DEMO-11").length === 1 && data.issues.filter((issue) => issue.issue_key === "DEMO-12").length === 1' >/dev/null
 
 printf 'Checking member access guards\n'
 MEMBER_LOGIN_BODY="$(printf '{"login":"%s","password":"%s"}' "$MEMBER_LOGIN" "$MEMBER_PASSWORD")"
@@ -325,5 +346,48 @@ NOTIFICATION_ID="$(api_get_with_jar "$TEMP_MEMBER_COOKIE_JAR" "/api/v1/notificat
 api_post_with_jar "$TEMP_MEMBER_COOKIE_JAR" "/api/v1/notifications/$NOTIFICATION_ID/read" '{}' | json_value 'data.read_at !== null' >/dev/null
 api_post_with_jar "$TEMP_MEMBER_COOKIE_JAR" "/api/v1/notifications/read-all" '{}' >/dev/null
 api_get_with_jar "$TEMP_MEMBER_COOKIE_JAR" "/api/v1/notifications/unread-count" | json_value 'data.unread_count === 0' >/dev/null
+
+printf 'Checking V4 workflow roles transitions automation and replacement\n'
+WORKFLOW="$(api_get "/api/v1/projects/$PROJECT_ID/workflow")"
+TODO_STATUS_ID="$(printf '%s' "$WORKFLOW" | json_value 'data.statuses.find((status) => status.key === "todo" && status.archived_at === null).id')"
+IN_PROGRESS_STATUS_ID="$(printf '%s' "$WORKFLOW" | json_value 'data.statuses.find((status) => status.key === "in_progress" && status.archived_at === null).id')"
+DONE_STATUS_ID="$(printf '%s' "$WORKFLOW" | json_value 'data.statuses.find((status) => status.key === "done" && status.archived_at === null).id')"
+
+CONTRIBUTOR_ISSUE_ID="$(api_post_with_jar "$MEMBER_COOKIE_JAR" "/api/v1/issues" "{\"project_id\":\"$PROJECT_ID\",\"title\":\"Smoke V4 contributor issue $RUN_ID\",\"description\":\"Created by contributor API smoke flow.\",\"issue_type\":\"task\",\"workflow_status_id\":\"$TODO_STATUS_ID\",\"priority\":\"medium\"}" | json_value 'data.id')"
+api_post_with_jar "$MEMBER_COOKIE_JAR" "/api/v1/issues/$CONTRIBUTOR_ISSUE_ID/transition" "{\"workflow_status_id\":\"$IN_PROGRESS_STATUS_ID\"}" | json_value "data.workflow_status.id === \"$IN_PROGRESS_STATUS_ID\"" >/dev/null
+
+api_put "/api/v1/projects/$PROJECT_ID/members/$MEMBER_USER_ID" '{"role":"lead"}' | json_value 'data.role === "lead"' >/dev/null
+REVIEW_STATUS_ID="$(api_post_with_jar "$MEMBER_COOKIE_JAR" "/api/v1/projects/$PROJECT_ID/workflow/statuses" "{\"key\":\"review_$RUN_ID\",\"name\":\"Smoke review $RUN_ID\",\"color\":\"#0ea5e9\",\"category\":\"in_progress\"}" | json_value 'data.id')"
+api_put_with_jar "$MEMBER_COOKIE_JAR" "/api/v1/projects/$PROJECT_ID/workflow/transitions" "{\"transitions\":[{\"from_status_id\":\"$TODO_STATUS_ID\",\"to_status_id\":\"$REVIEW_STATUS_ID\"},{\"from_status_id\":\"$IN_PROGRESS_STATUS_ID\",\"to_status_id\":\"$REVIEW_STATUS_ID\"},{\"from_status_id\":\"$REVIEW_STATUS_ID\",\"to_status_id\":\"$DONE_STATUS_ID\"}]}" | json_value 'data.transitions.length === 3' >/dev/null
+
+api_put "/api/v1/projects/$PROJECT_ID/members/$MEMBER_USER_ID" '{"role":"contributor"}' | json_value 'data.role === "contributor"' >/dev/null
+V4_TRANSITION_ISSUE_ID="$(api_post_with_jar "$MEMBER_COOKIE_JAR" "/api/v1/issues" "{\"project_id\":\"$PROJECT_ID\",\"title\":\"Smoke V4 transition issue $RUN_ID\",\"description\":\"Created by contributor API smoke flow.\",\"issue_type\":\"task\",\"workflow_status_id\":\"$TODO_STATUS_ID\",\"priority\":\"medium\"}" | json_value 'data.id')"
+api_post_with_jar "$MEMBER_COOKIE_JAR" "/api/v1/issues/$V4_TRANSITION_ISSUE_ID/transition" "{\"workflow_status_id\":\"$REVIEW_STATUS_ID\"}" | json_value "data.workflow_status.id === \"$REVIEW_STATUS_ID\"" >/dev/null
+if [ "$(api_post_status_with_jar "$MEMBER_COOKIE_JAR" "/api/v1/issues/$V4_TRANSITION_ISSUE_ID/transition" "{\"workflow_status_id\":\"$IN_PROGRESS_STATUS_ID\"}")" != "409" ]; then
+	printf 'Expected forbidden V4 transition to return 409\n' >&2
+	exit 1
+fi
+
+AUTOMATION_RULE_ID="$(api_post "/api/v1/projects/$PROJECT_ID/automation-rules" "{\"name\":\"Smoke assign review $RUN_ID\",\"trigger_type\":\"issue_created\",\"conditions\":[],\"actions\":[{\"type\":\"change_assignee\",\"user_id\":\"$SMOKE_MEMBER_ID\"},{\"type\":\"change_workflow_status\",\"workflow_status_id\":\"$REVIEW_STATUS_ID\"}],\"is_enabled\":true}" | json_value 'data.id')"
+AUTOMATED_ISSUE_ID="$(api_post "/api/v1/issues" "{\"project_id\":\"$PROJECT_ID\",\"title\":\"Smoke V4 automated issue $RUN_ID\",\"description\":\"Created by automation API smoke flow.\",\"issue_type\":\"task\",\"workflow_status_id\":\"$TODO_STATUS_ID\",\"priority\":\"medium\"}" | json_value "data.workflow_status.id === \"$REVIEW_STATUS_ID\" && data.assignee_id === \"$SMOKE_MEMBER_ID\" && data.id")"
+api_get "/api/v1/issues/$AUTOMATED_ISSUE_ID/activity" | json_value "data.activity.some((entry) => entry.action === \"automation_applied\" && entry.actor_id === null && entry.payload.rule_id === \"$AUTOMATION_RULE_ID\")" >/dev/null
+api_get_with_jar "$TEMP_MEMBER_COOKIE_JAR" "/api/v1/notifications" | json_value "data.notifications.some((notification) => notification.issue_id === \"$AUTOMATED_ISSUE_ID\" && notification.notification_type === \"issue_automation_assigned\")" >/dev/null
+
+api_post "/api/v1/projects/$PROJECT_ID/workflow/statuses/$REVIEW_STATUS_ID/archive" "{\"replacement_status_id\":\"$DONE_STATUS_ID\"}" | json_value 'data.archived_at !== null' >/dev/null
+api_get "/api/v1/issues/$AUTOMATED_ISSUE_ID" | json_value "data.workflow_status.id === \"$DONE_STATUS_ID\" && data.status === \"done\"" >/dev/null
+api_get "/api/v1/issues/$V4_TRANSITION_ISSUE_ID" | json_value "data.workflow_status.id === \"$DONE_STATUS_ID\" && data.status === \"done\"" >/dev/null
+
+api_put "/api/v1/projects/$PROJECT_ID/members/$MEMBER_USER_ID" '{"role":"viewer"}' | json_value 'data.role === "viewer"' >/dev/null
+api_get_with_jar "$MEMBER_COOKIE_JAR" "/api/v1/projects/$PROJECT_ID" | json_value 'data.project_role === "viewer" && data.can_write === false' >/dev/null
+VIEWER_CREATE_STATUS="$(api_post_status_with_jar "$MEMBER_COOKIE_JAR" "/api/v1/issues" "{\"project_id\":\"$PROJECT_ID\",\"title\":\"Viewer write $RUN_ID\",\"issue_type\":\"task\",\"workflow_status_id\":\"$TODO_STATUS_ID\",\"priority\":\"medium\"}")"
+if [ "$VIEWER_CREATE_STATUS" != "403" ]; then
+	printf 'Expected viewer issue creation to return 403\n' >&2
+	exit 1
+fi
+api_delete "/api/v1/projects/$PROJECT_ID/members/$MEMBER_USER_ID" >/dev/null
+if [ "$(api_get_status_with_jar "$MEMBER_COOKIE_JAR" "/api/v1/projects/$PROJECT_ID")" != "404" ]; then
+	printf 'Expected removed project member read to return 404\n' >&2
+	exit 1
+fi
 
 printf 'API smoke test passed\n'
