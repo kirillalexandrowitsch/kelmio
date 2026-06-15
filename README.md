@@ -2,7 +2,7 @@
 
 Free self-hosted team task tracker for small teams, built with Go, React + TypeScript, PostgreSQL, and Docker.
 
-Current status: V1-V3 and the post-V3 maintainability cleanup are fully completed. The V4 feature set and testing baseline are implemented; final V4 QA polish remains.
+Current status: V1-V4 and the post-V3 maintainability cleanup are fully completed.
 
 ## Features
 
@@ -161,6 +161,6 @@ The fast GitHub Actions workflow runs on every push and pull request. The separa
 - The login limiter is in-memory and single-node; it resets after backend restart and is not synchronized between backend instances.
 - Backups contain sensitive application data and must be stored privately outside Git.
 
-## V1-V4 Implementation Status
+## V1-V4 Completion Status
 
-V1, V2, V3, and the post-V3 cleanup are fully completed. The complete V4 feature set and its component, smoke, integration, and Playwright testing baseline are implemented. V4 is not yet declared fully completed: the remaining planned step is the final V4 QA polish and completion audit.
+V1, V2, V3, V4, and the post-V3 cleanup are fully completed. On June 15, 2026, the final V1-V4 audit passed two consecutive idempotent database setups, unit/component/integration/race/vet checks, production and API smoke, all Playwright e2e scenarios, production config and Compose validation, isolated production-stack TLS/security/bootstrap/backup/restore QA, production builds, and dependency audit. The final polish also updated Vite to `8.0.16` to remove known high-severity build-tool vulnerabilities. No known V1-V4 blocker bugs remain.

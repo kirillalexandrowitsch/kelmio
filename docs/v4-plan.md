@@ -14,6 +14,9 @@ production Compose, CI и deployment documentation.
 
 Post-V3 cleanup укрепил frontend/backend структуру, component tests и полный QA.
 
+Статус на 15 июня 2026 года: V4 полностью завершена. Все плановые фазы,
+Definition of Done и финальный V1-V4 QA закрыты.
+
 Цель V4: сделать workflow каждого проекта гибким и управляемым, сохранив простой
 self-hosted runtime и совместимость завершенных V1-V3 сценариев.
 
@@ -680,14 +683,23 @@ V4 считается завершенной, когда:
 Порядок должен сохраняться: сначала migration/backfill, затем permissions и
 workflow-aware domain behavior, затем UI, automation, tests/docs и final QA.
 
-## 14. Decision For Next Step
+## 14. Final V4 QA Result
 
-Следующий практический шаг после planning commit:
+V4 полностью завершена 15 июня 2026 года.
 
-реализовать `Add project workflow schema and backfill` отдельным migration-first
-коммитом.
+Финальный audit подтвердил:
 
-Коммит должен добавить workflow statuses, transitions и `workflow_status_id`,
-создать default workflow для каждого существующего project, безопасно backfill
-существующие issues и доказать migration integration tests, не меняя frontend и
-public API behavior.
+- два последовательных idempotent `make setup-db`;
+- полный V1-V4 unit, component, integration, race и vet baseline;
+- project workflow, transition graph, archive replacement и legacy status
+  compatibility;
+- project roles, permission isolation, dynamic project и active sprint boards;
+- synchronous single-pass automation, activity и notifications;
+- API smoke и все Playwright e2e сценарии;
+- production config, Compose, production images и isolated clean-room stack с
+  TLS, bootstrap, hardening smoke, backup и restore-check;
+- dependency audit без известных уязвимостей после обновления Vite до `8.0.16`;
+- отсутствие известных V4 blocker bugs.
+
+Следующий этап проекта должен начинаться с отдельного V5 planning документа, без
+расширения завершенного V4 scope.
