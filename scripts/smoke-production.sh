@@ -9,6 +9,7 @@ RATE_LIMIT_LOGIN_PER_MINUTE="${RATE_LIMIT_LOGIN_PER_MINUTE:-10}"
 EXPECT_SECURE_COOKIE="${EXPECT_SECURE_COOKIE:-false}"
 EXPECT_HSTS="${EXPECT_HSTS:-false}"
 CURL_INSECURE="${CURL_INSECURE:-false}"
+SMOKE_READY_TIMEOUT_SECONDS="${SMOKE_READY_TIMEOUT_SECONDS:-60}"
 
 API_BASE_URL="${API_BASE_URL%/}"
 COOKIE_JAR="$(mktemp "${TMPDIR:-/tmp}/team-task-tracker-production-smoke-cookies.XXXXXX")"
@@ -137,7 +138,23 @@ case "$CURL_INSECURE" in
 	*) fail "CURL_INSECURE must be true or false" ;;
 esac
 
+case "$SMOKE_READY_TIMEOUT_SECONDS" in
+	'' | *[!0-9]*) fail "SMOKE_READY_TIMEOUT_SECONDS must be a positive integer" ;;
+esac
+if [ "$SMOKE_READY_TIMEOUT_SECONDS" -le 0 ]; then
+	fail "SMOKE_READY_TIMEOUT_SECONDS must be a positive integer"
+fi
+
 printf 'Checking production-sensitive API smoke at %s\n' "$API_BASE_URL"
+
+attempts="$SMOKE_READY_TIMEOUT_SECONDS"
+until curl -fsS "$API_BASE_URL/readyz" >/dev/null 2>&1; do
+	attempts=$((attempts - 1))
+	if [ "$attempts" -le 0 ]; then
+		fail "Timed out waiting for API readiness at $API_BASE_URL/readyz"
+	fi
+	sleep 1
+done
 
 status="$(curl -sS -D "$HEADERS_FILE" -o "$BODY_FILE" -w '%{http_code}' "$API_BASE_URL/healthz")"
 assert_status "$status" "200"
