@@ -237,8 +237,8 @@ func newEmailOutboxIntegrationDB(t *testing.T, ctx context.Context) *pgxpool.Poo
 	if err != nil {
 		t.Fatalf("apply migrations: %v", err)
 	}
-	if len(applied) == 0 || applied[len(applied)-1].Version != 16 {
-		t.Fatalf("applied migrations = %#v, want through version 16", applied)
+	if len(applied) == 0 || applied[len(applied)-1].Version != 17 {
+		t.Fatalf("applied migrations = %#v, want through version 17", applied)
 	}
 	return db
 }

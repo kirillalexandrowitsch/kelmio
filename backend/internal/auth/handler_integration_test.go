@@ -112,11 +112,212 @@ func TestMeCleansExpiredSessionsAndKeepsActiveSessions(t *testing.T) {
 	}
 }
 
+func TestPasswordResetLifecycle(t *testing.T) {
+	ctx, db, userID := setupAuthIntegrationWorkspace(t)
+	if _, err := db.Exec(ctx, `
+		INSERT INTO sessions (user_id, token_hash, expires_at)
+		VALUES ($1, $2, now() + interval '1 hour')
+	`, userID, hashToken("existing-session")); err != nil {
+		t.Fatalf("insert session: %v", err)
+	}
+
+	handler := NewHandler(
+		db,
+		time.Hour,
+		false,
+		newIntegrationCSRFManager(t),
+		nil,
+		WithPasswordResetTTL(30*time.Minute),
+		WithPasswordResetBaseURL("http://localhost:5173"),
+	)
+	requestRecorder := performPasswordResetRequest(handler, `{"email":" Admin@Example.COM "}`)
+	if requestRecorder.Code != http.StatusAccepted {
+		t.Fatalf("request status = %d, want %d: %s", requestRecorder.Code, http.StatusAccepted, requestRecorder.Body.String())
+	}
+
+	token := resetTokenFromOutbox(t, ctx, db)
+	var tokenHash string
+	if err := db.QueryRow(ctx, `SELECT token_hash FROM password_reset_tokens WHERE user_id = $1`, userID).Scan(&tokenHash); err != nil {
+		t.Fatalf("select reset token hash: %v", err)
+	}
+	if tokenHash != hashToken(token) {
+		t.Fatalf("stored token hash = %q, want hash of outbox token", tokenHash)
+	}
+
+	previewRecorder := performPasswordResetPreview(handler, token)
+	if previewRecorder.Code != http.StatusOK {
+		t.Fatalf("preview status = %d, want %d: %s", previewRecorder.Code, http.StatusOK, previewRecorder.Body.String())
+	}
+	if body := previewRecorder.Body.String(); !strings.Contains(body, "admin@example.com") {
+		t.Fatalf("preview body = %q, want normalized email", body)
+	}
+
+	completeRecorder := performPasswordResetComplete(handler, token, `{"password":"new-admin-password","confirm_password":"new-admin-password"}`)
+	if completeRecorder.Code != http.StatusNoContent {
+		t.Fatalf("complete status = %d, want %d: %s", completeRecorder.Code, http.StatusNoContent, completeRecorder.Body.String())
+	}
+
+	var sessionCount int
+	if err := db.QueryRow(ctx, `SELECT count(*) FROM sessions WHERE user_id = $1`, userID).Scan(&sessionCount); err != nil {
+		t.Fatalf("count sessions: %v", err)
+	}
+	if sessionCount != 0 {
+		t.Fatalf("sessionCount = %d, want 0 after reset", sessionCount)
+	}
+
+	oldLogin := performLogin(handler, `{"login":"admin","password":"admin12345"}`)
+	if oldLogin.Code != http.StatusUnauthorized {
+		t.Fatalf("old login status = %d, want %d", oldLogin.Code, http.StatusUnauthorized)
+	}
+	newLogin := performLogin(handler, `{"login":"admin","password":"new-admin-password"}`)
+	if newLogin.Code != http.StatusOK {
+		t.Fatalf("new login status = %d, want %d: %s", newLogin.Code, http.StatusOK, newLogin.Body.String())
+	}
+
+	reuseRecorder := performPasswordResetComplete(handler, token, `{"password":"another-password","confirm_password":"another-password"}`)
+	if reuseRecorder.Code != http.StatusBadRequest || !strings.Contains(reuseRecorder.Body.String(), "password_reset_used") {
+		t.Fatalf("reuse response = %d %s, want password_reset_used", reuseRecorder.Code, reuseRecorder.Body.String())
+	}
+}
+
+func TestPasswordResetPrivacyAndRevokesPreviousTokens(t *testing.T) {
+	ctx, db, userID := setupAuthIntegrationWorkspace(t)
+	handler := NewHandler(db, time.Hour, false, newIntegrationCSRFManager(t), nil, WithPasswordResetTTL(30*time.Minute))
+
+	unknownRecorder := performPasswordResetRequest(handler, `{"email":"unknown@example.com"}`)
+	if unknownRecorder.Code != http.StatusAccepted {
+		t.Fatalf("unknown status = %d, want %d", unknownRecorder.Code, http.StatusAccepted)
+	}
+	var unknownOutboxCount int
+	if err := db.QueryRow(ctx, `SELECT count(*) FROM email_outbox`).Scan(&unknownOutboxCount); err != nil {
+		t.Fatalf("count outbox: %v", err)
+	}
+	if unknownOutboxCount != 0 {
+		t.Fatalf("unknownOutboxCount = %d, want 0", unknownOutboxCount)
+	}
+
+	firstRecorder := performPasswordResetRequest(handler, `{"email":"admin@example.com"}`)
+	if firstRecorder.Code != http.StatusAccepted {
+		t.Fatalf("first status = %d, want %d", firstRecorder.Code, http.StatusAccepted)
+	}
+	secondRecorder := performPasswordResetRequest(handler, `{"email":"admin@example.com"}`)
+	if secondRecorder.Code != http.StatusAccepted {
+		t.Fatalf("second status = %d, want %d", secondRecorder.Code, http.StatusAccepted)
+	}
+
+	var totalTokens int
+	var revokedTokens int
+	if err := db.QueryRow(ctx, `
+		SELECT count(*)::int, count(*) FILTER (WHERE revoked_at IS NOT NULL)::int
+		FROM password_reset_tokens
+		WHERE user_id = $1
+	`, userID).Scan(&totalTokens, &revokedTokens); err != nil {
+		t.Fatalf("count tokens: %v", err)
+	}
+	if totalTokens != 2 || revokedTokens != 1 {
+		t.Fatalf("totalTokens=%d revokedTokens=%d, want 2/1", totalTokens, revokedTokens)
+	}
+	var outboxCount int
+	if err := db.QueryRow(ctx, `SELECT count(*) FROM email_outbox WHERE email_type = 'password_reset'`).Scan(&outboxCount); err != nil {
+		t.Fatalf("count reset outbox: %v", err)
+	}
+	if outboxCount != 2 {
+		t.Fatalf("outboxCount = %d, want 2", outboxCount)
+	}
+}
+
+func TestPasswordResetTokenStates(t *testing.T) {
+	ctx, db, userID := setupAuthIntegrationWorkspace(t)
+	handler := NewHandler(db, time.Hour, false, newIntegrationCSRFManager(t), nil)
+	now := time.Now().UTC()
+
+	insertResetTokenState(t, ctx, db, userID, "expired-token", now.Add(-time.Hour), nil, nil)
+	usedAt := now.Add(-time.Minute)
+	insertResetTokenState(t, ctx, db, userID, "used-token", now.Add(time.Hour), &usedAt, nil)
+	revokedAt := now.Add(-time.Minute)
+	insertResetTokenState(t, ctx, db, userID, "revoked-token", now.Add(time.Hour), nil, &revokedAt)
+
+	tests := []struct {
+		name      string
+		token     string
+		wantCode  int
+		wantError string
+	}{
+		{name: "unknown", token: "unknown-token", wantCode: http.StatusNotFound, wantError: "password_reset_not_found"},
+		{name: "expired", token: "expired-token", wantCode: http.StatusBadRequest, wantError: "password_reset_expired"},
+		{name: "used", token: "used-token", wantCode: http.StatusBadRequest, wantError: "password_reset_used"},
+		{name: "revoked", token: "revoked-token", wantCode: http.StatusBadRequest, wantError: "password_reset_revoked"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			recorder := performPasswordResetPreview(handler, tt.token)
+			if recorder.Code != tt.wantCode || !strings.Contains(recorder.Body.String(), tt.wantError) {
+				t.Fatalf("response = %d %s, want %d/%s", recorder.Code, recorder.Body.String(), tt.wantCode, tt.wantError)
+			}
+		})
+	}
+}
+
 func performLogin(handler *Handler, body string) *httptest.ResponseRecorder {
 	request := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", strings.NewReader(body))
 	recorder := httptest.NewRecorder()
 	handler.login(recorder, request)
 	return recorder
+}
+
+func performPasswordResetRequest(handler *Handler, body string) *httptest.ResponseRecorder {
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/auth/password-reset/request", strings.NewReader(body))
+	request.RemoteAddr = "127.0.0.1:1234"
+	request.Header.Set("User-Agent", "integration-test")
+	recorder := httptest.NewRecorder()
+	handler.requestPasswordReset(recorder, request)
+	return recorder
+}
+
+func performPasswordResetPreview(handler *Handler, token string) *httptest.ResponseRecorder {
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/auth/password-reset/"+token, nil)
+	request.SetPathValue("token", token)
+	recorder := httptest.NewRecorder()
+	handler.previewPasswordReset(recorder, request)
+	return recorder
+}
+
+func performPasswordResetComplete(handler *Handler, token string, body string) *httptest.ResponseRecorder {
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/auth/password-reset/"+token+"/complete", strings.NewReader(body))
+	request.SetPathValue("token", token)
+	recorder := httptest.NewRecorder()
+	handler.completePasswordReset(recorder, request)
+	return recorder
+}
+
+func resetTokenFromOutbox(t *testing.T, ctx context.Context, db *pgxpool.Pool) string {
+	t.Helper()
+	var resetURLPath string
+	if err := db.QueryRow(ctx, `
+		SELECT template_data->>'reset_url_path'
+		FROM email_outbox
+		WHERE email_type = 'password_reset'
+		ORDER BY created_at DESC
+		LIMIT 1
+	`).Scan(&resetURLPath); err != nil {
+		t.Fatalf("select reset url path: %v", err)
+	}
+	const tokenPrefix = "/reset-password?token="
+	if !strings.HasPrefix(resetURLPath, tokenPrefix) {
+		t.Fatalf("resetURLPath = %q, want prefix %q", resetURLPath, tokenPrefix)
+	}
+	return strings.TrimPrefix(resetURLPath, tokenPrefix)
+}
+
+func insertResetTokenState(t *testing.T, ctx context.Context, db *pgxpool.Pool, userID string, token string, expiresAt time.Time, usedAt *time.Time, revokedAt *time.Time) {
+	t.Helper()
+	createdAt := expiresAt.Add(-time.Hour)
+	if _, err := db.Exec(ctx, `
+		INSERT INTO password_reset_tokens (user_id, token_hash, created_at, expires_at, used_at, revoked_at)
+		VALUES ($1, $2, $3, $4, $5, $6)
+	`, userID, hashToken(token), createdAt, expiresAt, usedAt, revokedAt); err != nil {
+		t.Fatalf("insert reset token %s: %v", token, err)
+	}
 }
 
 func setupAuthIntegrationWorkspace(t *testing.T) (context.Context, *pgxpool.Pool, string) {

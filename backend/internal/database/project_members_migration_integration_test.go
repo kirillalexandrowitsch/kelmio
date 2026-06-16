@@ -119,8 +119,8 @@ func TestProjectMemberMigrationBackfillsExistingProjects(t *testing.T) {
 	if err != nil {
 		t.Fatalf("apply project membership migration: %v", err)
 	}
-	if len(applied) != 5 || applied[0].Version != 12 || applied[1].Version != 13 || applied[2].Version != 14 || applied[3].Version != 15 || applied[4].Version != 16 {
-		t.Fatalf("membership migrations applied = %#v, want versions 12 through 16", applied)
+	if len(applied) != 6 || applied[0].Version != 12 || applied[1].Version != 13 || applied[2].Version != 14 || applied[3].Version != 15 || applied[4].Version != 16 || applied[5].Version != 17 {
+		t.Fatalf("membership migrations applied = %#v, want versions 12 through 17", applied)
 	}
 	var creatorRole string
 	var memberRole string

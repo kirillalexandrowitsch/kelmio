@@ -504,6 +504,29 @@ func TestCSRFProtectionAllowsInviteAcceptWithoutToken(t *testing.T) {
 	}
 }
 
+func TestCSRFProtectionAllowsPasswordResetWithoutToken(t *testing.T) {
+	t.Parallel()
+
+	manager := newTestCSRFManager(t)
+	handler := csrfProtection(manager, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+
+	for _, path := range []string{
+		"/api/v1/auth/password-reset/request",
+		"/api/v1/auth/password-reset/reset-token/complete",
+	} {
+		request := httptest.NewRequest(http.MethodPost, path, nil)
+		request.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "session-token"})
+		recorder := httptest.NewRecorder()
+		handler.ServeHTTP(recorder, request)
+
+		if recorder.Code != http.StatusNoContent {
+			t.Fatalf("%s status = %d, want %d", path, recorder.Code, http.StatusNoContent)
+		}
+	}
+}
+
 func TestCSRFProtectionRejectsMissingTokenWithSessionCookie(t *testing.T) {
 	t.Parallel()
 

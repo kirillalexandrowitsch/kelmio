@@ -76,12 +76,34 @@ func TestRenderSystemTestTemplate(t *testing.T) {
 	}
 }
 
+func TestRenderPasswordResetTemplate(t *testing.T) {
+	t.Parallel()
+	msg, err := Render(Email{
+		EmailType:      TypePasswordReset,
+		RecipientEmail: "member@example.com",
+		TemplateData: map[string]any{
+			"display_name": "Member",
+			"reset_url":    "http://localhost:5173/reset-password?token=secret-token",
+		},
+	})
+	if err != nil {
+		t.Fatalf("Render() error = %v", err)
+	}
+	if msg.Subject != "Reset your Team Task Tracker password" {
+		t.Fatalf("Subject = %q", msg.Subject)
+	}
+	if !strings.Contains(msg.TextBody, "secret-token") || !strings.Contains(msg.HTMLBody, "Reset password") {
+		t.Fatalf("message = %#v, want reset link in text/html", msg)
+	}
+}
+
 func TestRenderRejectsUnknownOrInvalidTemplate(t *testing.T) {
 	t.Parallel()
 	tests := []Email{
 		{EmailType: "unknown", RecipientEmail: "member@example.com", TemplateData: map[string]any{}},
 		{EmailType: TypeSystemTest, RecipientEmail: "member@example.com", TemplateData: map[string]any{"text_body": "body"}},
 		{EmailType: TypeSystemTest, RecipientEmail: "member@example.com", TemplateData: map[string]any{"subject": "subject"}},
+		{EmailType: TypePasswordReset, RecipientEmail: "member@example.com", TemplateData: map[string]any{}},
 	}
 	for _, email := range tests {
 		if _, err := Render(email); err == nil {

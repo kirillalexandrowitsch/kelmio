@@ -15,24 +15,36 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/crypto/bcrypt"
 
 	"team-task-tracker/backend/internal/csrf"
+	"team-task-tracker/backend/internal/emailoutbox"
 	"team-task-tracker/backend/internal/ratelimit"
 )
 
 const SessionCookieName = "team_task_tracker_session"
+const defaultPasswordResetTTL = 30 * time.Minute
 
 var errInvalidCredentials = errors.New("invalid credentials")
 var ErrUnauthorized = errors.New("unauthorized")
+var errPasswordResetNotFound = errors.New("password reset token not found")
+var errPasswordResetExpired = errors.New("password reset token expired")
+var errPasswordResetUsed = errors.New("password reset token used")
+var errPasswordResetRevoked = errors.New("password reset token revoked")
+
+type HandlerOption func(*Handler)
 
 type Handler struct {
-	db                  *pgxpool.Pool
-	sessionTTL          time.Duration
-	sessionCookieSecure bool
-	csrfManager         *csrf.Manager
-	loginLimiter        *ratelimit.Limiter
+	db                   *pgxpool.Pool
+	sessionTTL           time.Duration
+	sessionCookieSecure  bool
+	csrfManager          *csrf.Manager
+	loginLimiter         *ratelimit.Limiter
+	passwordResetLimiter *ratelimit.Limiter
+	passwordResetTTL     time.Duration
+	passwordResetBaseURL string
 }
 
 type loginRequest struct {
@@ -51,6 +63,15 @@ type updateProfileRequest struct {
 	DisplayName string `json:"display_name"`
 }
 
+type passwordResetRequest struct {
+	Email string `json:"email"`
+}
+
+type completePasswordResetRequest struct {
+	Password        string `json:"password"`
+	ConfirmPassword string `json:"confirm_password"`
+}
+
 type loginResponse struct {
 	User      userResponse `json:"user"`
 	ExpiresAt time.Time    `json:"expires_at"`
@@ -64,6 +85,15 @@ type csrfTokenResponse struct {
 	CSRFToken string `json:"csrf_token"`
 }
 
+type passwordResetRequestResponse struct {
+	Message string `json:"message"`
+}
+
+type passwordResetPreviewResponse struct {
+	Email     string    `json:"email"`
+	ExpiresAt time.Time `json:"expires_at"`
+}
+
 type userRecord struct {
 	ID           string
 	Email        string
@@ -72,6 +102,24 @@ type userRecord struct {
 	DisplayName  string
 	WorkspaceID  string
 	Role         string
+}
+
+type passwordResetUserRecord struct {
+	ID          string
+	Email       string
+	DisplayName string
+	WorkspaceID string
+}
+
+type passwordResetTokenRecord struct {
+	ID          string
+	UserID      string
+	Email       string
+	DisplayName string
+	TokenHash   string
+	ExpiresAt   time.Time
+	UsedAt      *time.Time
+	RevokedAt   *time.Time
 }
 
 type userResponse struct {
@@ -102,13 +150,42 @@ func NewHandler(
 	sessionCookieSecure bool,
 	csrfManager *csrf.Manager,
 	loginLimiter *ratelimit.Limiter,
+	options ...HandlerOption,
 ) *Handler {
-	return &Handler{
+	handler := &Handler{
 		db:                  db,
 		sessionTTL:          sessionTTL,
 		sessionCookieSecure: sessionCookieSecure,
 		csrfManager:         csrfManager,
 		loginLimiter:        loginLimiter,
+		passwordResetTTL:    defaultPasswordResetTTL,
+	}
+	for _, option := range options {
+		if option != nil {
+			option(handler)
+		}
+	}
+	if handler.passwordResetTTL <= 0 {
+		handler.passwordResetTTL = defaultPasswordResetTTL
+	}
+	return handler
+}
+
+func WithPasswordResetTTL(ttl time.Duration) HandlerOption {
+	return func(handler *Handler) {
+		handler.passwordResetTTL = ttl
+	}
+}
+
+func WithPasswordResetLimiter(limiter *ratelimit.Limiter) HandlerOption {
+	return func(handler *Handler) {
+		handler.passwordResetLimiter = limiter
+	}
+}
+
+func WithPasswordResetBaseURL(baseURL string) HandlerOption {
+	return func(handler *Handler) {
+		handler.passwordResetBaseURL = strings.TrimRight(strings.TrimSpace(baseURL), "/")
 	}
 }
 
@@ -119,6 +196,9 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/auth/csrf-token", h.csrfToken)
 	mux.HandleFunc("PATCH /api/v1/auth/profile", h.updateProfile)
 	mux.HandleFunc("PATCH /api/v1/auth/password", h.changePassword)
+	mux.HandleFunc("POST /api/v1/auth/password-reset/request", h.requestPasswordReset)
+	mux.HandleFunc("GET /api/v1/auth/password-reset/{token}", h.previewPasswordReset)
+	mux.HandleFunc("POST /api/v1/auth/password-reset/{token}/complete", h.completePasswordReset)
 }
 
 func (h *Handler) CurrentUser(r *http.Request) (CurrentUser, error) {
@@ -388,6 +468,114 @@ func (h *Handler) changePassword(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func (h *Handler) requestPasswordReset(w http.ResponseWriter, r *http.Request) {
+	var req passwordResetRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	rateLimitKey := passwordResetRateLimitKey(req.Email, r.RemoteAddr)
+	if h.passwordResetLimiter != nil {
+		result := h.passwordResetLimiter.Allow(rateLimitKey)
+		if !result.Allowed {
+			w.Header().Set("Retry-After", strconv.Itoa(retryAfterSeconds(result.RetryAfter)))
+			writeError(w, http.StatusTooManyRequests, "rate_limited", "too many password reset requests, try again later")
+			return
+		}
+	}
+
+	email, err := normalizePasswordResetEmail(req.Email)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	if err := h.createPasswordResetRequest(ctx, email, r); err != nil {
+		writeError(w, http.StatusInternalServerError, "internal_error", "could not request password reset")
+		return
+	}
+
+	writeJSON(w, http.StatusAccepted, passwordResetRequestResponse{
+		Message: "If an active account exists, password reset instructions will be sent.",
+	})
+}
+
+func (h *Handler) previewPasswordReset(w http.ResponseWriter, r *http.Request) {
+	token, err := normalizePasswordResetToken(r.PathValue("token"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	record, err := h.passwordResetTokenByHash(ctx, hashToken(token))
+	if err != nil {
+		writePasswordResetTokenError(w, err)
+		return
+	}
+	if err := validatePasswordResetTokenState(record, time.Now().UTC()); err != nil {
+		writePasswordResetTokenError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, passwordResetPreviewResponse{
+		Email:     record.Email,
+		ExpiresAt: record.ExpiresAt,
+	})
+}
+
+func (h *Handler) completePasswordReset(w http.ResponseWriter, r *http.Request) {
+	token, err := normalizePasswordResetToken(r.PathValue("token"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	var req completePasswordResetRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+	password, err := normalizeCompletePasswordReset(req)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	tokenHash := hashToken(token)
+	record, err := h.passwordResetTokenByHash(ctx, tokenHash)
+	if err != nil {
+		writePasswordResetTokenError(w, err)
+		return
+	}
+	if err := validatePasswordResetTokenState(record, time.Now().UTC()); err != nil {
+		writePasswordResetTokenError(w, err)
+		return
+	}
+
+	passwordHash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "internal_error", "could not reset password")
+		return
+	}
+
+	if err := h.completePasswordResetTransaction(ctx, tokenHash, string(passwordHash)); err != nil {
+		writePasswordResetTokenError(w, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (h *Handler) userByIdentifier(ctx context.Context, identifier string) (userRecord, error) {
 	var user userRecord
 	if err := h.db.QueryRow(ctx, `
@@ -513,6 +701,176 @@ func (h *Handler) updateOwnPassword(ctx context.Context, userID string, currentT
 	return tx.Commit(ctx)
 }
 
+func (h *Handler) createPasswordResetRequest(ctx context.Context, email string, r *http.Request) error {
+	tx, err := h.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	user, err := h.passwordResetUserByEmail(ctx, tx, email)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return tx.Commit(ctx)
+		}
+		return err
+	}
+
+	now := time.Now().UTC()
+	if _, err := tx.Exec(ctx, `
+		UPDATE password_reset_tokens
+		SET revoked_at = $2
+		WHERE user_id = $1
+			AND used_at IS NULL
+			AND revoked_at IS NULL
+	`, user.ID, now); err != nil {
+		return err
+	}
+
+	token, err := newPasswordResetToken()
+	if err != nil {
+		return err
+	}
+	tokenHash := hashToken(token)
+	expiresAt := now.Add(h.passwordResetTTL)
+	var resetID string
+	if err := tx.QueryRow(ctx, `
+		INSERT INTO password_reset_tokens (
+			user_id,
+			token_hash,
+			request_ip_hash,
+			request_user_agent,
+			created_at,
+			expires_at
+		)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		RETURNING id::text
+	`, user.ID, tokenHash, requestIPHash(r), requestUserAgent(r), now, expiresAt).Scan(&resetID); err != nil {
+		return err
+	}
+
+	resetURLPath := "/reset-password?token=" + token
+	resetURL := resetURLPath
+	if h.passwordResetBaseURL != "" {
+		resetURL = h.passwordResetBaseURL + resetURLPath
+	}
+	if _, err := emailoutbox.Enqueue(ctx, tx, emailoutbox.EnqueueInput{
+		WorkspaceID:    &user.WorkspaceID,
+		EmailType:      emailoutbox.TypePasswordReset,
+		RecipientEmail: user.Email,
+		TemplateData: map[string]any{
+			"display_name":   user.DisplayName,
+			"reset_url":      resetURL,
+			"reset_url_path": resetURLPath,
+			"expires_at":     expiresAt.Format(time.RFC3339),
+		},
+		DeduplicationKey: "password_reset:" + resetID,
+		NextAttemptAt:    now,
+	}); err != nil {
+		return err
+	}
+
+	return tx.Commit(ctx)
+}
+
+func (h *Handler) passwordResetUserByEmail(ctx context.Context, tx pgx.Tx, email string) (passwordResetUserRecord, error) {
+	var user passwordResetUserRecord
+	if err := tx.QueryRow(ctx, `
+		SELECT
+			u.id::text,
+			u.email,
+			u.display_name,
+			wm.workspace_id::text
+		FROM users u
+		JOIN workspace_members wm ON wm.user_id = u.id
+		WHERE
+			u.is_active = true
+			AND lower(u.email) = lower($1)
+		ORDER BY wm.joined_at ASC
+		LIMIT 1
+	`, email).Scan(&user.ID, &user.Email, &user.DisplayName, &user.WorkspaceID); err != nil {
+		return passwordResetUserRecord{}, err
+	}
+	return user, nil
+}
+
+func (h *Handler) passwordResetTokenByHash(ctx context.Context, tokenHash string) (passwordResetTokenRecord, error) {
+	return scanPasswordResetToken(h.db.QueryRow(ctx, `
+		SELECT
+			prt.id::text,
+			prt.user_id::text,
+			u.email,
+			u.display_name,
+			prt.token_hash,
+			prt.expires_at,
+			prt.used_at,
+			prt.revoked_at
+		FROM password_reset_tokens prt
+		JOIN users u ON u.id = prt.user_id
+		WHERE prt.token_hash = $1
+			AND u.is_active = true
+	`, tokenHash))
+}
+
+func (h *Handler) completePasswordResetTransaction(ctx context.Context, tokenHash string, passwordHash string) error {
+	tx, err := h.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	record, err := scanPasswordResetToken(tx.QueryRow(ctx, `
+		SELECT
+			prt.id::text,
+			prt.user_id::text,
+			u.email,
+			u.display_name,
+			prt.token_hash,
+			prt.expires_at,
+			prt.used_at,
+			prt.revoked_at
+		FROM password_reset_tokens prt
+		JOIN users u ON u.id = prt.user_id
+		WHERE prt.token_hash = $1
+			AND u.is_active = true
+		FOR UPDATE OF prt
+	`, tokenHash))
+	if err != nil {
+		return err
+	}
+	if err := validatePasswordResetTokenState(record, time.Now().UTC()); err != nil {
+		return err
+	}
+
+	now := time.Now().UTC()
+	if _, err := tx.Exec(ctx, `
+		UPDATE users
+		SET password_hash = $2
+		WHERE id = $1
+	`, record.UserID, passwordHash); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, `
+		UPDATE password_reset_tokens
+		SET used_at = $2
+		WHERE id = $1
+	`, record.ID, now); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, `
+		DELETE FROM sessions
+		WHERE user_id = $1
+	`, record.UserID); err != nil {
+		return err
+	}
+
+	return tx.Commit(ctx)
+}
+
 func (h *Handler) updateOwnProfile(ctx context.Context, userID string, displayName string) (userRecord, error) {
 	var user userRecord
 	if err := h.db.QueryRow(ctx, `
@@ -611,6 +969,139 @@ func normalizeChangePassword(req changePasswordRequest) (string, string, error) 
 	}
 
 	return currentPassword, newPassword, nil
+}
+
+func normalizePasswordResetEmail(email string) (string, error) {
+	email = strings.ToLower(strings.TrimSpace(email))
+	if email == "" {
+		return "", errors.New("email is required")
+	}
+	if len(email) > 320 {
+		return "", errors.New("email must be 320 characters or fewer")
+	}
+	if !strings.Contains(email, "@") {
+		return "", errors.New("email is invalid")
+	}
+	return email, nil
+}
+
+func normalizePasswordResetToken(token string) (string, error) {
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return "", errors.New("password reset token is required")
+	}
+	if len(token) > 256 {
+		return "", errors.New("password reset token is invalid")
+	}
+	return token, nil
+}
+
+func normalizeCompletePasswordReset(req completePasswordResetRequest) (string, error) {
+	password := strings.TrimSpace(req.Password)
+	confirmPassword := strings.TrimSpace(req.ConfirmPassword)
+	if len(password) < 8 {
+		return "", errors.New("password must be at least 8 characters")
+	}
+	if len(password) > 128 {
+		return "", errors.New("password must be 128 characters or fewer")
+	}
+	if confirmPassword == "" {
+		return "", errors.New("confirm_password is required")
+	}
+	if password != confirmPassword {
+		return "", errors.New("confirm_password must match password")
+	}
+	return password, nil
+}
+
+func validatePasswordResetTokenState(record passwordResetTokenRecord, now time.Time) error {
+	if record.RevokedAt != nil {
+		return errPasswordResetRevoked
+	}
+	if record.UsedAt != nil {
+		return errPasswordResetUsed
+	}
+	if !now.Before(record.ExpiresAt) {
+		return errPasswordResetExpired
+	}
+	return nil
+}
+
+func writePasswordResetTokenError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, pgx.ErrNoRows), errors.Is(err, errPasswordResetNotFound):
+		writeError(w, http.StatusNotFound, "password_reset_not_found", "password reset token was not found")
+	case errors.Is(err, errPasswordResetExpired):
+		writeError(w, http.StatusBadRequest, "password_reset_expired", "password reset token has expired")
+	case errors.Is(err, errPasswordResetUsed):
+		writeError(w, http.StatusBadRequest, "password_reset_used", "password reset token was already used")
+	case errors.Is(err, errPasswordResetRevoked):
+		writeError(w, http.StatusBadRequest, "password_reset_revoked", "password reset token was revoked")
+	default:
+		writeError(w, http.StatusInternalServerError, "internal_error", "password reset failed")
+	}
+}
+
+func passwordResetRateLimitKey(email string, remoteAddr string) string {
+	if normalized, err := normalizePasswordResetEmail(email); err == nil {
+		return "email:" + normalized
+	}
+	return "ip:" + requestIPHashFromRemoteAddr(remoteAddr)
+}
+
+func requestIPHash(r *http.Request) string {
+	if r == nil {
+		return ""
+	}
+	return requestIPHashFromRemoteAddr(r.RemoteAddr)
+}
+
+func requestIPHashFromRemoteAddr(remoteAddr string) string {
+	remoteAddr = strings.TrimSpace(remoteAddr)
+	if remoteAddr == "" {
+		return ""
+	}
+	return hashToken(remoteAddr)
+}
+
+func requestUserAgent(r *http.Request) string {
+	if r == nil {
+		return ""
+	}
+	userAgent := strings.TrimSpace(r.UserAgent())
+	if len(userAgent) > 240 {
+		return userAgent[:240]
+	}
+	return userAgent
+}
+
+func newPasswordResetToken() (string, error) {
+	return newSessionToken()
+}
+
+func scanPasswordResetToken(row interface{ Scan(...any) error }) (passwordResetTokenRecord, error) {
+	var record passwordResetTokenRecord
+	var usedAt pgtype.Timestamptz
+	var revokedAt pgtype.Timestamptz
+	if err := row.Scan(
+		&record.ID,
+		&record.UserID,
+		&record.Email,
+		&record.DisplayName,
+		&record.TokenHash,
+		&record.ExpiresAt,
+		&usedAt,
+		&revokedAt,
+	); err != nil {
+		return passwordResetTokenRecord{}, err
+	}
+	if usedAt.Valid {
+		record.UsedAt = &usedAt.Time
+	}
+	if revokedAt.Valid {
+		record.RevokedAt = &revokedAt.Time
+	}
+	return record, nil
 }
 
 func (user userRecord) toResponse() userResponse {

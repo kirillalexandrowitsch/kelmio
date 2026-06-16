@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -212,6 +213,108 @@ func TestNormalizeChangePasswordValidation(t *testing.T) {
 				t.Fatal("expected error")
 			}
 		})
+	}
+}
+
+func TestNormalizePasswordResetEmail(t *testing.T) {
+	t.Parallel()
+
+	got, err := normalizePasswordResetEmail(" MEMBER@Example.COM ")
+	if err != nil {
+		t.Fatalf("normalizePasswordResetEmail() error = %v", err)
+	}
+	if got != "member@example.com" {
+		t.Fatalf("email = %q, want normalized email", got)
+	}
+}
+
+func TestNormalizePasswordResetEmailValidation(t *testing.T) {
+	t.Parallel()
+
+	tests := []string{"", "bad", strings.Repeat("a", 321)}
+	for _, email := range tests {
+		email := email
+		t.Run(email, func(t *testing.T) {
+			t.Parallel()
+			if _, err := normalizePasswordResetEmail(email); err == nil {
+				t.Fatal("expected error")
+			}
+		})
+	}
+}
+
+func TestNormalizeCompletePasswordReset(t *testing.T) {
+	t.Parallel()
+
+	password, err := normalizeCompletePasswordReset(completePasswordResetRequest{
+		Password:        " new-password ",
+		ConfirmPassword: " new-password ",
+	})
+	if err != nil {
+		t.Fatalf("normalizeCompletePasswordReset() error = %v", err)
+	}
+	if password != "new-password" {
+		t.Fatalf("password = %q, want new-password", password)
+	}
+}
+
+func TestNormalizeCompletePasswordResetValidation(t *testing.T) {
+	t.Parallel()
+
+	tests := []completePasswordResetRequest{
+		{Password: "short", ConfirmPassword: "short"},
+		{Password: "new-password", ConfirmPassword: ""},
+		{Password: "new-password", ConfirmPassword: "other-password"},
+		{Password: "x" + strings.Repeat("a", 128), ConfirmPassword: "x" + strings.Repeat("a", 128)},
+	}
+	for _, req := range tests {
+		req := req
+		t.Run(req.Password, func(t *testing.T) {
+			t.Parallel()
+			if _, err := normalizeCompletePasswordReset(req); err == nil {
+				t.Fatal("expected error")
+			}
+		})
+	}
+}
+
+func TestValidatePasswordResetTokenState(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, time.June, 16, 12, 0, 0, 0, time.UTC)
+	usedAt := now.Add(-time.Minute)
+	revokedAt := now.Add(-2 * time.Minute)
+	tests := []struct {
+		name   string
+		record passwordResetTokenRecord
+		want   error
+	}{
+		{name: "valid", record: passwordResetTokenRecord{ExpiresAt: now.Add(time.Minute)}},
+		{name: "revoked wins", record: passwordResetTokenRecord{ExpiresAt: now.Add(time.Minute), RevokedAt: &revokedAt, UsedAt: &usedAt}, want: errPasswordResetRevoked},
+		{name: "used", record: passwordResetTokenRecord{ExpiresAt: now.Add(time.Minute), UsedAt: &usedAt}, want: errPasswordResetUsed},
+		{name: "expired", record: passwordResetTokenRecord{ExpiresAt: now}, want: errPasswordResetExpired},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			err := validatePasswordResetTokenState(tt.record, now)
+			if !errors.Is(err, tt.want) {
+				t.Fatalf("validatePasswordResetTokenState() error = %v, want %v", err, tt.want)
+			}
+		})
+	}
+}
+
+func TestPasswordResetRateLimitKey(t *testing.T) {
+	t.Parallel()
+
+	if got := passwordResetRateLimitKey(" MEMBER@Example.COM ", "127.0.0.1:1234"); got != "email:member@example.com" {
+		t.Fatalf("passwordResetRateLimitKey(valid email) = %q", got)
+	}
+	got := passwordResetRateLimitKey("bad", "127.0.0.1:1234")
+	if !strings.HasPrefix(got, "ip:") || strings.Contains(got, "127.0.0.1") {
+		t.Fatalf("passwordResetRateLimitKey(invalid email) = %q, want hashed ip fallback", got)
 	}
 }
 

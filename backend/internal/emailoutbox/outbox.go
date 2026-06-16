@@ -22,7 +22,8 @@ const (
 	StatusSent       = "sent"
 	StatusFailed     = "failed"
 
-	TypeSystemTest = "system_test"
+	TypeSystemTest    = "system_test"
+	TypePasswordReset = "password_reset"
 )
 
 var ErrInvalidInput = errors.New("email outbox input is invalid")

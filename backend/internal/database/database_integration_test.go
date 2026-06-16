@@ -90,6 +90,7 @@ func TestPostgresMigrationsCreateCoreSchema(t *testing.T) {
 		"project_members",
 		"automation_rules",
 		"email_outbox",
+		"password_reset_tokens",
 		"sessions",
 		"activity_log",
 		"schema_migrations",
@@ -247,6 +248,10 @@ func TestPostgresMigrationsCreateCoreSchema(t *testing.T) {
 		"email_outbox_deduplication_key_valid",
 		"email_outbox_processing_started_at_valid",
 		"email_outbox_sent_at_valid",
+		"password_reset_tokens_hash_valid",
+		"password_reset_tokens_request_ip_hash_valid",
+		"password_reset_tokens_user_agent_valid",
+		"password_reset_tokens_expires_after_created",
 	}
 	for _, constraintName := range expectedConstraints {
 		var exists bool
@@ -293,6 +298,10 @@ func TestPostgresMigrationsCreateCoreSchema(t *testing.T) {
 		"idx_email_outbox_claim",
 		"idx_email_outbox_stale_processing",
 		"idx_email_outbox_workspace_status",
+		"idx_password_reset_tokens_token_hash",
+		"idx_password_reset_tokens_user_created",
+		"idx_password_reset_tokens_active_user",
+		"idx_password_reset_tokens_expiry",
 	}
 	for _, indexName := range expectedIndexes {
 		var exists bool
@@ -870,8 +879,8 @@ func TestProjectWorkflowMigrationBackfillsLegacyIssues(t *testing.T) {
 	if err != nil {
 		t.Fatalf("apply workflow migration: %v", err)
 	}
-	if len(applied) != 6 || applied[0].Version != 11 || applied[1].Version != 12 || applied[2].Version != 13 || applied[3].Version != 14 || applied[4].Version != 15 || applied[5].Version != 16 {
-		t.Fatalf("post-legacy migrations applied = %#v, want versions 11 through 16", applied)
+	if len(applied) != 7 || applied[0].Version != 11 || applied[1].Version != 12 || applied[2].Version != 13 || applied[3].Version != 14 || applied[4].Version != 15 || applied[5].Version != 16 || applied[6].Version != 17 {
+		t.Fatalf("post-legacy migrations applied = %#v, want versions 11 through 17", applied)
 	}
 
 	var workflowStatuses int

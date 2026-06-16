@@ -67,7 +67,17 @@ func main() {
 	}
 
 	loginLimiter := ratelimit.NewLimiter(cfg.RateLimitLoginPerMinute, time.Minute, time.Now)
-	authHandler := auth.NewHandler(db, cfg.SessionTTL, cfg.SessionCookieSecure, csrfManager, loginLimiter)
+	passwordResetLimiter := ratelimit.NewLimiter(cfg.RateLimitLoginPerMinute, time.Minute, time.Now)
+	authHandler := auth.NewHandler(
+		db,
+		cfg.SessionTTL,
+		cfg.SessionCookieSecure,
+		csrfManager,
+		loginLimiter,
+		auth.WithPasswordResetTTL(cfg.PasswordResetTTL),
+		auth.WithPasswordResetLimiter(passwordResetLimiter),
+		auth.WithPasswordResetBaseURL(cfg.PublicAppURL),
+	)
 	authHandler.RegisterRoutes(mux)
 	notificationService := notifications.NewService()
 
@@ -423,6 +433,12 @@ func isCSRFExempt(r *http.Request) bool {
 		return false
 	}
 	if r.URL.Path == "/api/v1/auth/login" {
+		return true
+	}
+	if r.URL.Path == "/api/v1/auth/password-reset/request" {
+		return true
+	}
+	if strings.HasPrefix(r.URL.Path, "/api/v1/auth/password-reset/") && strings.HasSuffix(r.URL.Path, "/complete") {
 		return true
 	}
 
