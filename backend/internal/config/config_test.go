@@ -48,6 +48,33 @@ func TestLoadDevelopmentDefaults(t *testing.T) {
 	if cfg.BuildTime != "" {
 		t.Fatalf("BuildTime = %q, want empty default", cfg.BuildTime)
 	}
+	if cfg.SMTPHost != "localhost" {
+		t.Fatalf("SMTPHost = %q, want localhost", cfg.SMTPHost)
+	}
+	if cfg.SMTPPort != 1025 {
+		t.Fatalf("SMTPPort = %d, want 1025", cfg.SMTPPort)
+	}
+	if cfg.SMTPTLSMode != SMTPTLSModeNone {
+		t.Fatalf("SMTPTLSMode = %q, want none", cfg.SMTPTLSMode)
+	}
+	if cfg.SMTPFromEmail != "no-reply@team-task-tracker.local" {
+		t.Fatalf("SMTPFromEmail = %q, want local sender", cfg.SMTPFromEmail)
+	}
+	if cfg.SMTPFromName != "Team Task Tracker" {
+		t.Fatalf("SMTPFromName = %q, want product sender", cfg.SMTPFromName)
+	}
+	if !cfg.EmailDeliveryEnabled {
+		t.Fatal("EmailDeliveryEnabled = false, want true in development")
+	}
+	if cfg.EmailWorkerPollInterval != 10*time.Second {
+		t.Fatalf("EmailWorkerPollInterval = %s, want 10s", cfg.EmailWorkerPollInterval)
+	}
+	if cfg.EmailMaxAttempts != 5 {
+		t.Fatalf("EmailMaxAttempts = %d, want 5", cfg.EmailMaxAttempts)
+	}
+	if cfg.PasswordResetTTL != 30*time.Minute {
+		t.Fatalf("PasswordResetTTL = %s, want 30m", cfg.PasswordResetTTL)
+	}
 }
 
 func TestLoadProductionRequiresPublicAppURL(t *testing.T) {
@@ -131,6 +158,131 @@ func TestLoadValidProductionConfig(t *testing.T) {
 	}
 	if cfg.BuildTime != "2026-06-05T20:00:00Z" {
 		t.Fatalf("BuildTime = %q, want configured build time", cfg.BuildTime)
+	}
+	if cfg.EmailDeliveryEnabled {
+		t.Fatal("EmailDeliveryEnabled = true, want false default in production")
+	}
+}
+
+func TestLoadValidProductionSMTPConfig(t *testing.T) {
+	setValidProductionEnv(t)
+	setValidProductionEmailEnv(t)
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	if !cfg.EmailDeliveryEnabled {
+		t.Fatal("EmailDeliveryEnabled = false, want true")
+	}
+	if cfg.SMTPHost != "smtp.example.com" || cfg.SMTPPort != 587 {
+		t.Fatalf("SMTP host/port = %s:%d, want smtp.example.com:587", cfg.SMTPHost, cfg.SMTPPort)
+	}
+	if cfg.SMTPTLSMode != SMTPTLSModeStartTLS {
+		t.Fatalf("SMTPTLSMode = %q, want starttls", cfg.SMTPTLSMode)
+	}
+	if cfg.SMTPFromEmail != "no-reply@example.com" {
+		t.Fatalf("SMTPFromEmail = %q, want configured sender", cfg.SMTPFromEmail)
+	}
+	if cfg.EmailWorkerPollInterval != 5*time.Second {
+		t.Fatalf("EmailWorkerPollInterval = %s, want 5s", cfg.EmailWorkerPollInterval)
+	}
+	if cfg.EmailMaxAttempts != 7 {
+		t.Fatalf("EmailMaxAttempts = %d, want 7", cfg.EmailMaxAttempts)
+	}
+	if cfg.PasswordResetTTL != 45*time.Minute {
+		t.Fatalf("PasswordResetTTL = %s, want 45m", cfg.PasswordResetTTL)
+	}
+}
+
+func TestLoadProductionEmailDeliveryDisabledDoesNotRequireSMTPHost(t *testing.T) {
+	setValidProductionEnv(t)
+	t.Setenv("EMAIL_DELIVERY_ENABLED", "false")
+	t.Setenv("SMTP_HOST", "")
+	t.Setenv("SMTP_PORT", "")
+	t.Setenv("SMTP_FROM_EMAIL", "")
+	t.Setenv("SMTP_FROM_NAME", "")
+
+	if _, err := Load(); err != nil {
+		t.Fatalf("Load() error = %v, want disabled email delivery to allow empty SMTP host and sender", err)
+	}
+}
+
+func TestLoadProductionEmailDeliveryRequiresSMTPHost(t *testing.T) {
+	setValidProductionEnv(t)
+	setValidProductionEmailEnv(t)
+	t.Setenv("SMTP_HOST", "")
+
+	_, err := Load()
+	if err == nil || !strings.Contains(err.Error(), "SMTP_HOST is required when EMAIL_DELIVERY_ENABLED=true") {
+		t.Fatalf("Load() error = %v, want SMTP_HOST required", err)
+	}
+}
+
+func TestLoadProductionEmailDeliveryRejectsInvalidSMTPPort(t *testing.T) {
+	setValidProductionEnv(t)
+	setValidProductionEmailEnv(t)
+	t.Setenv("SMTP_PORT", "70000")
+
+	_, err := Load()
+	if err == nil || !strings.Contains(err.Error(), "SMTP_PORT must be a valid port") {
+		t.Fatalf("Load() error = %v, want invalid SMTP_PORT error", err)
+	}
+}
+
+func TestLoadRejectsInvalidSMTPTLSMode(t *testing.T) {
+	clearConfigEnv(t)
+	t.Setenv("SMTP_TLS_MODE", "ssl")
+
+	_, err := Load()
+	if err == nil || !strings.Contains(err.Error(), "SMTP_TLS_MODE must be none, starttls, or tls") {
+		t.Fatalf("Load() error = %v, want invalid SMTP_TLS_MODE error", err)
+	}
+}
+
+func TestLoadProductionEmailDeliveryRequiresSafeTLSMode(t *testing.T) {
+	setValidProductionEnv(t)
+	setValidProductionEmailEnv(t)
+	t.Setenv("SMTP_TLS_MODE", "none")
+
+	_, err := Load()
+	if err == nil || !strings.Contains(err.Error(), "SMTP_TLS_MODE must be starttls or tls in production") {
+		t.Fatalf("Load() error = %v, want production safe TLS error", err)
+	}
+}
+
+func TestLoadRejectsInvalidSMTPFromEmail(t *testing.T) {
+	clearConfigEnv(t)
+	t.Setenv("SMTP_FROM_EMAIL", "not-email")
+
+	_, err := Load()
+	if err == nil || !strings.Contains(err.Error(), "SMTP_FROM_EMAIL must be a valid email address") {
+		t.Fatalf("Load() error = %v, want invalid sender error", err)
+	}
+}
+
+func TestLoadRejectsInvalidEmailWorkerSettings(t *testing.T) {
+	tests := []struct {
+		name string
+		key  string
+		val  string
+		want string
+	}{
+		{name: "poll interval", key: "EMAIL_WORKER_POLL_INTERVAL", val: "0s", want: "EMAIL_WORKER_POLL_INTERVAL must be greater than 0"},
+		{name: "max attempts", key: "EMAIL_MAX_ATTEMPTS", val: "0", want: "EMAIL_MAX_ATTEMPTS must be greater than 0"},
+		{name: "password reset ttl", key: "PASSWORD_RESET_TTL", val: "bad-duration", want: "PASSWORD_RESET_TTL must be greater than 0"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			clearConfigEnv(t)
+			t.Setenv(tt.key, tt.val)
+
+			_, err := Load()
+			if err == nil || !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("Load() error = %v, want %q", err, tt.want)
+			}
+		})
 	}
 }
 
@@ -256,6 +408,17 @@ func clearConfigEnv(t *testing.T) {
 		"APP_VERSION",
 		"BUILD_COMMIT",
 		"BUILD_TIME",
+		"SMTP_HOST",
+		"SMTP_PORT",
+		"SMTP_USERNAME",
+		"SMTP_PASSWORD",
+		"SMTP_FROM_EMAIL",
+		"SMTP_FROM_NAME",
+		"SMTP_TLS_MODE",
+		"EMAIL_DELIVERY_ENABLED",
+		"EMAIL_WORKER_POLL_INTERVAL",
+		"EMAIL_MAX_ATTEMPTS",
+		"PASSWORD_RESET_TTL",
 		"POSTGRES_HOST",
 		"POSTGRES_PORT",
 		"POSTGRES_DB",
@@ -280,4 +443,19 @@ func setValidProductionEnv(t *testing.T) {
 	t.Setenv("CSRF_SECRET", "0123456789abcdef0123456789abcdef")
 	t.Setenv("RATE_LIMIT_LOGIN_PER_MINUTE", "5")
 	t.Setenv("BUILD_TIME", "2026-06-05T20:00:00Z")
+}
+
+func setValidProductionEmailEnv(t *testing.T) {
+	t.Helper()
+	t.Setenv("EMAIL_DELIVERY_ENABLED", "true")
+	t.Setenv("SMTP_HOST", "smtp.example.com")
+	t.Setenv("SMTP_PORT", "587")
+	t.Setenv("SMTP_USERNAME", "smtp-user")
+	t.Setenv("SMTP_PASSWORD", "smtp-password")
+	t.Setenv("SMTP_FROM_EMAIL", "no-reply@example.com")
+	t.Setenv("SMTP_FROM_NAME", "Team Task Tracker")
+	t.Setenv("SMTP_TLS_MODE", SMTPTLSModeStartTLS)
+	t.Setenv("EMAIL_WORKER_POLL_INTERVAL", "5s")
+	t.Setenv("EMAIL_MAX_ATTEMPTS", "7")
+	t.Setenv("PASSWORD_RESET_TTL", "45m")
 }

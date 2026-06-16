@@ -87,6 +87,8 @@ Development endpoints:
 - backend readiness: `http://localhost:8080/readyz`
 - runtime metadata: `http://localhost:8080/api/v1/version`
 - PostgreSQL: `localhost:15432`
+- Mailpit SMTP: `localhost:1025`
+- Mailpit UI: `http://localhost:8025`
 
 `make setup-db` applies migrations and runs the idempotent localhost demo seed. The V4 seed makes `admin` a DEMO project lead and `demo_member` a contributor, adds the custom `review` status, DEMO-11/12, automation rules, readable automation activity, and automation notifications alongside the existing V1-V3 demo data. Do not use the demo seed in production.
 

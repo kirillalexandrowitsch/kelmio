@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/mail"
 	"net/url"
 	"os"
 	"strconv"
@@ -14,6 +15,10 @@ import (
 const (
 	EnvDevelopment = "development"
 	EnvProduction  = "production"
+
+	SMTPTLSModeNone     = "none"
+	SMTPTLSModeStartTLS = "starttls"
+	SMTPTLSModeTLS      = "tls"
 )
 
 type Config struct {
@@ -30,6 +35,17 @@ type Config struct {
 	AppVersion              string
 	BuildCommit             string
 	BuildTime               string
+	SMTPHost                string
+	SMTPPort                int
+	SMTPUsername            string
+	SMTPPassword            string
+	SMTPFromEmail           string
+	SMTPFromName            string
+	SMTPTLSMode             string
+	EmailDeliveryEnabled    bool
+	EmailWorkerPollInterval time.Duration
+	EmailMaxAttempts        int
+	PasswordResetTTL        time.Duration
 }
 
 func Load() (Config, error) {
@@ -48,6 +64,17 @@ func Load() (Config, error) {
 		AppVersion:              env("APP_VERSION", "development"),
 		BuildCommit:             env("BUILD_COMMIT", "local"),
 		BuildTime:               env("BUILD_TIME", ""),
+		SMTPHost:                smtpHost(appEnv),
+		SMTPPort:                intEnv("SMTP_PORT", 1025),
+		SMTPUsername:            env("SMTP_USERNAME", ""),
+		SMTPPassword:            env("SMTP_PASSWORD", ""),
+		SMTPFromEmail:           env("SMTP_FROM_EMAIL", "no-reply@team-task-tracker.local"),
+		SMTPFromName:            env("SMTP_FROM_NAME", "Team Task Tracker"),
+		SMTPTLSMode:             strings.ToLower(env("SMTP_TLS_MODE", SMTPTLSModeNone)),
+		EmailDeliveryEnabled:    boolEnv("EMAIL_DELIVERY_ENABLED", appEnv == EnvDevelopment),
+		EmailWorkerPollInterval: durationEnv("EMAIL_WORKER_POLL_INTERVAL", 10*time.Second),
+		EmailMaxAttempts:        intEnv("EMAIL_MAX_ATTEMPTS", 5),
+		PasswordResetTTL:        durationEnv("PASSWORD_RESET_TTL", 30*time.Minute),
 	}
 
 	if cfg.AppEnv == EnvProduction && cfg.FrontendURL == "" {
@@ -87,6 +114,7 @@ func (cfg Config) Validate() error {
 	if cfg.RateLimitLoginPerMinute <= 0 {
 		problems = append(problems, "RATE_LIMIT_LOGIN_PER_MINUTE must be greater than 0")
 	}
+	problems = append(problems, validateEmailConfig(cfg)...)
 
 	if cfg.AppEnv == EnvProduction {
 		problems = append(problems, validateProduction(cfg)...)
@@ -163,6 +191,13 @@ func trustedOrigins(appEnv string) []string {
 		raw = frontendURL(appEnv)
 	}
 	return splitCSV(raw)
+}
+
+func smtpHost(appEnv string) string {
+	if appEnv == EnvProduction {
+		return env("SMTP_HOST", "")
+	}
+	return env("SMTP_HOST", "localhost")
 }
 
 func splitCSV(raw string) []string {
@@ -244,6 +279,55 @@ func validateDatabaseURL(databaseURL string) error {
 	}
 	if parsed.Fragment != "" {
 		return errors.New("DATABASE_URL must not include a fragment")
+	}
+	return nil
+}
+
+func validateEmailConfig(cfg Config) []string {
+	var problems []string
+
+	if cfg.EmailWorkerPollInterval <= 0 {
+		problems = append(problems, "EMAIL_WORKER_POLL_INTERVAL must be greater than 0")
+	}
+	if cfg.EmailMaxAttempts <= 0 {
+		problems = append(problems, "EMAIL_MAX_ATTEMPTS must be greater than 0")
+	}
+	if cfg.PasswordResetTTL <= 0 {
+		problems = append(problems, "PASSWORD_RESET_TTL must be greater than 0")
+	}
+	switch cfg.SMTPTLSMode {
+	case SMTPTLSModeNone, SMTPTLSModeStartTLS, SMTPTLSModeTLS:
+	default:
+		problems = append(problems, "SMTP_TLS_MODE must be none, starttls, or tls")
+	}
+
+	if !cfg.EmailDeliveryEnabled {
+		return problems
+	}
+	if strings.TrimSpace(cfg.SMTPHost) == "" {
+		problems = append(problems, "SMTP_HOST is required when EMAIL_DELIVERY_ENABLED=true")
+	}
+	if cfg.SMTPPort < 1 || cfg.SMTPPort > 65535 {
+		problems = append(problems, "SMTP_PORT must be a valid port from 1 to 65535 when EMAIL_DELIVERY_ENABLED=true")
+	}
+	if strings.TrimSpace(cfg.SMTPFromEmail) == "" {
+		problems = append(problems, "SMTP_FROM_EMAIL is required when EMAIL_DELIVERY_ENABLED=true")
+	} else if err := validateEmailAddress(cfg.SMTPFromEmail, "SMTP_FROM_EMAIL"); err != nil {
+		problems = append(problems, err.Error())
+	}
+	if strings.TrimSpace(cfg.SMTPFromName) == "" {
+		problems = append(problems, "SMTP_FROM_NAME is required when EMAIL_DELIVERY_ENABLED=true")
+	}
+	if cfg.AppEnv == EnvProduction && cfg.SMTPTLSMode == SMTPTLSModeNone {
+		problems = append(problems, "SMTP_TLS_MODE must be starttls or tls in production when EMAIL_DELIVERY_ENABLED=true")
+	}
+	return problems
+}
+
+func validateEmailAddress(value string, name string) error {
+	parsed, err := mail.ParseAddress(value)
+	if err != nil || parsed.Address != strings.TrimSpace(value) {
+		return fmt.Errorf("%s must be a valid email address", name)
 	}
 	return nil
 }
