@@ -54,6 +54,36 @@ services:
       mailpit:
         condition: service_started
 
+  email-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: team-task-tracker-email-worker
+    command: go run ./cmd/email-worker
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      BACKEND_PORT: ${BACKEND_PORT:-8080}
+      DATABASE_URL: postgres://${POSTGRES_USER:-team_task_tracker}:${POSTGRES_PASSWORD:-team_task_tracker}@postgres:5432/${POSTGRES_DB:-team_task_tracker}?sslmode=disable
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+      SMTP_HOST: ${SMTP_HOST:-mailpit}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-no-reply@team-task-tracker.local}
+      SMTP_FROM_NAME: ${SMTP_FROM_NAME:-Team Task Tracker}
+      SMTP_TLS_MODE: ${SMTP_TLS_MODE:-none}
+      EMAIL_DELIVERY_ENABLED: ${EMAIL_DELIVERY_ENABLED:-true}
+      EMAIL_WORKER_POLL_INTERVAL: ${EMAIL_WORKER_POLL_INTERVAL:-10s}
+      EMAIL_MAX_ATTEMPTS: ${EMAIL_MAX_ATTEMPTS:-5}
+      PASSWORD_RESET_TTL: ${PASSWORD_RESET_TTL:-30m}
+    volumes:
+      - ./backend:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+
   frontend:
     build:
       context: ./frontend

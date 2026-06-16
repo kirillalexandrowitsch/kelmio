@@ -111,6 +111,50 @@ services:
         condition: service_healthy
     restart: "no"
 
+  email-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: production
+    image: team-task-tracker-backend:prod
+    command:
+      - /app/bin/email-worker
+    environment:
+      APP_ENV: production
+      BACKEND_PORT: "8080"
+      DATABASE_URL: ${DATABASE_URL:-}
+      POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
+      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+      POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_SSLMODE: ${POSTGRES_SSLMODE:-disable}
+      PUBLIC_APP_URL: ${PUBLIC_APP_URL:?set PUBLIC_APP_URL}
+      FRONTEND_URL: ${PUBLIC_APP_URL:?set PUBLIC_APP_URL}
+      TRUSTED_ORIGINS: ${TRUSTED_ORIGINS:?set TRUSTED_ORIGINS}
+      SESSION_TTL: ${SESSION_TTL:-168h}
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-true}
+      CSRF_SECRET: ${CSRF_SECRET:?set CSRF_SECRET}
+      RATE_LIMIT_LOGIN_PER_MINUTE: ${RATE_LIMIT_LOGIN_PER_MINUTE:-10}
+      APP_VERSION: ${APP_VERSION:-production}
+      BUILD_COMMIT: ${BUILD_COMMIT:-unknown}
+      BUILD_TIME: ${BUILD_TIME:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-}
+      SMTP_FROM_NAME: ${SMTP_FROM_NAME:-}
+      SMTP_TLS_MODE: ${SMTP_TLS_MODE:-starttls}
+      EMAIL_DELIVERY_ENABLED: ${EMAIL_DELIVERY_ENABLED:-false}
+      EMAIL_WORKER_POLL_INTERVAL: ${EMAIL_WORKER_POLL_INTERVAL:-10s}
+      EMAIL_MAX_ATTEMPTS: ${EMAIL_MAX_ATTEMPTS:-5}
+      PASSWORD_RESET_TTL: ${PASSWORD_RESET_TTL:-30m}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
   frontend:
     build:
       context: ./frontend
