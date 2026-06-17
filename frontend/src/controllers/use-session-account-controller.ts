@@ -6,12 +6,16 @@ type SessionAccountControllerOptions = {
   initialSection: AppSection;
   initialSprintId: string;
   initialInviteAcceptToken: string | null;
+  initialForgotPasswordRoute: boolean;
+  initialPasswordResetToken: string | null;
 };
 
 export function useSessionAccountController({
   initialSection,
   initialSprintId,
   initialInviteAcceptToken,
+  initialForgotPasswordRoute,
+  initialPasswordResetToken,
 }: SessionAccountControllerOptions) {
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [loginValue, setLoginValue] = useState("admin");
@@ -24,6 +28,12 @@ export function useSessionAccountController({
   const [routeSprintId, setRouteSprintId] = useState(initialSprintId);
   const [inviteAcceptToken, setInviteAcceptToken] = useState(
     initialInviteAcceptToken,
+  );
+  const [isForgotPasswordRoute, setIsForgotPasswordRoute] = useState(
+    initialForgotPasswordRoute,
+  );
+  const [passwordResetToken, setPasswordResetToken] = useState(
+    initialPasswordResetToken,
   );
   const [accountError, setAccountError] = useState("");
   const [accountSuccess, setAccountSuccess] = useState("");
@@ -60,6 +70,10 @@ export function useSessionAccountController({
     setRouteSprintId,
     inviteAcceptToken,
     setInviteAcceptToken,
+    isForgotPasswordRoute,
+    setIsForgotPasswordRoute,
+    passwordResetToken,
+    setPasswordResetToken,
     accountError,
     setAccountError,
     accountSuccess,

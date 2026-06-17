@@ -38,6 +38,8 @@ import {
   type ListTeamInvitesResponse,
   type ListTeamMembersResponse,
   type PaginationParams,
+  type PasswordResetPreview,
+  type PasswordResetRequestResponse,
   type Project,
   type ProjectMember,
   type ProjectRole,
@@ -100,6 +102,8 @@ export type {
   Label,
   NotificationType,
   PaginationParams,
+  PasswordResetPreview,
+  PasswordResetRequestResponse,
   Project,
   ProjectMember,
   ProjectRole,
@@ -140,11 +144,13 @@ let csrfTokenRequest: Promise<string> | null = null;
 
 export class ApiError extends Error {
   status: number;
+  code: string;
 
-  constructor(message: string, status: number) {
+  constructor(message: string, status: number, code = "") {
     super(message);
     this.name = "ApiError";
     this.status = status;
+    this.code = code;
   }
 }
 
@@ -156,6 +162,39 @@ export async function login(loginValue: string, password: string) {
       password,
     }),
   });
+}
+
+export async function requestPasswordReset(email: string) {
+  return request<PasswordResetRequestResponse>(
+    "/api/v1/auth/password-reset/request",
+    {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    },
+  );
+}
+
+export async function getPasswordResetPreview(token: string) {
+  return request<PasswordResetPreview>(
+    `/api/v1/auth/password-reset/${encodeURIComponent(token)}`,
+  );
+}
+
+export async function completePasswordReset(
+  token: string,
+  password: string,
+  confirmPassword: string,
+) {
+  await request<void>(
+    `/api/v1/auth/password-reset/${encodeURIComponent(token)}/complete`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        password,
+        confirm_password: confirmPassword,
+      }),
+    },
+  );
 }
 
 export async function getCurrentUser() {
@@ -840,7 +879,7 @@ async function request<T>(
 
     const message =
       payload?.error?.message ?? `Request failed with status ${response.status}`;
-    throw new ApiError(message, response.status);
+    throw new ApiError(message, response.status, errorCode ?? "");
   }
 
   if (path === "/api/v1/auth/login" || path === "/api/v1/auth/logout") {
@@ -870,7 +909,7 @@ async function getCSRFToken() {
           const message =
             payload?.error?.message ??
             `Request failed with status ${response.status}`;
-          throw new ApiError(message, response.status);
+          throw new ApiError(message, response.status, payload?.error?.code ?? "");
         }
 
         const token = (payload as CSRFTokenResponse | null)?.csrf_token;

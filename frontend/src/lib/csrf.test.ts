@@ -18,6 +18,17 @@ test("does not require CSRF for safe requests and login", () => {
     requestNeedsCSRF("/api/v1/auth/invites/invite-token/accept", "POST"),
     false,
   );
+  assert.equal(
+    requestNeedsCSRF("/api/v1/auth/password-reset/request", "POST"),
+    false,
+  );
+  assert.equal(
+    requestNeedsCSRF(
+      "/api/v1/auth/password-reset/reset-token/complete",
+      "POST",
+    ),
+    false,
+  );
   assert.equal(requestNeedsCSRF("/api/v1/auth/csrf-token", "GET"), false);
 });
 

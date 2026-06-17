@@ -7,6 +7,7 @@ type SignInScreenProps = {
   error: string;
   isSubmitting: boolean;
   loginValue: string;
+  onForgotPassword: () => void;
   onLoginChange: (value: string) => void;
   onPasswordChange: (value: string) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
@@ -29,6 +30,7 @@ export function SignInScreen({
   error,
   isSubmitting,
   loginValue,
+  onForgotPassword,
   onLoginChange,
   onPasswordChange,
   onSubmit,
@@ -77,6 +79,14 @@ export function SignInScreen({
 
           <button disabled={!canSignIn} type="submit">
             {isSubmitting ? "Signing in..." : "Sign in"}
+          </button>
+
+          <button
+            className="auth-link-button"
+            onClick={onForgotPassword}
+            type="button"
+          >
+            Forgot password?
           </button>
         </form>
       </section>

@@ -34,6 +34,8 @@ const appSectionPaths: Record<AppSection, string> = {
 };
 
 const inviteAcceptPath = "/accept-invite";
+const forgotPasswordPathname = "/forgot-password";
+const passwordResetPathname = "/reset-password";
 const boardPathname = "/board";
 
 export function appSectionPath(section: AppSection) {
@@ -64,10 +66,34 @@ export function isInviteAcceptRoute(pathname: string) {
   return pathname === inviteAcceptPath;
 }
 
+export function isForgotPasswordRoute(pathname: string) {
+  return pathname === forgotPasswordPathname;
+}
+
+export function isPasswordResetRoute(pathname: string) {
+  return pathname === passwordResetPathname;
+}
+
 export function inviteAcceptTokenFromLocation(
   location: Pick<Location, "pathname" | "search">,
 ) {
   if (!isInviteAcceptRoute(location.pathname)) {
+    return null;
+  }
+
+  return new URLSearchParams(location.search).get("token")?.trim() ?? "";
+}
+
+export function forgotPasswordRouteFromLocation(
+  location: Pick<Location, "pathname">,
+) {
+  return isForgotPasswordRoute(location.pathname);
+}
+
+export function passwordResetTokenFromLocation(
+  location: Pick<Location, "pathname" | "search">,
+) {
+  if (!isPasswordResetRoute(location.pathname)) {
     return null;
   }
 
@@ -110,6 +136,34 @@ export function currentInviteAcceptTokenFromLocation(
   }
 
   return inviteAcceptTokenFromLocation(window.location);
+}
+
+export function currentForgotPasswordRouteFromLocation(
+  location: Pick<Location, "pathname"> | undefined = undefined,
+) {
+  if (location) {
+    return forgotPasswordRouteFromLocation(location);
+  }
+
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  return forgotPasswordRouteFromLocation(window.location);
+}
+
+export function currentPasswordResetTokenFromLocation(
+  location: Pick<Location, "pathname" | "search"> | undefined = undefined,
+) {
+  if (location) {
+    return passwordResetTokenFromLocation(location);
+  }
+
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  return passwordResetTokenFromLocation(window.location);
 }
 
 export function sprintIdFromPath(pathname: string) {

@@ -7,7 +7,9 @@ import {
   boardPath,
   boardProjectIdFromLocation,
   currentAppSectionFromLocation,
+  forgotPasswordRouteFromLocation,
   inviteAcceptTokenFromLocation,
+  passwordResetTokenFromLocation,
   sprintIdFromPath,
 } from "./routing.ts";
 
@@ -60,6 +62,35 @@ test("extracts invite accept tokens from public route", () => {
     inviteAcceptTokenFromLocation({
       pathname: "/team",
       search: "?token=invite-token",
+    }),
+    null,
+  );
+});
+
+test("detects forgot password public route", () => {
+  assert.equal(forgotPasswordRouteFromLocation({ pathname: "/forgot-password" }), true);
+  assert.equal(forgotPasswordRouteFromLocation({ pathname: "/" }), false);
+});
+
+test("extracts password reset tokens from public route", () => {
+  assert.equal(
+    passwordResetTokenFromLocation({
+      pathname: "/reset-password",
+      search: "?token=reset-token",
+    }),
+    "reset-token",
+  );
+  assert.equal(
+    passwordResetTokenFromLocation({
+      pathname: "/reset-password",
+      search: "",
+    }),
+    "",
+  );
+  assert.equal(
+    passwordResetTokenFromLocation({
+      pathname: "/account",
+      search: "?token=reset-token",
     }),
     null,
   );

@@ -17,6 +17,15 @@ export type CSRFTokenResponse = {
   csrf_token: string;
 };
 
+export type PasswordResetRequestResponse = {
+  message: string;
+};
+
+export type PasswordResetPreview = {
+  email: string;
+  expires_at: string;
+};
+
 export type RuntimeVersion = {
   version: string;
   commit: string;

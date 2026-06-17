@@ -129,8 +129,10 @@ import {
   appSectionPath,
   appSections,
   boardPath,
+  currentForgotPasswordRouteFromLocation,
   currentBoardProjectIdFromLocation,
   currentInviteAcceptTokenFromLocation,
+  currentPasswordResetTokenFromLocation,
   currentAppSectionFromLocation,
   sprintIdFromPath,
   type AppSection,
@@ -144,6 +146,10 @@ import { AppSidebar, WorkspaceTopbar } from "./components/app-shell";
 import { AccountSection } from "./features/account/account-section";
 import { InviteAcceptScreen } from "./features/auth/invite-accept-screen";
 import { BootingScreen, SignInScreen } from "./features/auth/auth-screens";
+import {
+  ForgotPasswordScreen,
+  ResetPasswordScreen,
+} from "./features/auth/password-reset-screens";
 import { BoardSection } from "./features/board/board-section";
 import { DashboardSection } from "./features/dashboard/dashboard-section";
 import { IssueCreateForm } from "./features/issues/issue-create-form";
@@ -270,6 +276,10 @@ export function ApplicationController() {
     setRouteSprintId,
     inviteAcceptToken,
     setInviteAcceptToken,
+    isForgotPasswordRoute,
+    setIsForgotPasswordRoute,
+    passwordResetToken,
+    setPasswordResetToken,
     accountError,
     setAccountError,
     accountSuccess,
@@ -296,6 +306,8 @@ export function ApplicationController() {
     initialSection: currentAppSectionFromLocation(),
     initialSprintId: currentSprintIdFromLocation(),
     initialInviteAcceptToken: currentInviteAcceptTokenFromLocation(),
+    initialForgotPasswordRoute: currentForgotPasswordRouteFromLocation(),
+    initialPasswordResetToken: currentPasswordResetTokenFromLocation(),
   });
   const {
     projects,
@@ -701,6 +713,8 @@ export function ApplicationController() {
   ) {
     setActiveSection(section);
     setInviteAcceptToken(null);
+    setIsForgotPasswordRoute(false);
+    setPasswordResetToken(null);
     if (section !== "sprints") {
       setRouteSprintId("");
     }
@@ -734,6 +748,8 @@ export function ApplicationController() {
     setBoardProjectId(projectId);
     setRouteSprintId("");
     setInviteAcceptToken(null);
+    setIsForgotPasswordRoute(false);
+    setPasswordResetToken(null);
 
     if (typeof window === "undefined") {
       return;
@@ -762,6 +778,8 @@ export function ApplicationController() {
     setActiveSection("sprints");
     setRouteSprintId(sprintId);
     setInviteAcceptToken(null);
+    setIsForgotPasswordRoute(false);
+    setPasswordResetToken(null);
 
     if (typeof window === "undefined") {
       return;
@@ -782,6 +800,26 @@ export function ApplicationController() {
     }
 
     window.history.pushState({ section: "sprints", sprintId }, "", nextPath);
+  }
+
+  function navigateToForgotPassword() {
+    setActiveSection("dashboard");
+    setRouteSprintId("");
+    setBoardProjectId("");
+    setInviteAcceptToken(null);
+    setIsForgotPasswordRoute(true);
+    setPasswordResetToken(null);
+    setError("");
+
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    if (window.location.pathname === "/forgot-password" && window.location.search === "") {
+      return;
+    }
+
+    window.history.pushState({ authRoute: "forgot-password" }, "", "/forgot-password");
   }
 
   useEffect(() => {
@@ -819,6 +857,8 @@ export function ApplicationController() {
       setRouteSprintId(currentSprintIdFromLocation());
       setBoardProjectId(currentBoardProjectIdFromLocation());
       setInviteAcceptToken(currentInviteAcceptTokenFromLocation());
+      setIsForgotPasswordRoute(currentForgotPasswordRouteFromLocation());
+      setPasswordResetToken(currentPasswordResetTokenFromLocation());
     }
 
     window.addEventListener("popstate", handleRouteChange);
@@ -827,14 +867,24 @@ export function ApplicationController() {
     };
   }, []);
 
-  function handleInviteAcceptSignIn() {
+  function handlePublicAuthSignIn() {
     if (user) {
       void handleLogout();
       return;
     }
 
     setError("");
+    setLoginValue("");
+    setPassword("");
     navigateToSection("dashboard", "replace");
+  }
+
+  function handlePasswordResetCompleted() {
+    setUser(null);
+    setError("");
+    setLoginValue("");
+    setPassword("");
+    setIsSubmitting(false);
   }
 
   useEffect(() => {
@@ -4656,8 +4706,22 @@ export function ApplicationController() {
   if (inviteAcceptToken !== null) {
     return (
       <InviteAcceptScreen
-        onGoToSignIn={handleInviteAcceptSignIn}
+        onGoToSignIn={handlePublicAuthSignIn}
         token={inviteAcceptToken}
+      />
+    );
+  }
+
+  if (isForgotPasswordRoute) {
+    return <ForgotPasswordScreen onGoToSignIn={handlePublicAuthSignIn} />;
+  }
+
+  if (passwordResetToken !== null) {
+    return (
+      <ResetPasswordScreen
+        onGoToSignIn={handlePublicAuthSignIn}
+        onResetCompleted={handlePasswordResetCompleted}
+        token={passwordResetToken}
       />
     );
   }
@@ -4669,6 +4733,7 @@ export function ApplicationController() {
         error={error}
         isSubmitting={isSubmitting}
         loginValue={loginValue}
+        onForgotPassword={navigateToForgotPassword}
         onLoginChange={setLoginValue}
         onPasswordChange={setPassword}
         onSubmit={handleLogin}

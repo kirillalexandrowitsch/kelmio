@@ -128,6 +128,7 @@ test("sign-in form forwards credentials and submit action", async () => {
   const user = userEvent.setup();
   const onLoginChange = vi.fn();
   const onPasswordChange = vi.fn();
+  const onForgotPassword = vi.fn();
   const onSubmit = vi.fn(preventSubmit);
 
   render(
@@ -136,6 +137,7 @@ test("sign-in form forwards credentials and submit action", async () => {
       error=""
       isSubmitting={false}
       loginValue=""
+      onForgotPassword={onForgotPassword}
       onLoginChange={onLoginChange}
       onPasswordChange={onPasswordChange}
       onSubmit={onSubmit}
@@ -150,6 +152,9 @@ test("sign-in form forwards credentials and submit action", async () => {
   assert.equal(onLoginChange.mock.calls.at(-1)?.[0], "n");
   assert.equal(onPasswordChange.mock.calls.at(-1)?.[0], "3");
   assert.equal(onSubmit.mock.calls.length, 1);
+
+  await user.click(screen.getByRole("button", { name: "Forgot password?" }));
+  assert.equal(onForgotPassword.mock.calls.length, 1);
 });
 
 test("issue create form exposes project, label, and disabled submit behavior", async () => {

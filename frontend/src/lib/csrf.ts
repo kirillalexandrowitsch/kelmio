@@ -9,12 +9,21 @@ export function requestNeedsCSRF(path: string, method = "GET") {
     unsafeMethods.has(normalizedMethod) &&
     path !== "/api/v1/auth/login" &&
     !isInviteAcceptPath(path) &&
+    !isPasswordResetPublicPath(path) &&
     path !== CSRF_TOKEN_PATH
   );
 }
 
 export function isInviteAcceptPath(path: string) {
   return path.startsWith("/api/v1/auth/invites/") && path.endsWith("/accept");
+}
+
+export function isPasswordResetPublicPath(path: string) {
+  return (
+    path === "/api/v1/auth/password-reset/request" ||
+    (path.startsWith("/api/v1/auth/password-reset/") &&
+      path.endsWith("/complete"))
+  );
 }
 
 export function isCSRFError(status: number, code: unknown) {

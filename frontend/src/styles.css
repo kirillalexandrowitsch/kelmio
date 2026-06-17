@@ -205,8 +205,22 @@ a {
   background: #18231d;
 }
 
+.auth-form .auth-link-button {
+  min-height: auto;
+  padding: 0;
+  border: 0;
+  color: #4e795d;
+  background: transparent;
+  text-align: left;
+}
+
 .auth-form button:hover:not(:disabled) {
   background: #27362d;
+}
+
+.auth-form .auth-link-button:hover:not(:disabled) {
+  color: #18231d;
+  background: transparent;
 }
 
 .account-form button {
