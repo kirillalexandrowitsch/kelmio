@@ -7,7 +7,10 @@ import {
   type TeamMember,
   type UpdateTeamMemberInput,
 } from "../../lib/api-types";
-import { inviteStatusLabel } from "../../lib/invite-view";
+import {
+  inviteDeliveryStatusLabel,
+  inviteStatusLabel,
+} from "../../lib/invite-view";
 import { TEAM_PERMISSION_NOTE } from "../../lib/permissions";
 import { memberInitials } from "../../lib/team-view";
 
@@ -32,6 +35,7 @@ type TeamSectionProps = {
   onInviteRoleChange: (value: TeamMember["role"]) => void;
   onPasswordChange: (value: string) => void;
   onRevokeTeamInvite: (invite: TeamInvite) => void;
+  onResendTeamInvite: (invite: TeamInvite) => void;
   onResetPassword: (
     event: FormEvent<HTMLFormElement>,
     memberId: string,
@@ -43,6 +47,7 @@ type TeamSectionProps = {
   onUsernameChange: (value: string) => void;
   passwordResetMemberId: string;
   revokingTeamInviteIds: string[];
+  resendingTeamInviteIds: string[];
   resettingTeamMemberPasswordIds: string[];
   teamInviteEmail: string;
   teamInviteFormError: string;
@@ -83,6 +88,7 @@ export function TeamSection({
   onInviteRoleChange,
   onPasswordChange,
   onRevokeTeamInvite,
+  onResendTeamInvite,
   onResetPassword,
   onResetPasswordChange,
   onRoleChange,
@@ -91,6 +97,7 @@ export function TeamSection({
   onUsernameChange,
   passwordResetMemberId,
   revokingTeamInviteIds,
+  resendingTeamInviteIds,
   resettingTeamMemberPasswordIds,
   teamInviteEmail,
   teamInviteFormError,
@@ -253,8 +260,8 @@ export function TeamSection({
             </header>
 
             <p className="muted">
-              Create an invite link without sending email. The raw link is shown
-              only right after creation.
+              Create an invite email and keep the raw link available as a copy
+              fallback right after creation.
             </p>
 
             <FormError message={teamInvitesError} />
@@ -296,8 +303,11 @@ export function TeamSection({
                 {teamInvites.map((invite) => {
                   const inviteLink = teamInviteLinksById[invite.id] ?? "";
                   const isRevokingInvite = revokingTeamInviteIds.includes(invite.id);
+                  const isResendingInvite = resendingTeamInviteIds.includes(invite.id);
                   const canRevokeInvite =
                     invite.status === "pending" && !isRevokingInvite;
+                  const canResendInvite =
+                    invite.status === "pending" && !isResendingInvite;
 
                   return (
                     <article className="team-invite-card" key={invite.id}>
@@ -311,6 +321,11 @@ export function TeamSection({
 
                       <span className={`invite-status invite-status-${invite.status}`}>
                         {inviteStatusLabel(invite.status)}
+                      </span>
+                      <span
+                        className={`invite-delivery-status invite-delivery-status-${invite.email_delivery_status}`}
+                      >
+                        Email: {inviteDeliveryStatusLabel(invite.email_delivery_status)}
                       </span>
 
                       {inviteLink ? (
@@ -336,6 +351,16 @@ export function TeamSection({
                             type="button"
                           >
                             {copiedTeamInviteId === invite.id ? "Copied" : "Copy link"}
+                          </button>
+                        ) : null}
+                        {invite.status === "pending" ? (
+                          <button
+                            className="small-button"
+                            disabled={!canResendInvite}
+                            onClick={() => onResendTeamInvite(invite)}
+                            type="button"
+                          >
+                            {isResendingInvite ? "Resending..." : "Resend email"}
                           </button>
                         ) : null}
                         {invite.status === "pending" ? (

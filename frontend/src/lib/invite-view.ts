@@ -1,4 +1,7 @@
-import type { TeamInviteStatus } from "./api-types.ts";
+import type {
+  TeamInviteEmailDeliveryStatus,
+  TeamInviteStatus,
+} from "./api-types.ts";
 import {
   isValidEmail,
   isValidUsername,
@@ -24,6 +27,21 @@ export function inviteStatusLabel(status: TeamInviteStatus) {
       return "Revoked";
     case "expired":
       return "Expired";
+  }
+}
+
+export function inviteDeliveryStatusLabel(status: TeamInviteEmailDeliveryStatus) {
+  switch (status) {
+    case "not_sent":
+      return "Not sent";
+    case "pending":
+      return "Pending";
+    case "processing":
+      return "Processing";
+    case "sent":
+      return "Sent";
+    case "failed":
+      return "Failed";
   }
 }
 

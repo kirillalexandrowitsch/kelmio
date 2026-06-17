@@ -102,7 +102,7 @@ func main() {
 	teamHandler := team.NewHandler(db, authHandler)
 	teamHandler.RegisterRoutes(mux)
 
-	invitesHandler := invites.NewHandler(db, authHandler)
+	invitesHandler := invites.NewHandler(db, authHandler, invites.WithInviteBaseURL(cfg.PublicAppURL))
 	invitesHandler.RegisterRoutes(mux)
 
 	sprintsHandler := sprints.NewHandler(db, authHandler, notificationService)

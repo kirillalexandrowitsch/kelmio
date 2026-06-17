@@ -117,6 +117,7 @@ export type {
   SprintFilters,
   SprintStatus,
   TeamInvite,
+  TeamInviteEmailDeliveryStatus,
   TeamInviteStatus,
   TeamMember,
   TransitionIssueInput,
@@ -427,6 +428,15 @@ export async function createTeamInvite(input: CreateTeamInviteInput) {
 export async function revokeTeamInvite(inviteId: string) {
   return request<TeamInvite>(
     `/api/v1/team/invites/${encodeURIComponent(inviteId)}/revoke`,
+    {
+      method: "POST",
+    },
+  );
+}
+
+export async function resendTeamInvite(inviteId: string) {
+  return request<TeamInvite>(
+    `/api/v1/team/invites/${encodeURIComponent(inviteId)}/resend`,
     {
       method: "POST",
     },

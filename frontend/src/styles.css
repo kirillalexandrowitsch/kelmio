@@ -2140,7 +2140,7 @@ h1 {
 
 .team-invite-card {
   display: grid;
-  grid-template-columns: minmax(180px, 1fr) auto minmax(260px, 1.4fr) auto;
+  grid-template-columns: minmax(180px, 1fr) auto auto minmax(260px, 1.4fr) auto;
   align-items: center;
   gap: 12px;
   padding: 12px;
@@ -2189,6 +2189,37 @@ h1 {
 
 .invite-status-revoked,
 .invite-status-expired {
+  border-color: #d9aaa2;
+  color: #923c2d;
+  background: #fff7f5;
+}
+
+.invite-delivery-status {
+  padding: 6px 9px;
+  border: 1px solid #c8d1cb;
+  border-radius: 999px;
+  color: #4e5c54;
+  background: #ffffff;
+  font-size: 12px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.invite-delivery-status-pending,
+.invite-delivery-status-processing {
+  border-color: #c8d1cb;
+  color: #4e5c54;
+  background: #f6f8f6;
+}
+
+.invite-delivery-status-sent {
+  border-color: #b8c5bd;
+  color: #2f6142;
+  background: #e7f3ea;
+}
+
+.invite-delivery-status-failed,
+.invite-delivery-status-not_sent {
   border-color: #d9aaa2;
   color: #923c2d;
   background: #fff7f5;

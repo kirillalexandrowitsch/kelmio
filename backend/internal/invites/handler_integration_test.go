@@ -45,6 +45,9 @@ func TestInviteLifecycleIntegration(t *testing.T) {
 	if token == "" {
 		t.Fatal("token is empty")
 	}
+	if created.EmailDeliveryStatus != "pending" || created.EmailQueuedAt == nil {
+		t.Fatalf("created delivery status = %q queued=%v, want pending with queued time", created.EmailDeliveryStatus, created.EmailQueuedAt)
+	}
 
 	var storedHash string
 	if err := db.QueryRow(ctx, `SELECT token_hash FROM team_invites WHERE id = $1`, created.ID).Scan(&storedHash); err != nil {
@@ -56,6 +59,19 @@ func TestInviteLifecycleIntegration(t *testing.T) {
 	if storedHash != hashInviteToken(token) {
 		t.Fatal("stored token hash does not match token")
 	}
+	var outboxCount int
+	var inviteURLPath string
+	if err := db.QueryRow(ctx, `
+		SELECT count(*)::int, max(template_data->>'invite_url_path')
+		FROM email_outbox
+		WHERE email_type = 'team_invite'
+			AND template_data->>'invite_id' = $1
+	`, created.ID).Scan(&outboxCount, &inviteURLPath); err != nil {
+		t.Fatalf("select invite outbox: %v", err)
+	}
+	if outboxCount != 1 || inviteURLPath != "/accept-invite?token="+token {
+		t.Fatalf("outboxCount=%d inviteURLPath=%q, want one invite email with accept URL", outboxCount, inviteURLPath)
+	}
 
 	listed, err := handler.listInvites(ctx, seed.admin)
 	if err != nil {
@@ -64,12 +80,40 @@ func TestInviteLifecycleIntegration(t *testing.T) {
 	if len(listed) != 1 || listed[0].ID != created.ID {
 		t.Fatalf("listed invites = %#v, want created invite", listed)
 	}
+	if listed[0].EmailDeliveryStatus != "pending" || listed[0].EmailQueuedAt == nil {
+		t.Fatalf("listed delivery status = %#v, want pending summary", listed[0])
+	}
 
 	if _, _, err := handler.createInvite(ctx, seed.admin, normalizedCreateInvite{
 		Email: "new-member@example.com",
 		Role:  "member",
 	}); !errors.Is(err, errInviteExists) {
 		t.Fatalf("duplicate invite error = %v, want %v", err, errInviteExists)
+	}
+
+	handler.now = func() time.Time { return time.Now().UTC().Add(2 * time.Minute) }
+	resent, err := handler.resendInvite(ctx, seed.admin, created.ID)
+	if err != nil {
+		t.Fatalf("resend invite: %v", err)
+	}
+	if resent.ID != created.ID || resent.EmailDeliveryStatus != "pending" || resent.EmailQueuedAt == nil {
+		t.Fatalf("resent invite = %#v, want same invite with pending delivery", resent)
+	}
+	if err := db.QueryRow(ctx, `
+		SELECT count(*)::int
+		FROM email_outbox
+		WHERE email_type = 'team_invite'
+			AND template_data->>'invite_id' = $1
+	`, created.ID).Scan(&outboxCount); err != nil {
+		t.Fatalf("count resent outbox: %v", err)
+	}
+	if outboxCount != 2 {
+		t.Fatalf("outboxCount after resend = %d, want 2", outboxCount)
+	}
+	handler.now = func() time.Time { return time.Now().UTC() }
+	var cooldownErr inviteResendCooldownError
+	if _, err := handler.resendInvite(ctx, seed.admin, created.ID); !errors.As(err, &cooldownErr) {
+		t.Fatalf("second resend error = %v, want cooldown", err)
 	}
 
 	preview, err := handler.inviteByToken(ctx, token)
@@ -152,6 +196,25 @@ func TestInviteRejectsRevokedExpiredAlreadyMemberAndUserConflictsIntegration(t *
 		t.Fatalf("expired accept error = %v, want %v", err, errInviteExpired)
 	}
 
+	var preEmailInviteID string
+	if err := db.QueryRow(ctx, `
+		INSERT INTO team_invites (
+			workspace_id,
+			email,
+			role,
+			token_hash,
+			created_by,
+			expires_at
+		)
+		VALUES ($1, 'pre-email@example.com', 'member', $2, $3, now() + interval '7 days')
+		RETURNING id::text
+	`, seed.workspaceID, hashInviteToken("pre-email-token"), seed.admin.ID).Scan(&preEmailInviteID); err != nil {
+		t.Fatalf("insert pre-email invite: %v", err)
+	}
+	if _, err := handler.resendInvite(ctx, seed.admin, preEmailInviteID); !errors.Is(err, errInviteEmailUnavailable) {
+		t.Fatalf("pre-email resend error = %v, want %v", err, errInviteEmailUnavailable)
+	}
+
 	alreadyMemberInvite, alreadyMemberToken, err := handler.createInvite(ctx, seed.admin, normalizedCreateInvite{
 		Email: seed.member.Email,
 		Role:  "member",
@@ -230,6 +293,10 @@ func TestInviteAPIAdminAccessAndTokenLeakIntegration(t *testing.T) {
 	if memberCreate.Code != http.StatusForbidden {
 		t.Fatalf("member create status = %d, want %d: %s", memberCreate.Code, http.StatusForbidden, memberCreate.Body.String())
 	}
+	memberResend := performInviteRequest(mux, http.MethodPost, "/api/v1/team/invites/00000000-0000-0000-0000-000000000000/resend", "", memberCookie)
+	if memberResend.Code != http.StatusForbidden {
+		t.Fatalf("member resend status = %d, want %d: %s", memberResend.Code, http.StatusForbidden, memberResend.Body.String())
+	}
 
 	adminCookie := loginInviteTestUser(t, mux, seed.admin.Username, "admin12345")
 	adminCreate := performInviteRequest(mux, http.MethodPost, "/api/v1/team/invites", `{"email":"api-invite@example.com","role":"member"}`, adminCookie)
@@ -246,6 +313,17 @@ func TestInviteAPIAdminAccessAndTokenLeakIntegration(t *testing.T) {
 	}
 	if createBody.AcceptURLPath != "/accept-invite?token="+createBody.AcceptToken {
 		t.Fatalf("accept url path = %q", createBody.AcceptURLPath)
+	}
+	if createBody.EmailDeliveryStatus != "pending" {
+		t.Fatalf("email delivery status = %q, want pending", createBody.EmailDeliveryStatus)
+	}
+
+	adminResend := performInviteRequest(mux, http.MethodPost, "/api/v1/team/invites/"+createBody.ID+"/resend", "", adminCookie)
+	if adminResend.Code != http.StatusOK {
+		t.Fatalf("admin resend status = %d, want %d: %s", adminResend.Code, http.StatusOK, adminResend.Body.String())
+	}
+	if strings.Contains(adminResend.Body.String(), createBody.AcceptToken) {
+		t.Fatal("resend response leaked raw invite token")
 	}
 
 	adminList := performInviteRequest(mux, http.MethodGet, "/api/v1/team/invites", "", adminCookie)

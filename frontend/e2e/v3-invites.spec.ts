@@ -5,6 +5,8 @@ import type { AuthResponse, TeamMember } from "../src/lib/api-types";
 const adminLogin = process.env.E2E_ADMIN_LOGIN ?? "admin";
 const adminPassword = process.env.E2E_ADMIN_PASSWORD ?? "admin12345";
 const apiBaseURL = process.env.E2E_API_BASE_URL ?? "http://localhost:8080";
+const appBaseURL = process.env.E2E_BASE_URL ?? "http://localhost:5173";
+const mailpitBaseURL = process.env.E2E_MAILPIT_BASE_URL ?? "http://localhost:8025";
 
 test("V3 invite UI: admin creates invite and recipient accepts it", async ({
   page,
@@ -31,10 +33,11 @@ test("V3 invite UI: admin creates invite and recipient accepts it", async ({
     await expect(inviteCard).toContainText("Pending");
     const inviteLinkInput = inviteCard.getByLabel(`Invite link for ${email}`);
     await expect(inviteLinkInput).toHaveValue(/\/accept-invite\?token=/);
-    const inviteLink = await inviteLinkInput.inputValue();
+    await expect(inviteCard).toContainText("Email: Pending");
+    const emailedInvite = await waitForValidInviteEmail(page, email);
 
     await logoutViaApi(page);
-    await page.goto(inviteLink);
+    await page.goto(emailedInvite.link);
     await expect(
       page.getByRole("heading", { name: "Accept workspace invite" }),
     ).toBeVisible();
@@ -92,6 +95,16 @@ test("V3 invite UI: admin revokes a pending invite", async ({ page }) => {
   const inviteLink = await inviteCard
     .getByLabel(`Invite link for ${email}`)
     .inputValue();
+  const createEmail = await waitForValidInviteEmail(page, email);
+
+  await inviteCard.getByRole("button", { name: "Resend email" }).click();
+  const resentEmail = await waitForValidInviteEmail(
+    page,
+    email,
+    new Set([createEmail.id]),
+  );
+  expect(resentEmail.link).toContain("/accept-invite?token=");
+
   await inviteCard.getByRole("button", { name: "Revoke" }).click();
   await expect(inviteCard).toContainText("Revoked");
   await expect(inviteCard.getByRole("button", { name: "Revoke" })).toHaveCount(0);
@@ -126,6 +139,105 @@ async function deactivateMemberViaApi(page: Page, memberId: string) {
       },
     }),
   );
+}
+
+async function waitForValidInviteEmail(
+  page: Page,
+  email: string,
+  seenMessageIds: Set<string> = new Set(),
+) {
+  const deadline = Date.now() + 45000;
+
+  while (Date.now() < deadline) {
+    const messagesResponse = await page.request.get(`${mailpitBaseURL}/api/v1/messages`);
+    if (messagesResponse.ok()) {
+      const payload = await messagesResponse.json().catch(() => null);
+      const messages = Array.isArray(payload?.messages) ? payload.messages : [];
+
+      for (const message of messages) {
+        if (!messageTargetsEmail(message, email)) {
+          continue;
+        }
+
+        const messageID = String(message.ID ?? message.Id ?? message.id ?? "");
+        if (!messageID || seenMessageIds.has(messageID)) {
+          continue;
+        }
+
+        const detailResponse = await page.request.get(
+          `${mailpitBaseURL}/api/v1/message/${encodeURIComponent(messageID)}`,
+        );
+        if (!detailResponse.ok()) {
+          continue;
+        }
+
+        const detail = await detailResponse.json().catch(() => null);
+        const link = extractInviteLink(detail);
+        if (link && (await invitePreviewIsValid(page, link))) {
+          return { id: messageID, link };
+        }
+      }
+    }
+
+    await page.waitForTimeout(1000);
+  }
+
+  throw new Error(`Timed out waiting for invite email for ${email}`);
+}
+
+function messageTargetsEmail(message: unknown, email: string) {
+  return collectStrings(message)
+    .map((value) => value.toLowerCase())
+    .some((value) => value.includes(email.toLowerCase()));
+}
+
+function extractInviteLink(payload: unknown) {
+  const inviteLinkPattern =
+    /(?:https?:\/\/[^\s"'<>]+)?\/accept-invite\?token=[A-Za-z0-9_-]+/;
+  for (const value of collectStrings(payload)) {
+    const match = value.match(inviteLinkPattern);
+    if (!match) {
+      continue;
+    }
+
+    const link = match[0];
+    if (link.startsWith("http")) {
+      return link;
+    }
+    return `${appBaseURL.replace(/\/$/, "")}${link}`;
+  }
+
+  return "";
+}
+
+function collectStrings(value: unknown): string[] {
+  if (typeof value === "string") {
+    return [value];
+  }
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => collectStrings(item));
+  }
+  if (value && typeof value === "object") {
+    return Object.values(value).flatMap((item) => collectStrings(item));
+  }
+  return [];
+}
+
+async function invitePreviewIsValid(page: Page, inviteLink: string) {
+  const token = inviteTokenFromLink(inviteLink);
+  const response = await page.request.get(
+    `${apiBaseURL}/api/v1/auth/invites/${encodeURIComponent(token)}`,
+  );
+  return response.ok();
+}
+
+function inviteTokenFromLink(inviteLink: string) {
+  const parsed = new URL(inviteLink);
+  const token = parsed.searchParams.get("token") ?? "";
+  if (!token) {
+    throw new Error(`Invite link is missing token: ${inviteLink}`);
+  }
+  return token;
 }
 
 async function logoutViaApi(page: Page) {

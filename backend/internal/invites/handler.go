@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"regexp"
@@ -16,13 +17,16 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/crypto/bcrypt"
 
 	"team-task-tracker/backend/internal/auth"
+	"team-task-tracker/backend/internal/emailoutbox"
 )
 
 const inviteTTL = 7 * 24 * time.Hour
+const inviteResendCooldown = time.Minute
 
 var emailPattern = regexp.MustCompile(`^[^@\s]+@[^@\s]+\.[^@\s]+$`)
 var usernamePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{2,31}$`)
@@ -34,10 +38,29 @@ var errInviteRevoked = errors.New("invite revoked")
 var errInviteAccepted = errors.New("invite already accepted")
 var errAlreadyMember = errors.New("already member")
 var errUserExists = errors.New("user exists")
+var errInviteEmailUnavailable = errors.New("invite email unavailable")
 
 type Handler struct {
-	db   *pgxpool.Pool
-	auth *auth.Handler
+	db            *pgxpool.Pool
+	auth          *auth.Handler
+	inviteBaseURL string
+	now           func() time.Time
+}
+
+type HandlerOption func(*Handler)
+
+func WithInviteBaseURL(baseURL string) HandlerOption {
+	return func(handler *Handler) {
+		handler.inviteBaseURL = strings.TrimRight(strings.TrimSpace(baseURL), "/")
+	}
+}
+
+type inviteResendCooldownError struct {
+	retryAfter time.Duration
+}
+
+func (err inviteResendCooldownError) Error() string {
+	return "invite resend cooldown"
 }
 
 type createInviteRequest struct {
@@ -52,16 +75,19 @@ type acceptInviteRequest struct {
 }
 
 type inviteResponse struct {
-	ID          string     `json:"id"`
-	WorkspaceID string     `json:"workspace_id"`
-	Email       string     `json:"email"`
-	Role        string     `json:"role"`
-	Status      string     `json:"status"`
-	CreatedBy   string     `json:"created_by"`
-	CreatedAt   time.Time  `json:"created_at"`
-	ExpiresAt   time.Time  `json:"expires_at"`
-	AcceptedAt  *time.Time `json:"accepted_at"`
-	RevokedAt   *time.Time `json:"revoked_at"`
+	ID                  string     `json:"id"`
+	WorkspaceID         string     `json:"workspace_id"`
+	Email               string     `json:"email"`
+	Role                string     `json:"role"`
+	Status              string     `json:"status"`
+	CreatedBy           string     `json:"created_by"`
+	CreatedAt           time.Time  `json:"created_at"`
+	ExpiresAt           time.Time  `json:"expires_at"`
+	AcceptedAt          *time.Time `json:"accepted_at"`
+	RevokedAt           *time.Time `json:"revoked_at"`
+	EmailDeliveryStatus string     `json:"email_delivery_status"`
+	EmailQueuedAt       *time.Time `json:"email_queued_at"`
+	EmailSentAt         *time.Time `json:"email_sent_at"`
 }
 
 type createInviteResponse struct {
@@ -102,16 +128,20 @@ type normalizedAcceptInvite struct {
 }
 
 type inviteRecord struct {
-	ID            string
-	WorkspaceID   string
-	WorkspaceName string
-	Email         string
-	Role          string
-	CreatedBy     string
-	CreatedAt     time.Time
-	ExpiresAt     time.Time
-	AcceptedAt    *time.Time
-	RevokedAt     *time.Time
+	ID                  string
+	WorkspaceID         string
+	WorkspaceName       string
+	Email               string
+	Role                string
+	CreatedBy           string
+	CreatedByName       string
+	CreatedAt           time.Time
+	ExpiresAt           time.Time
+	AcceptedAt          *time.Time
+	RevokedAt           *time.Time
+	EmailDeliveryStatus string
+	EmailQueuedAt       *time.Time
+	EmailSentAt         *time.Time
 }
 
 type dbtx interface {
@@ -120,17 +150,23 @@ type dbtx interface {
 	QueryRow(context.Context, string, ...any) pgx.Row
 }
 
-func NewHandler(db *pgxpool.Pool, authHandler *auth.Handler) *Handler {
-	return &Handler{
+func NewHandler(db *pgxpool.Pool, authHandler *auth.Handler, options ...HandlerOption) *Handler {
+	handler := &Handler{
 		db:   db,
 		auth: authHandler,
+		now:  func() time.Time { return time.Now().UTC() },
 	}
+	for _, option := range options {
+		option(handler)
+	}
+	return handler
 }
 
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/team/invites", h.list)
 	mux.HandleFunc("POST /api/v1/team/invites", h.create)
 	mux.HandleFunc("POST /api/v1/team/invites/{id}/revoke", h.revoke)
+	mux.HandleFunc("POST /api/v1/team/invites/{id}/resend", h.resend)
 	mux.HandleFunc("GET /api/v1/auth/invites/{token}", h.preview)
 	mux.HandleFunc("POST /api/v1/auth/invites/{token}/accept", h.accept)
 }
@@ -225,6 +261,61 @@ func (h *Handler) revoke(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, invite)
 }
 
+func (h *Handler) resend(w http.ResponseWriter, r *http.Request) {
+	user, ok := h.requireAdmin(w, r)
+	if !ok {
+		return
+	}
+
+	inviteID, err := normalizeInviteID(r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	invite, err := h.resendInvite(ctx, user, inviteID)
+	if err != nil {
+		var cooldownErr inviteResendCooldownError
+		if errors.As(err, &cooldownErr) {
+			retryAfter := int(cooldownErr.retryAfter.Seconds())
+			if retryAfter < 1 {
+				retryAfter = 1
+			}
+			w.Header().Set("Retry-After", fmt.Sprintf("%d", retryAfter))
+			writeError(w, http.StatusTooManyRequests, "rate_limited", "invite email was resent recently")
+			return
+		}
+		if errors.Is(err, pgx.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "invite_not_found", "invite was not found")
+			return
+		}
+		if errors.Is(err, errInviteExpired) {
+			writeError(w, http.StatusBadRequest, "invite_expired", "invite has expired")
+			return
+		}
+		if errors.Is(err, errInviteRevoked) {
+			writeError(w, http.StatusBadRequest, "invite_revoked", "invite was revoked")
+			return
+		}
+		if errors.Is(err, errInviteAccepted) {
+			writeError(w, http.StatusBadRequest, "invite_already_accepted", "invite was already accepted")
+			return
+		}
+		if errors.Is(err, errInviteEmailUnavailable) {
+			writeError(w, http.StatusConflict, "invite_email_unavailable", "invite email link is not available for resend")
+			return
+		}
+
+		writeError(w, http.StatusInternalServerError, "internal_error", "could not resend invite")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, invite)
+}
+
 func (h *Handler) preview(w http.ResponseWriter, r *http.Request) {
 	token, err := normalizeInviteToken(r.PathValue("token"))
 	if err != nil {
@@ -290,16 +381,29 @@ func (h *Handler) listInvites(ctx context.Context, user auth.CurrentUser) ([]inv
 			ti.email,
 			ti.role,
 			ti.created_by::text,
+			COALESCE(u.display_name, ''),
 			ti.created_at,
 			ti.expires_at,
 			ti.accepted_at,
-			ti.revoked_at
+			ti.revoked_at,
+			COALESCE(delivery.status, ''),
+			delivery.created_at,
+			delivery.sent_at
 		FROM team_invites ti
 		JOIN workspaces w ON w.id = ti.workspace_id
+		LEFT JOIN users u ON u.id = ti.created_by
+		LEFT JOIN LATERAL (
+			SELECT eo.status, eo.created_at, eo.sent_at
+			FROM email_outbox eo
+			WHERE eo.email_type = $2
+				AND eo.template_data->>'invite_id' = ti.id::text
+			ORDER BY eo.created_at DESC, eo.id DESC
+			LIMIT 1
+		) delivery ON true
 		WHERE ti.workspace_id = $1
 		ORDER BY ti.created_at DESC, ti.id DESC
 		LIMIT 100
-	`, user.WorkspaceID)
+	`, user.WorkspaceID, emailoutbox.TypeTeamInvite)
 	if err != nil {
 		return nil, err
 	}
@@ -329,8 +433,17 @@ func (h *Handler) createInvite(ctx context.Context, user auth.CurrentUser, input
 		return inviteResponse{}, "", err
 	}
 
-	expiresAt := time.Now().UTC().Add(inviteTTL)
-	invite, err := scanInvite(h.db.QueryRow(ctx, `
+	tx, err := h.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return inviteResponse{}, "", err
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	now := h.now()
+	expiresAt := now.Add(inviteTTL)
+	invite, err := scanInvite(tx.QueryRow(ctx, `
 		INSERT INTO team_invites (workspace_id, email, role, token_hash, created_by, expires_at)
 		VALUES ($1, $2, $3, $4, $5, $6)
 		RETURNING
@@ -340,11 +453,15 @@ func (h *Handler) createInvite(ctx context.Context, user auth.CurrentUser, input
 			email,
 			role,
 			created_by::text,
+			$7::text,
 			created_at,
 			expires_at,
 			accepted_at,
-			revoked_at
-	`, user.WorkspaceID, input.Email, input.Role, hashInviteToken(token), user.ID, expiresAt))
+			revoked_at,
+			''::text,
+			NULL::timestamptz,
+			NULL::timestamptz
+	`, user.WorkspaceID, input.Email, input.Role, hashInviteToken(token), user.ID, expiresAt, user.DisplayName))
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
@@ -354,7 +471,158 @@ func (h *Handler) createInvite(ctx context.Context, user auth.CurrentUser, input
 		return inviteResponse{}, "", err
 	}
 
-	return invite.toResponse(time.Now().UTC()), token, nil
+	emailRecord, err := h.enqueueInviteEmail(ctx, tx, invite, token, "create")
+	if err != nil {
+		return inviteResponse{}, "", err
+	}
+	invite.EmailDeliveryStatus = emailRecord.Status
+	invite.EmailQueuedAt = &emailRecord.CreatedAt
+	invite.EmailSentAt = emailRecord.SentAt
+
+	if err := tx.Commit(ctx); err != nil {
+		return inviteResponse{}, "", err
+	}
+
+	return invite.toResponse(now), token, nil
+}
+
+func (h *Handler) resendInvite(ctx context.Context, user auth.CurrentUser, inviteID string) (inviteResponse, error) {
+	tx, err := h.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return inviteResponse{}, err
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	now := h.now()
+	invite, err := h.inviteByIDForUpdate(ctx, tx, user.WorkspaceID, inviteID)
+	if err != nil {
+		return inviteResponse{}, err
+	}
+	if err := ensureInvitePending(invite, now); err != nil {
+		return inviteResponse{}, err
+	}
+
+	payload, err := h.latestInviteEmailPayload(ctx, tx, invite.ID)
+	if err != nil {
+		return inviteResponse{}, err
+	}
+	if payload.InviteURLPath == "" {
+		return inviteResponse{}, errInviteEmailUnavailable
+	}
+
+	retryAfter, err := h.inviteResendRetryAfter(ctx, tx, invite.ID, now)
+	if err != nil {
+		return inviteResponse{}, err
+	}
+	if retryAfter > 0 {
+		return inviteResponse{}, inviteResendCooldownError{retryAfter: retryAfter}
+	}
+
+	emailRecord, err := h.enqueueInviteEmailWithPayload(ctx, tx, invite, payload.InviteURLPath, payload.InviteURL, "resend")
+	if err != nil {
+		return inviteResponse{}, err
+	}
+	invite.EmailDeliveryStatus = emailRecord.Status
+	invite.EmailQueuedAt = &emailRecord.CreatedAt
+	invite.EmailSentAt = emailRecord.SentAt
+
+	if err := tx.Commit(ctx); err != nil {
+		return inviteResponse{}, err
+	}
+
+	return invite.toResponse(now), nil
+}
+
+type inviteEmailPayload struct {
+	InviteURLPath string
+	InviteURL     string
+}
+
+func (h *Handler) latestInviteEmailPayload(ctx context.Context, tx pgx.Tx, inviteID string) (inviteEmailPayload, error) {
+	var payload inviteEmailPayload
+	var inviteURLPath pgtype.Text
+	var inviteURL pgtype.Text
+	if err := tx.QueryRow(ctx, `
+		SELECT
+			template_data->>'invite_url_path',
+			template_data->>'invite_url'
+		FROM email_outbox
+		WHERE email_type = $1
+			AND template_data->>'invite_id' = $2
+		ORDER BY created_at DESC, id DESC
+		LIMIT 1
+	`, emailoutbox.TypeTeamInvite, inviteID).Scan(&inviteURLPath, &inviteURL); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return inviteEmailPayload{}, errInviteEmailUnavailable
+		}
+		return inviteEmailPayload{}, err
+	}
+	if inviteURLPath.Valid {
+		payload.InviteURLPath = strings.TrimSpace(inviteURLPath.String)
+	}
+	if inviteURL.Valid {
+		payload.InviteURL = strings.TrimSpace(inviteURL.String)
+	}
+	return payload, nil
+}
+
+func (h *Handler) inviteResendRetryAfter(ctx context.Context, tx pgx.Tx, inviteID string, now time.Time) (time.Duration, error) {
+	var latestResendAt pgtype.Timestamptz
+	if err := tx.QueryRow(ctx, `
+		SELECT max(created_at)
+		FROM email_outbox
+		WHERE email_type = $1
+			AND template_data->>'invite_id' = $2
+			AND deduplication_key LIKE $3
+	`, emailoutbox.TypeTeamInvite, inviteID, "team_invite:resend:"+inviteID+":%").Scan(&latestResendAt); err != nil {
+		return 0, err
+	}
+	if !latestResendAt.Valid {
+		return 0, nil
+	}
+	nextAllowedAt := latestResendAt.Time.Add(inviteResendCooldown)
+	if !now.Before(nextAllowedAt) {
+		return 0, nil
+	}
+	return nextAllowedAt.Sub(now), nil
+}
+
+func (h *Handler) enqueueInviteEmail(ctx context.Context, tx pgx.Tx, invite inviteRecord, token string, reason string) (emailoutbox.Email, error) {
+	inviteURLPath := "/accept-invite?token=" + token
+	inviteURL := inviteURLPath
+	if h.inviteBaseURL != "" {
+		inviteURL = h.inviteBaseURL + inviteURLPath
+	}
+	return h.enqueueInviteEmailWithPayload(ctx, tx, invite, inviteURLPath, inviteURL, reason)
+}
+
+func (h *Handler) enqueueInviteEmailWithPayload(ctx context.Context, tx pgx.Tx, invite inviteRecord, inviteURLPath string, inviteURL string, reason string) (emailoutbox.Email, error) {
+	now := h.now()
+	if inviteURL == "" && h.inviteBaseURL != "" {
+		inviteURL = h.inviteBaseURL + inviteURLPath
+	}
+	if inviteURL == "" {
+		inviteURL = inviteURLPath
+	}
+	return emailoutbox.Enqueue(ctx, tx, emailoutbox.EnqueueInput{
+		WorkspaceID:    &invite.WorkspaceID,
+		EmailType:      emailoutbox.TypeTeamInvite,
+		RecipientEmail: invite.Email,
+		TemplateData: map[string]any{
+			"invite_url":           inviteURL,
+			"invite_url_path":      inviteURLPath,
+			"workspace_name":       invite.WorkspaceName,
+			"email":                invite.Email,
+			"role":                 invite.Role,
+			"expires_at":           invite.ExpiresAt.Format(time.RFC3339),
+			"inviter_display_name": invite.CreatedByName,
+			"invite_id":            invite.ID,
+		},
+		DeduplicationKey: fmt.Sprintf("team_invite:%s:%s:%d", reason, invite.ID, now.UnixNano()),
+		NextAttemptAt:    now,
+	})
 }
 
 func (h *Handler) revokeInvite(ctx context.Context, user auth.CurrentUser, inviteID string) (inviteResponse, error) {
@@ -385,11 +653,15 @@ func (h *Handler) revokeInvite(ctx context.Context, user auth.CurrentUser, invit
 			(SELECT name FROM workspaces WHERE workspaces.id = team_invites.workspace_id),
 			email,
 			role,
-				created_by::text,
-				created_at,
-				expires_at,
-				accepted_at,
-				revoked_at
+			created_by::text,
+			COALESCE((SELECT display_name FROM users WHERE users.id = team_invites.created_by), ''),
+			created_at,
+			expires_at,
+			accepted_at,
+			revoked_at,
+			''::text,
+			NULL::timestamptz,
+			NULL::timestamptz
 		`, inviteID))
 		if err != nil {
 			return inviteResponse{}, err
@@ -567,12 +839,17 @@ func (h *Handler) inviteByTokenHash(ctx context.Context, db dbtx, tokenHash stri
 			ti.email,
 			ti.role,
 			ti.created_by::text,
+			COALESCE(u.display_name, ''),
 			ti.created_at,
 			ti.expires_at,
 			ti.accepted_at,
-			ti.revoked_at
+			ti.revoked_at,
+			''::text,
+			NULL::timestamptz,
+			NULL::timestamptz
 		FROM team_invites ti
 		JOIN workspaces w ON w.id = ti.workspace_id
+		LEFT JOIN users u ON u.id = ti.created_by
 		WHERE ti.token_hash = $1
 	`
 	if forUpdate {
@@ -591,12 +868,17 @@ func (h *Handler) inviteByIDForUpdate(ctx context.Context, db dbtx, workspaceID 
 			ti.email,
 			ti.role,
 			ti.created_by::text,
+			COALESCE(u.display_name, ''),
 			ti.created_at,
 			ti.expires_at,
 			ti.accepted_at,
-			ti.revoked_at
+			ti.revoked_at,
+			''::text,
+			NULL::timestamptz,
+			NULL::timestamptz
 		FROM team_invites ti
 		JOIN workspaces w ON w.id = ti.workspace_id
+		LEFT JOIN users u ON u.id = ti.created_by
 		WHERE ti.id = $1
 			AND ti.workspace_id = $2
 		FOR UPDATE OF ti
@@ -698,17 +980,24 @@ func inviteStatus(invite inviteRecord, now time.Time) string {
 }
 
 func (invite inviteRecord) toResponse(now time.Time) inviteResponse {
+	deliveryStatus := invite.EmailDeliveryStatus
+	if deliveryStatus == "" {
+		deliveryStatus = "not_sent"
+	}
 	return inviteResponse{
-		ID:          invite.ID,
-		WorkspaceID: invite.WorkspaceID,
-		Email:       invite.Email,
-		Role:        invite.Role,
-		Status:      inviteStatus(invite, now),
-		CreatedBy:   invite.CreatedBy,
-		CreatedAt:   invite.CreatedAt,
-		ExpiresAt:   invite.ExpiresAt,
-		AcceptedAt:  invite.AcceptedAt,
-		RevokedAt:   invite.RevokedAt,
+		ID:                  invite.ID,
+		WorkspaceID:         invite.WorkspaceID,
+		Email:               invite.Email,
+		Role:                invite.Role,
+		Status:              inviteStatus(invite, now),
+		CreatedBy:           invite.CreatedBy,
+		CreatedAt:           invite.CreatedAt,
+		ExpiresAt:           invite.ExpiresAt,
+		AcceptedAt:          invite.AcceptedAt,
+		RevokedAt:           invite.RevokedAt,
+		EmailDeliveryStatus: deliveryStatus,
+		EmailQueuedAt:       invite.EmailQueuedAt,
+		EmailSentAt:         invite.EmailSentAt,
 	}
 }
 
@@ -732,6 +1021,9 @@ type rowScanner interface {
 
 func scanInvite(row rowScanner) (inviteRecord, error) {
 	var invite inviteRecord
+	var emailDeliveryStatus pgtype.Text
+	var emailQueuedAt pgtype.Timestamptz
+	var emailSentAt pgtype.Timestamptz
 	if err := row.Scan(
 		&invite.ID,
 		&invite.WorkspaceID,
@@ -739,12 +1031,25 @@ func scanInvite(row rowScanner) (inviteRecord, error) {
 		&invite.Email,
 		&invite.Role,
 		&invite.CreatedBy,
+		&invite.CreatedByName,
 		&invite.CreatedAt,
 		&invite.ExpiresAt,
 		&invite.AcceptedAt,
 		&invite.RevokedAt,
+		&emailDeliveryStatus,
+		&emailQueuedAt,
+		&emailSentAt,
 	); err != nil {
 		return inviteRecord{}, err
+	}
+	if emailDeliveryStatus.Valid {
+		invite.EmailDeliveryStatus = emailDeliveryStatus.String
+	}
+	if emailQueuedAt.Valid {
+		invite.EmailQueuedAt = &emailQueuedAt.Time
+	}
+	if emailSentAt.Valid {
+		invite.EmailSentAt = &emailSentAt.Time
 	}
 
 	return invite, nil

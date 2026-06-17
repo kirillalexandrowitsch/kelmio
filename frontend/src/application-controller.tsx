@@ -90,6 +90,7 @@ import {
   replaceWorkflowTransitions,
   resetTeamMemberPassword,
   revokeTeamInvite,
+  resendTeamInvite,
   removeIssueFromSprint,
   setIssueLabels,
   startSprint,
@@ -398,6 +399,8 @@ export function ApplicationController() {
     setCopiedTeamInviteId,
     revokingTeamInviteIds,
     setRevokingTeamInviteIds,
+    resendingTeamInviteIds,
+    setResendingTeamInviteIds,
     updatingTeamMemberIds,
     setUpdatingTeamMemberIds,
     passwordResetMemberId,
@@ -1274,6 +1277,7 @@ export function ApplicationController() {
       setTeamInviteLinksById({});
       setCopiedTeamInviteId("");
       setRevokingTeamInviteIds([]);
+      setResendingTeamInviteIds([]);
       return;
     }
 
@@ -1932,6 +1936,7 @@ export function ApplicationController() {
     setTeamInviteLinksById({});
     setCopiedTeamInviteId("");
     setRevokingTeamInviteIds([]);
+    setResendingTeamInviteIds([]);
     setUpdatingTeamMemberIds([]);
     setPasswordResetMemberId("");
     setTeamMemberResetPassword("");
@@ -3000,6 +3005,32 @@ export function ApplicationController() {
       setTeamInvitesError(apiErrorMessage(err, "Could not revoke invite."));
     } finally {
       setRevokingTeamInviteIds((currentIds) =>
+        currentIds.filter((currentId) => currentId !== invite.id),
+      );
+    }
+  }
+
+  async function handleResendTeamInvite(invite: TeamInvite) {
+    if (invite.status !== "pending") {
+      return;
+    }
+
+    setTeamInvitesError("");
+    setResendingTeamInviteIds((currentIds) =>
+      currentIds.includes(invite.id) ? currentIds : [...currentIds, invite.id],
+    );
+
+    try {
+      const resentInvite = await resendTeamInvite(invite.id);
+      setTeamInvites((currentInvites) =>
+        currentInvites.map((currentInvite) =>
+          currentInvite.id === resentInvite.id ? resentInvite : currentInvite,
+        ),
+      );
+    } catch (err) {
+      setTeamInvitesError(apiErrorMessage(err, "Could not resend invite email."));
+    } finally {
+      setResendingTeamInviteIds((currentIds) =>
         currentIds.filter((currentId) => currentId !== invite.id),
       );
     }
@@ -4859,6 +4890,9 @@ export function ApplicationController() {
           onRevokeTeamInvite={(invite) => {
             void handleRevokeTeamInvite(invite);
           }}
+          onResendTeamInvite={(invite) => {
+            void handleResendTeamInvite(invite);
+          }}
           onResetPassword={(event, memberId) => {
             void handleResetTeamMemberPassword(event, memberId);
           }}
@@ -4871,6 +4905,7 @@ export function ApplicationController() {
           onUsernameChange={setTeamMemberUsername}
           passwordResetMemberId={passwordResetMemberId}
           revokingTeamInviteIds={revokingTeamInviteIds}
+          resendingTeamInviteIds={resendingTeamInviteIds}
           resettingTeamMemberPasswordIds={resettingTeamMemberPasswordIds}
           teamInviteEmail={teamInviteEmail}
           teamInviteFormError={teamInviteFormError}

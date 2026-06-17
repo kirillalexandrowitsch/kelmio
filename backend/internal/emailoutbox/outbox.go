@@ -24,6 +24,7 @@ const (
 
 	TypeSystemTest    = "system_test"
 	TypePasswordReset = "password_reset"
+	TypeTeamInvite    = "team_invite"
 )
 
 var ErrInvalidInput = errors.New("email outbox input is invalid")

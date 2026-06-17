@@ -66,6 +66,7 @@ export function useWorkspaceAdminController() {
   >({});
   const [copiedTeamInviteId, setCopiedTeamInviteId] = useState("");
   const [revokingTeamInviteIds, setRevokingTeamInviteIds] = useState<string[]>([]);
+  const [resendingTeamInviteIds, setResendingTeamInviteIds] = useState<string[]>([]);
   const [updatingTeamMemberIds, setUpdatingTeamMemberIds] = useState<string[]>([]);
   const [passwordResetMemberId, setPasswordResetMemberId] = useState("");
   const [teamMemberResetPassword, setTeamMemberResetPassword] = useState("");
@@ -168,6 +169,8 @@ export function useWorkspaceAdminController() {
     setCopiedTeamInviteId,
     revokingTeamInviteIds,
     setRevokingTeamInviteIds,
+    resendingTeamInviteIds,
+    setResendingTeamInviteIds,
     updatingTeamMemberIds,
     setUpdatingTeamMemberIds,
     passwordResetMemberId,

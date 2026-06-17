@@ -16,6 +16,8 @@ func Render(email Email) (mailer.Message, error) {
 		return renderSystemTest(email)
 	case TypePasswordReset:
 		return renderPasswordReset(email)
+	case TypeTeamInvite:
+		return renderTeamInvite(email)
 	default:
 		return mailer.Message{}, fmt.Errorf("%w: unknown email type", ErrTemplateInvalid)
 	}
@@ -31,6 +33,38 @@ func renderSystemTest(email Email) (mailer.Message, error) {
 	if strings.TrimSpace(textBody) == "" && strings.TrimSpace(htmlBody) == "" {
 		return mailer.Message{}, fmt.Errorf("%w: text_body or html_body is required", ErrTemplateInvalid)
 	}
+	return mailer.Message{
+		To:       []string{email.RecipientEmail},
+		Subject:  subject,
+		TextBody: textBody,
+		HTMLBody: htmlBody,
+	}, nil
+}
+
+func renderTeamInvite(email Email) (mailer.Message, error) {
+	inviteURL, ok := stringField(email.TemplateData, "invite_url")
+	if !ok {
+		inviteURL, ok = stringField(email.TemplateData, "invite_url_path")
+	}
+	if !ok {
+		return mailer.Message{}, fmt.Errorf("%w: invite_url is required", ErrTemplateInvalid)
+	}
+	workspaceName, _ := stringField(email.TemplateData, "workspace_name")
+	if workspaceName == "" {
+		workspaceName = "Team Task Tracker"
+	}
+	inviterDisplayName, _ := stringField(email.TemplateData, "inviter_display_name")
+	if inviterDisplayName == "" {
+		inviterDisplayName = "An administrator"
+	}
+	role, _ := stringField(email.TemplateData, "role")
+	if role == "" {
+		role = "member"
+	}
+
+	subject := fmt.Sprintf("You're invited to %s", workspaceName)
+	textBody := fmt.Sprintf("%s invited you to join %s as %s.\n\nAccept your invite:\n%s\n\nIf you did not expect this invite, you can ignore this email.", inviterDisplayName, workspaceName, role, inviteURL)
+	htmlBody := fmt.Sprintf("<p>%s invited you to join <strong>%s</strong> as %s.</p><p><a href=\"%s\">Accept invite</a></p><p>If you did not expect this invite, you can ignore this email.</p>", htmlEscape(inviterDisplayName), htmlEscape(workspaceName), htmlEscape(role), htmlEscape(inviteURL))
 	return mailer.Message{
 		To:       []string{email.RecipientEmail},
 		Subject:  subject,

@@ -97,6 +97,29 @@ func TestRenderPasswordResetTemplate(t *testing.T) {
 	}
 }
 
+func TestRenderTeamInviteTemplate(t *testing.T) {
+	t.Parallel()
+	msg, err := Render(Email{
+		EmailType:      TypeTeamInvite,
+		RecipientEmail: "member@example.com",
+		TemplateData: map[string]any{
+			"invite_url":           "http://localhost:5173/accept-invite?token=secret-token",
+			"workspace_name":       "Demo Workspace",
+			"role":                 "member",
+			"inviter_display_name": "Admin User",
+		},
+	})
+	if err != nil {
+		t.Fatalf("Render() error = %v", err)
+	}
+	if msg.Subject != "You're invited to Demo Workspace" {
+		t.Fatalf("Subject = %q", msg.Subject)
+	}
+	if !strings.Contains(msg.TextBody, "secret-token") || !strings.Contains(msg.HTMLBody, "Accept invite") {
+		t.Fatalf("message = %#v, want invite link in text/html", msg)
+	}
+}
+
 func TestRenderRejectsUnknownOrInvalidTemplate(t *testing.T) {
 	t.Parallel()
 	tests := []Email{
@@ -104,6 +127,7 @@ func TestRenderRejectsUnknownOrInvalidTemplate(t *testing.T) {
 		{EmailType: TypeSystemTest, RecipientEmail: "member@example.com", TemplateData: map[string]any{"text_body": "body"}},
 		{EmailType: TypeSystemTest, RecipientEmail: "member@example.com", TemplateData: map[string]any{"subject": "subject"}},
 		{EmailType: TypePasswordReset, RecipientEmail: "member@example.com", TemplateData: map[string]any{}},
+		{EmailType: TypeTeamInvite, RecipientEmail: "member@example.com", TemplateData: map[string]any{}},
 	}
 	for _, email := range tests {
 		if _, err := Render(email); err == nil {

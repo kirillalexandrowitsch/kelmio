@@ -72,6 +72,12 @@ export type TeamMember = {
 };
 
 export type TeamInviteStatus = "pending" | "accepted" | "revoked" | "expired";
+export type TeamInviteEmailDeliveryStatus =
+  | "not_sent"
+  | "pending"
+  | "processing"
+  | "sent"
+  | "failed";
 
 export type TeamInvite = {
   id: string;
@@ -84,6 +90,9 @@ export type TeamInvite = {
   expires_at: string;
   accepted_at: string | null;
   revoked_at: string | null;
+  email_delivery_status: TeamInviteEmailDeliveryStatus;
+  email_queued_at: string | null;
+  email_sent_at: string | null;
 };
 
 export type CreateTeamInviteResponse = TeamInvite & {

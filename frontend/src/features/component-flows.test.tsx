@@ -618,6 +618,7 @@ function teamProps(currentUser: CurrentUser): ComponentProps<typeof TeamSection>
     onInviteRoleChange: vi.fn(),
     onPasswordChange: vi.fn(),
     onRevokeTeamInvite: vi.fn(),
+    onResendTeamInvite: vi.fn(),
     onResetPassword: vi.fn(),
     onResetPasswordChange: vi.fn(),
     onRoleChange: vi.fn(),
@@ -626,6 +627,7 @@ function teamProps(currentUser: CurrentUser): ComponentProps<typeof TeamSection>
     onUsernameChange: vi.fn(),
     passwordResetMemberId: "",
     revokingTeamInviteIds: [],
+    resendingTeamInviteIds: [],
     resettingTeamMemberPasswordIds: [],
     teamInviteEmail: "",
     teamInviteFormError: "",
@@ -657,4 +659,38 @@ test("team view exposes admin controls and member read-only state", () => {
   assert.ok(screen.getByRole("heading", { name: "Team management" }));
   assert.equal(screen.queryByRole("button", { name: "Create invite" }), null);
   assert.equal(screen.queryByRole("button", { name: "Create member" }), null);
+});
+
+test("team invites show delivery state and resend controls", async () => {
+  const user = userEvent.setup();
+  const pendingInvite = {
+    id: "invite-1",
+    workspace_id: "workspace-1",
+    email: "new-member@example.com",
+    role: "member" as const,
+    status: "pending" as const,
+    created_by: admin.id,
+    created_at: "2026-06-17T10:00:00Z",
+    expires_at: "2026-06-24T10:00:00Z",
+    accepted_at: null,
+    revoked_at: null,
+    email_delivery_status: "pending" as const,
+    email_queued_at: "2026-06-17T10:00:00Z",
+    email_sent_at: null,
+  };
+  const props = {
+    ...teamProps(admin),
+    copiedTeamInviteId: "invite-1",
+    teamInvites: [pendingInvite],
+    teamInviteLinksById: {
+      "invite-1": "http://localhost:5173/accept-invite?token=invite-token",
+    },
+  };
+  render(<TeamSection {...props} />);
+
+  assert.ok(screen.getByText("Email: Pending"));
+  await user.click(screen.getByRole("button", { name: "Resend email" }));
+  assert.equal(props.onResendTeamInvite.mock.calls[0]?.[0], pendingInvite);
+  await user.click(screen.getByRole("button", { name: "Copied" }));
+  assert.equal(props.onCopyTeamInviteLink.mock.calls[0]?.[0], pendingInvite.id);
 });
