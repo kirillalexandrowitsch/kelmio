@@ -25,6 +25,7 @@ import (
 	"team-task-tracker/backend/internal/invites"
 	"team-task-tracker/backend/internal/issues"
 	"team-task-tracker/backend/internal/labels"
+	appmetrics "team-task-tracker/backend/internal/metrics"
 	"team-task-tracker/backend/internal/notifications"
 	"team-task-tracker/backend/internal/projectmembers"
 	"team-task-tracker/backend/internal/projects"
@@ -61,6 +62,14 @@ func main() {
 	mux.HandleFunc("GET /api/v1/ready", readinessHandler(db))
 	mux.HandleFunc("GET /api/v1/version", versionHandler(cfg))
 
+	var metricsRecorder *appmetrics.AppMetrics
+	if cfg.MetricsEnabled {
+		metricsRecorder = appmetrics.NewAppMetrics()
+		metricsRecorder.RegisterDatabaseReadyCollector(db)
+		metricsRecorder.RegisterEmailOutboxCollector(db)
+		mux.Handle("GET /metrics", metricsRecorder.Handler(cfg.MetricsAuthToken))
+	}
+
 	csrfManager, err := csrf.NewManager(cfg.CSRFSecret)
 	if err != nil {
 		logger.Error("csrf manager setup failed", "error", err)
@@ -78,6 +87,7 @@ func main() {
 		auth.WithPasswordResetTTL(cfg.PasswordResetTTL),
 		auth.WithPasswordResetLimiter(passwordResetLimiter),
 		auth.WithPasswordResetBaseURL(cfg.PublicAppURL),
+		auth.WithMetrics(metricsRecorder),
 	)
 	authHandler.RegisterRoutes(mux)
 	notificationService := notifications.NewService()
@@ -118,9 +128,14 @@ func main() {
 	notificationsHandler := notifications.NewHandler(db, authHandler)
 	notificationsHandler.RegisterRoutes(mux)
 
+	handler := http.Handler(recoverPanic(logger, securityHeaders(requestBodyLimit(maxRequestBodyBytes, cors(cfg.TrustedOrigins, csrfProtection(csrfManager, mux))))))
+	if metricsRecorder != nil {
+		handler = metricsRecorder.HTTPMiddleware(handler)
+	}
+
 	server := &http.Server{
 		Addr:         ":" + cfg.Port,
-		Handler:      requestID(requestLogger(logger, recoverPanic(logger, securityHeaders(requestBodyLimit(maxRequestBodyBytes, cors(cfg.TrustedOrigins, csrfProtection(csrfManager, mux))))))),
+		Handler:      requestID(requestLogger(logger, handler)),
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 10 * time.Second,
 		IdleTimeout:  120 * time.Second,

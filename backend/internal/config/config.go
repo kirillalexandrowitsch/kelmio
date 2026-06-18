@@ -46,6 +46,9 @@ type Config struct {
 	EmailWorkerPollInterval time.Duration
 	EmailMaxAttempts        int
 	PasswordResetTTL        time.Duration
+	MetricsEnabled          bool
+	MetricsAuthToken        string
+	EmailWorkerMetricsPort  string
 }
 
 func Load() (Config, error) {
@@ -75,6 +78,9 @@ func Load() (Config, error) {
 		EmailWorkerPollInterval: durationEnv("EMAIL_WORKER_POLL_INTERVAL", 10*time.Second),
 		EmailMaxAttempts:        intEnv("EMAIL_MAX_ATTEMPTS", 5),
 		PasswordResetTTL:        durationEnv("PASSWORD_RESET_TTL", 30*time.Minute),
+		MetricsAuthToken:        env("METRICS_AUTH_TOKEN", ""),
+		MetricsEnabled:          metricsEnabled(appEnv),
+		EmailWorkerMetricsPort:  env("EMAIL_WORKER_METRICS_PORT", "9091"),
 	}
 
 	if cfg.AppEnv == EnvProduction && cfg.FrontendURL == "" {
@@ -115,6 +121,7 @@ func (cfg Config) Validate() error {
 		problems = append(problems, "RATE_LIMIT_LOGIN_PER_MINUTE must be greater than 0")
 	}
 	problems = append(problems, validateEmailConfig(cfg)...)
+	problems = append(problems, validateMetricsConfig(cfg)...)
 
 	if cfg.AppEnv == EnvProduction {
 		problems = append(problems, validateProduction(cfg)...)
@@ -239,6 +246,20 @@ func boolEnv(key string, fallback bool) bool {
 	return parsed
 }
 
+func metricsEnabled(appEnv string) bool {
+	if value, ok := os.LookupEnv("METRICS_ENABLED"); ok {
+		trimmed := strings.TrimSpace(value)
+		if trimmed != "" {
+			parsed, err := strconv.ParseBool(trimmed)
+			return err == nil && parsed
+		}
+	}
+	if appEnv == EnvProduction {
+		return strings.TrimSpace(os.Getenv("METRICS_AUTH_TOKEN")) != ""
+	}
+	return true
+}
+
 func intEnv(key string, fallback int) int {
 	value := env(key, "")
 	if value == "" {
@@ -322,6 +343,25 @@ func validateEmailConfig(cfg Config) []string {
 		problems = append(problems, "SMTP_TLS_MODE must be starttls or tls in production when EMAIL_DELIVERY_ENABLED=true")
 	}
 	return problems
+}
+
+func validateMetricsConfig(cfg Config) []string {
+	var problems []string
+	if err := validateNamedPort(cfg.EmailWorkerMetricsPort, "EMAIL_WORKER_METRICS_PORT"); err != nil {
+		problems = append(problems, err.Error())
+	}
+	if cfg.AppEnv == EnvProduction && cfg.MetricsEnabled && len(strings.TrimSpace(cfg.MetricsAuthToken)) < 32 {
+		problems = append(problems, "METRICS_AUTH_TOKEN must be at least 32 characters in production when METRICS_ENABLED=true")
+	}
+	return problems
+}
+
+func validateNamedPort(port string, name string) error {
+	value, err := strconv.Atoi(port)
+	if err != nil || value < 1 || value > 65535 {
+		return fmt.Errorf("%s must be a valid port from 1 to 65535", name)
+	}
+	return nil
 }
 
 func validateEmailAddress(value string, name string) error {

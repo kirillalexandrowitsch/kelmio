@@ -88,6 +88,24 @@ func TestRetryAfterSeconds(t *testing.T) {
 	}
 }
 
+func TestLoginRecordsInvalidOutcomeForMalformedRequest(t *testing.T) {
+	t.Parallel()
+
+	recorder := &fakeLoginMetrics{}
+	handler := NewHandler(nil, time.Hour, false, nil, nil, WithMetrics(recorder))
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", strings.NewReader(`{"login":`))
+	response := httptest.NewRecorder()
+
+	handler.login(response, request)
+
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400", response.Code)
+	}
+	if len(recorder.outcomes) != 1 || recorder.outcomes[0] != "invalid" {
+		t.Fatalf("recorded outcomes = %#v, want invalid", recorder.outcomes)
+	}
+}
+
 func TestHashToken(t *testing.T) {
 	t.Parallel()
 
@@ -104,6 +122,14 @@ func TestHashToken(t *testing.T) {
 	if first == third {
 		t.Fatal("different tokens should produce different hashes")
 	}
+}
+
+type fakeLoginMetrics struct {
+	outcomes []string
+}
+
+func (m *fakeLoginMetrics) RecordAuthLoginOutcome(outcome string) {
+	m.outcomes = append(m.outcomes, outcome)
 }
 
 func TestNormalizeDisplayName(t *testing.T) {

@@ -36,6 +36,10 @@ var errPasswordResetRevoked = errors.New("password reset token revoked")
 
 type HandlerOption func(*Handler)
 
+type LoginMetrics interface {
+	RecordAuthLoginOutcome(outcome string)
+}
+
 type Handler struct {
 	db                   *pgxpool.Pool
 	sessionTTL           time.Duration
@@ -45,6 +49,7 @@ type Handler struct {
 	passwordResetLimiter *ratelimit.Limiter
 	passwordResetTTL     time.Duration
 	passwordResetBaseURL string
+	metrics              LoginMetrics
 }
 
 type loginRequest struct {
@@ -189,6 +194,12 @@ func WithPasswordResetBaseURL(baseURL string) HandlerOption {
 	}
 }
 
+func WithMetrics(metrics LoginMetrics) HandlerOption {
+	return func(handler *Handler) {
+		handler.metrics = metrics
+	}
+}
+
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/auth/login", h.login)
 	mux.HandleFunc("POST /api/v1/auth/logout", h.logout)
@@ -225,12 +236,14 @@ func (h *Handler) CurrentUser(r *http.Request) (CurrentUser, error) {
 func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 	var req loginRequest
 	if err := decodeJSON(w, r, &req); err != nil {
+		h.recordLoginOutcome("invalid")
 		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
 		return
 	}
 
 	identifier := req.identifier()
 	if identifier == "" || req.Password == "" {
+		h.recordLoginOutcome("invalid")
 		writeError(w, http.StatusBadRequest, "invalid_request", "login and password are required")
 		return
 	}
@@ -239,6 +252,7 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 	if h.loginLimiter != nil {
 		result := h.loginLimiter.Allow(rateLimitKey)
 		if !result.Allowed {
+			h.recordLoginOutcome("rate_limited")
 			w.Header().Set("Retry-After", strconv.Itoa(retryAfterSeconds(result.RetryAfter)))
 			writeError(w, http.StatusTooManyRequests, "rate_limited", "too many login attempts, try again later")
 			return
@@ -253,27 +267,32 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 	user, err := h.userByIdentifier(ctx, identifier)
 	if err != nil {
 		if errors.Is(err, errInvalidCredentials) {
+			h.recordLoginOutcome("invalid")
 			writeError(w, http.StatusUnauthorized, "invalid_credentials", "invalid login or password")
 			return
 		}
 
+		h.recordLoginOutcome("error")
 		writeError(w, http.StatusInternalServerError, "internal_error", "login failed")
 		return
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
+		h.recordLoginOutcome("invalid")
 		writeError(w, http.StatusUnauthorized, "invalid_credentials", "invalid login or password")
 		return
 	}
 
 	token, err := newSessionToken()
 	if err != nil {
+		h.recordLoginOutcome("error")
 		writeError(w, http.StatusInternalServerError, "internal_error", "could not create session")
 		return
 	}
 
 	expiresAt := time.Now().UTC().Add(h.sessionTTL)
 	if err := h.createSession(ctx, user.ID, hashToken(token), expiresAt); err != nil {
+		h.recordLoginOutcome("error")
 		writeError(w, http.StatusInternalServerError, "internal_error", "could not create session")
 		return
 	}
@@ -281,12 +300,19 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 	if h.loginLimiter != nil {
 		h.loginLimiter.Reset(rateLimitKey)
 	}
+	h.recordLoginOutcome("success")
 
 	http.SetCookie(w, sessionCookie(token, expiresAt, int(h.sessionTTL.Seconds()), h.sessionCookieSecure))
 	writeJSON(w, http.StatusOK, loginResponse{
 		User:      user.toResponse(),
 		ExpiresAt: expiresAt,
 	})
+}
+
+func (h *Handler) recordLoginOutcome(outcome string) {
+	if h.metrics != nil {
+		h.metrics.RecordAuthLoginOutcome(outcome)
+	}
 }
 
 func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {

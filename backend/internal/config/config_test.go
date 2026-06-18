@@ -75,6 +75,15 @@ func TestLoadDevelopmentDefaults(t *testing.T) {
 	if cfg.PasswordResetTTL != 30*time.Minute {
 		t.Fatalf("PasswordResetTTL = %s, want 30m", cfg.PasswordResetTTL)
 	}
+	if !cfg.MetricsEnabled {
+		t.Fatal("MetricsEnabled = false, want true in development")
+	}
+	if cfg.MetricsAuthToken != "" {
+		t.Fatalf("MetricsAuthToken = %q, want empty development token", cfg.MetricsAuthToken)
+	}
+	if cfg.EmailWorkerMetricsPort != "9091" {
+		t.Fatalf("EmailWorkerMetricsPort = %q, want 9091", cfg.EmailWorkerMetricsPort)
+	}
 }
 
 func TestLoadProductionRequiresPublicAppURL(t *testing.T) {
@@ -161,6 +170,51 @@ func TestLoadValidProductionConfig(t *testing.T) {
 	}
 	if cfg.EmailDeliveryEnabled {
 		t.Fatal("EmailDeliveryEnabled = true, want false default in production")
+	}
+	if cfg.MetricsEnabled {
+		t.Fatal("MetricsEnabled = true, want false production default without token")
+	}
+}
+
+func TestLoadValidProductionMetricsConfig(t *testing.T) {
+	setValidProductionEnv(t)
+	t.Setenv("METRICS_AUTH_TOKEN", "0123456789abcdef0123456789abcdef")
+	t.Setenv("EMAIL_WORKER_METRICS_PORT", "19091")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	if !cfg.MetricsEnabled {
+		t.Fatal("MetricsEnabled = false, want true when production token is configured")
+	}
+	if cfg.MetricsAuthToken != "0123456789abcdef0123456789abcdef" {
+		t.Fatalf("MetricsAuthToken = %q, want configured token", cfg.MetricsAuthToken)
+	}
+	if cfg.EmailWorkerMetricsPort != "19091" {
+		t.Fatalf("EmailWorkerMetricsPort = %q, want configured port", cfg.EmailWorkerMetricsPort)
+	}
+}
+
+func TestLoadProductionMetricsEnabledRequiresLongToken(t *testing.T) {
+	setValidProductionEnv(t)
+	t.Setenv("METRICS_ENABLED", "true")
+	t.Setenv("METRICS_AUTH_TOKEN", "short")
+
+	_, err := Load()
+	if err == nil || !strings.Contains(err.Error(), "METRICS_AUTH_TOKEN must be at least 32 characters in production") {
+		t.Fatalf("Load() error = %v, want metrics token length error", err)
+	}
+}
+
+func TestLoadRejectsInvalidWorkerMetricsPort(t *testing.T) {
+	clearConfigEnv(t)
+	t.Setenv("EMAIL_WORKER_METRICS_PORT", "70000")
+
+	_, err := Load()
+	if err == nil || !strings.Contains(err.Error(), "EMAIL_WORKER_METRICS_PORT must be a valid port") {
+		t.Fatalf("Load() error = %v, want invalid worker metrics port error", err)
 	}
 }
 
@@ -419,6 +473,9 @@ func clearConfigEnv(t *testing.T) {
 		"EMAIL_WORKER_POLL_INTERVAL",
 		"EMAIL_MAX_ATTEMPTS",
 		"PASSWORD_RESET_TTL",
+		"METRICS_ENABLED",
+		"METRICS_AUTH_TOKEN",
+		"EMAIL_WORKER_METRICS_PORT",
 		"POSTGRES_HOST",
 		"POSTGRES_PORT",
 		"POSTGRES_DB",
