@@ -1,6 +1,6 @@
 SHELL := /bin/sh
 
-.PHONY: help doctor dev down logs ps db-up wait-db migrate-up seed setup-db backup restore restore-check backend-dev email-worker backend-test backend-integration-test frontend-install frontend-dev frontend-build frontend-test frontend-e2e-install frontend-e2e smoke-api smoke-production prod-config-check prod-compose-check prod-stack-qa verify
+.PHONY: help doctor dev down logs ps db-up wait-db migrate-up seed setup-db backup restore restore-check backend-dev email-worker email-diagnostics backend-test backend-integration-test frontend-install frontend-dev frontend-build frontend-test frontend-e2e-install frontend-e2e smoke-api smoke-production prod-config-check prod-compose-check prod-stack-qa verify
 
 help:
 	@printf '%s\n' 'Available commands:'
@@ -19,6 +19,7 @@ help:
 	@printf '%s\n' '  make restore-check    Verify BACKUP in isolated temporary PostgreSQL'
 	@printf '%s\n' '  make backend-dev      Run backend locally'
 	@printf '%s\n' '  make email-worker     Run email delivery worker locally'
+	@printf '%s\n' '  make email-diagnostics Show read-only email outbox diagnostics'
 	@printf '%s\n' '  make backend-test     Run Go tests'
 	@printf '%s\n' '  make backend-integration-test Run Go integration tests against local PostgreSQL'
 	@printf '%s\n' '  make frontend-install Install frontend dependencies'
@@ -80,6 +81,9 @@ backend-dev:
 email-worker:
 	cd backend && go run ./cmd/email-worker
 
+email-diagnostics:
+	sh scripts/email-diagnostics.sh
+
 backend-test:
 	cd backend && go test ./...
 
@@ -128,6 +132,7 @@ verify:
 	sh -n scripts/backup-db.sh
 	sh -n scripts/restore-db.sh
 	sh -n scripts/restore-check-db.sh
+	sh -n scripts/email-diagnostics.sh
 	./scripts/doctor.sh
 	cd backend && go test ./...
 	cd frontend && npm test

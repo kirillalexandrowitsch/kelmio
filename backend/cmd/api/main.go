@@ -21,6 +21,7 @@ import (
 	"team-task-tracker/backend/internal/config"
 	"team-task-tracker/backend/internal/csrf"
 	"team-task-tracker/backend/internal/database"
+	"team-task-tracker/backend/internal/emaildiagnostics"
 	"team-task-tracker/backend/internal/invites"
 	"team-task-tracker/backend/internal/issues"
 	"team-task-tracker/backend/internal/labels"
@@ -104,6 +105,9 @@ func main() {
 
 	invitesHandler := invites.NewHandler(db, authHandler, invites.WithInviteBaseURL(cfg.PublicAppURL))
 	invitesHandler.RegisterRoutes(mux)
+
+	emailDiagnosticsHandler := emaildiagnostics.NewHandler(db, authHandler)
+	emailDiagnosticsHandler.RegisterRoutes(mux)
 
 	sprintsHandler := sprints.NewHandler(db, authHandler, notificationService)
 	sprintsHandler.RegisterRoutes(mux)

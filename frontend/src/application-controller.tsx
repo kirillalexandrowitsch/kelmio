@@ -8,6 +8,7 @@ import {
   CurrentUser,
   CreateWorkflowStatusInput,
   CreateAutomationRuleInput,
+  EmailDiagnostics,
   TeamInvite,
   Issue,
   IssueActivity,
@@ -60,6 +61,7 @@ import {
   deleteAutomationRule,
   getIssue,
   getCurrentUser,
+  getEmailDiagnostics,
   getProject,
   getProjectWorkflow,
   getRuntimeVersion,
@@ -401,6 +403,12 @@ export function ApplicationController() {
     setRevokingTeamInviteIds,
     resendingTeamInviteIds,
     setResendingTeamInviteIds,
+    emailDiagnostics,
+    setEmailDiagnostics,
+    emailDiagnosticsError,
+    setEmailDiagnosticsError,
+    isLoadingEmailDiagnostics,
+    setIsLoadingEmailDiagnostics,
     updatingTeamMemberIds,
     setUpdatingTeamMemberIds,
     passwordResetMemberId,
@@ -1278,6 +1286,9 @@ export function ApplicationController() {
       setCopiedTeamInviteId("");
       setRevokingTeamInviteIds([]);
       setResendingTeamInviteIds([]);
+      setEmailDiagnostics(null);
+      setEmailDiagnosticsError("");
+      setIsLoadingEmailDiagnostics(false);
       return;
     }
 
@@ -1285,6 +1296,8 @@ export function ApplicationController() {
     setTeamInvitesError("");
     setTeamInviteFormError("");
     setIsLoadingTeamInvites(true);
+    setEmailDiagnosticsError("");
+    setIsLoadingEmailDiagnostics(true);
 
     listTeamInvites()
       .then((response) => {
@@ -1300,6 +1313,25 @@ export function ApplicationController() {
       .finally(() => {
         if (isMounted) {
           setIsLoadingTeamInvites(false);
+        }
+      });
+
+    getEmailDiagnostics()
+      .then((diagnostics) => {
+        if (isMounted) {
+          setEmailDiagnostics(diagnostics);
+        }
+      })
+      .catch((err) => {
+        if (isMounted) {
+          setEmailDiagnosticsError(
+            apiErrorMessage(err, "Could not load email diagnostics."),
+          );
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsLoadingEmailDiagnostics(false);
         }
       });
 
@@ -3033,6 +3065,26 @@ export function ApplicationController() {
       setResendingTeamInviteIds((currentIds) =>
         currentIds.filter((currentId) => currentId !== invite.id),
       );
+    }
+  }
+
+  async function handleRefreshEmailDiagnostics() {
+    if (!user || user.workspace.role !== "admin") {
+      return;
+    }
+
+    setEmailDiagnosticsError("");
+    setIsLoadingEmailDiagnostics(true);
+
+    try {
+      const diagnostics: EmailDiagnostics = await getEmailDiagnostics();
+      setEmailDiagnostics(diagnostics);
+    } catch (err) {
+      setEmailDiagnosticsError(
+        apiErrorMessage(err, "Could not load email diagnostics."),
+      );
+    } finally {
+      setIsLoadingEmailDiagnostics(false);
     }
   }
 
@@ -4871,9 +4923,12 @@ export function ApplicationController() {
           canResetTeamMemberPassword={canResetTeamMemberPassword}
           copiedTeamInviteId={copiedTeamInviteId}
           currentUser={user}
+          emailDiagnostics={emailDiagnostics}
+          emailDiagnosticsError={emailDiagnosticsError}
           isCreatingTeamInvite={isCreatingTeamInvite}
           isActive={activeSection === "team"}
           isCreatingTeamMember={isCreatingTeamMember}
+          isLoadingEmailDiagnostics={isLoadingEmailDiagnostics}
           isLoadingTeamInvites={isLoadingTeamInvites}
           isLoadingTeamMembers={isLoadingTeamMembers}
           onCancelResetPassword={cancelResetTeamMemberPassword}
@@ -4889,6 +4944,9 @@ export function ApplicationController() {
           onPasswordChange={setTeamMemberPassword}
           onRevokeTeamInvite={(invite) => {
             void handleRevokeTeamInvite(invite);
+          }}
+          onRefreshEmailDiagnostics={() => {
+            void handleRefreshEmailDiagnostics();
           }}
           onResendTeamInvite={(invite) => {
             void handleResendTeamInvite(invite);

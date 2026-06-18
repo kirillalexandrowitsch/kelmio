@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type {
+  EmailDiagnostics,
   Label,
   Project,
   ProjectMember,
@@ -67,6 +68,11 @@ export function useWorkspaceAdminController() {
   const [copiedTeamInviteId, setCopiedTeamInviteId] = useState("");
   const [revokingTeamInviteIds, setRevokingTeamInviteIds] = useState<string[]>([]);
   const [resendingTeamInviteIds, setResendingTeamInviteIds] = useState<string[]>([]);
+  const [emailDiagnostics, setEmailDiagnostics] =
+    useState<EmailDiagnostics | null>(null);
+  const [emailDiagnosticsError, setEmailDiagnosticsError] = useState("");
+  const [isLoadingEmailDiagnostics, setIsLoadingEmailDiagnostics] =
+    useState(false);
   const [updatingTeamMemberIds, setUpdatingTeamMemberIds] = useState<string[]>([]);
   const [passwordResetMemberId, setPasswordResetMemberId] = useState("");
   const [teamMemberResetPassword, setTeamMemberResetPassword] = useState("");
@@ -171,6 +177,12 @@ export function useWorkspaceAdminController() {
     setRevokingTeamInviteIds,
     resendingTeamInviteIds,
     setResendingTeamInviteIds,
+    emailDiagnostics,
+    setEmailDiagnostics,
+    emailDiagnosticsError,
+    setEmailDiagnosticsError,
+    isLoadingEmailDiagnostics,
+    setIsLoadingEmailDiagnostics,
     updatingTeamMemberIds,
     setUpdatingTeamMemberIds,
     passwordResetMemberId,

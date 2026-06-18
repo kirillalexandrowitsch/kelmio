@@ -95,6 +95,33 @@ export type TeamInvite = {
   email_sent_at: string | null;
 };
 
+export type EmailDiagnosticsCounts = {
+  pending: number;
+  processing: number;
+  sent: number;
+  failed: number;
+};
+
+export type EmailDiagnosticsFailure = {
+  id: string;
+  email_type: string;
+  recipient_email: string;
+  attempt_count: number;
+  last_error: string;
+  created_at: string;
+  updated_at: string;
+  next_attempt_at: string;
+  sent_at: string | null;
+};
+
+export type EmailDiagnostics = {
+  total: number;
+  counts: EmailDiagnosticsCounts;
+  oldest_pending_at: string | null;
+  oldest_processing_started_at: string | null;
+  recent_terminal_failures: EmailDiagnosticsFailure[];
+};
+
 export type CreateTeamInviteResponse = TeamInvite & {
   accept_token: string;
   accept_url_path: string;

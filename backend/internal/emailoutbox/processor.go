@@ -12,13 +12,21 @@ type StateStore interface {
 	MarkFailed(ctx context.Context, id string, cause error) error
 }
 
-func ProcessRecord(ctx context.Context, store StateStore, client mailer.Client, email Email, maxAttempts int) error {
+type ProcessResult struct {
+	Status string
+}
+
+func ProcessRecord(ctx context.Context, store StateStore, client mailer.Client, email Email, maxAttempts int) (ProcessResult, error) {
 	message, err := Render(email)
 	if err != nil {
-		return store.MarkFailed(ctx, email.ID, err)
+		return ProcessResult{Status: StatusFailed}, store.MarkFailed(ctx, email.ID, err)
 	}
 	if err := client.Send(ctx, message); err != nil {
-		return store.MarkRetry(ctx, email, err, maxAttempts)
+		status := StatusPending
+		if maxAttempts <= 0 || email.AttemptCount >= maxAttempts {
+			status = StatusFailed
+		}
+		return ProcessResult{Status: status}, store.MarkRetry(ctx, email, err, maxAttempts)
 	}
-	return store.MarkSent(ctx, email.ID)
+	return ProcessResult{Status: StatusSent}, store.MarkSent(ctx, email.ID)
 }

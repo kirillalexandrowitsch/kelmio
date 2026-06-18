@@ -77,11 +77,12 @@ func processBatch(ctx context.Context, logger *slog.Logger, store *emailoutbox.S
 		return 0, err
 	}
 	for _, email := range emails {
-		if err := emailoutbox.ProcessRecord(ctx, store, client, email, maxAttempts); err != nil {
-			logger.Error("email record processing failed", "email_outbox_id", email.ID, "email_type", email.EmailType, "attempt_count", email.AttemptCount, "error", err)
+		result, err := emailoutbox.ProcessRecord(ctx, store, client, email, maxAttempts)
+		if err != nil {
+			logger.Error("email record processing failed", "email_outbox_id", email.ID, "email_type", email.EmailType, "attempt_count", email.AttemptCount, "target_status", result.Status, "error", err)
 			continue
 		}
-		logger.Info("email record processed", "email_outbox_id", email.ID, "email_type", email.EmailType, "attempt_count", email.AttemptCount)
+		logger.Info("email record processed", "email_outbox_id", email.ID, "email_type", email.EmailType, "attempt_count", email.AttemptCount, "status", result.Status)
 	}
 	return len(emails), nil
 }

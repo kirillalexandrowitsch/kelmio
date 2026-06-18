@@ -17,6 +17,7 @@ import {
   type CreateTeamInviteResponse,
   type CreateTeamMemberInput,
   type CreateWorkflowStatusInput,
+  type EmailDiagnostics,
   type InvitePreview,
   type Issue,
   type IssueComment,
@@ -86,6 +87,7 @@ export type {
   CreateTeamInviteInput,
   CreateTeamInviteResponse,
   CreateWorkflowStatusInput,
+  EmailDiagnostics,
   CreateAutomationRuleInput,
   InvitePreview,
   Issue,
@@ -416,6 +418,10 @@ export async function listTeamMembers() {
 
 export async function listTeamInvites() {
   return request<ListTeamInvitesResponse>("/api/v1/team/invites");
+}
+
+export async function getEmailDiagnostics() {
+  return request<EmailDiagnostics>("/api/v1/email/diagnostics");
 }
 
 export async function createTeamInvite(input: CreateTeamInviteInput) {

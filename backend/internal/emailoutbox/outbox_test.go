@@ -173,8 +173,12 @@ func TestProcessRecordMarksSent(t *testing.T) {
 	store := &fakeStateStore{}
 	client := fakeMailer{}
 	email := validEmailForProcessing()
-	if err := ProcessRecord(context.Background(), store, client, email, 5); err != nil {
+	result, err := ProcessRecord(context.Background(), store, client, email, 5)
+	if err != nil {
 		t.Fatalf("ProcessRecord() error = %v", err)
+	}
+	if result.Status != StatusSent {
+		t.Fatalf("status = %q, want sent", result.Status)
 	}
 	if store.sentID != email.ID {
 		t.Fatalf("sentID = %q, want %q", store.sentID, email.ID)
@@ -188,8 +192,12 @@ func TestProcessRecordMarksRetryAndFailed(t *testing.T) {
 	client := fakeMailer{err: sendErr}
 	email := validEmailForProcessing()
 	email.AttemptCount = 1
-	if err := ProcessRecord(context.Background(), store, client, email, 5); err != nil {
+	result, err := ProcessRecord(context.Background(), store, client, email, 5)
+	if err != nil {
 		t.Fatalf("ProcessRecord retry error = %v", err)
+	}
+	if result.Status != StatusPending {
+		t.Fatalf("retry status = %q, want pending", result.Status)
 	}
 	if store.retryID != email.ID {
 		t.Fatalf("retryID = %q, want %q", store.retryID, email.ID)
@@ -197,8 +205,12 @@ func TestProcessRecordMarksRetryAndFailed(t *testing.T) {
 
 	store = &fakeStateStore{}
 	email.AttemptCount = 5
-	if err := ProcessRecord(context.Background(), store, client, email, 5); err != nil {
+	result, err = ProcessRecord(context.Background(), store, client, email, 5)
+	if err != nil {
 		t.Fatalf("ProcessRecord failed error = %v", err)
+	}
+	if result.Status != StatusFailed {
+		t.Fatalf("failed status = %q, want failed", result.Status)
 	}
 	if store.failedID != email.ID {
 		t.Fatalf("failedID = %q, want %q", store.failedID, email.ID)
@@ -210,11 +222,29 @@ func TestProcessRecordMarksFailedForTemplateError(t *testing.T) {
 	store := &fakeStateStore{}
 	email := validEmailForProcessing()
 	email.EmailType = "unknown"
-	if err := ProcessRecord(context.Background(), store, fakeMailer{}, email, 5); err != nil {
+	result, err := ProcessRecord(context.Background(), store, fakeMailer{}, email, 5)
+	if err != nil {
 		t.Fatalf("ProcessRecord() error = %v", err)
+	}
+	if result.Status != StatusFailed {
+		t.Fatalf("status = %q, want failed", result.Status)
 	}
 	if store.failedID != email.ID {
 		t.Fatalf("failedID = %q, want %q", store.failedID, email.ID)
+	}
+}
+
+func TestMaskRecipientEmail(t *testing.T) {
+	t.Parallel()
+	tests := map[string]string{
+		"Member@Example.COM": "m***@example.com",
+		"a@example.com":      "a***@example.com",
+		"invalid":            "[masked]",
+	}
+	for input, want := range tests {
+		if got := MaskRecipientEmail(input); got != want {
+			t.Fatalf("MaskRecipientEmail(%q) = %q, want %q", input, got, want)
+		}
 	}
 }
 

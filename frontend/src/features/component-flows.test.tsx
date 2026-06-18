@@ -14,6 +14,7 @@ import { TeamSection } from "./team/team-section";
 import {
   type AppNotification,
   type CurrentUser,
+  type EmailDiagnostics,
   type Project,
   type ProjectMember,
   type SavedFilter,
@@ -603,9 +604,12 @@ function teamProps(currentUser: CurrentUser): ComponentProps<typeof TeamSection>
     canResetTeamMemberPassword: false,
     copiedTeamInviteId: "",
     currentUser,
+    emailDiagnostics: null,
+    emailDiagnosticsError: "",
     isCreatingTeamInvite: false,
     isActive: true,
     isCreatingTeamMember: false,
+    isLoadingEmailDiagnostics: false,
     isLoadingTeamInvites: false,
     isLoadingTeamMembers: false,
     onCancelResetPassword: vi.fn(),
@@ -618,6 +622,7 @@ function teamProps(currentUser: CurrentUser): ComponentProps<typeof TeamSection>
     onInviteRoleChange: vi.fn(),
     onPasswordChange: vi.fn(),
     onRevokeTeamInvite: vi.fn(),
+    onRefreshEmailDiagnostics: vi.fn(),
     onResendTeamInvite: vi.fn(),
     onResetPassword: vi.fn(),
     onResetPasswordChange: vi.fn(),
@@ -693,4 +698,69 @@ test("team invites show delivery state and resend controls", async () => {
   assert.equal(props.onResendTeamInvite.mock.calls[0]?.[0], pendingInvite);
   await user.click(screen.getByRole("button", { name: "Copied" }));
   assert.equal(props.onCopyTeamInviteLink.mock.calls[0]?.[0], pendingInvite.id);
+});
+
+test("team email diagnostics show counts, failures and refresh action", async () => {
+  const user = userEvent.setup();
+  const diagnostics: EmailDiagnostics = {
+    total: 12,
+    counts: {
+      pending: 2,
+      processing: 1,
+      sent: 8,
+      failed: 1,
+    },
+    oldest_pending_at: "2026-06-18T10:00:00Z",
+    oldest_processing_started_at: null,
+    recent_terminal_failures: [
+      {
+        id: "email-1",
+        email_type: "password_reset",
+        recipient_email: "a***@example.com",
+        attempt_count: 5,
+        last_error: "smtp password=[redacted] token=[redacted]",
+        created_at: "2026-06-18T09:00:00Z",
+        updated_at: "2026-06-18T11:00:00Z",
+        next_attempt_at: "2026-06-18T11:00:00Z",
+        sent_at: null,
+      },
+    ],
+  };
+  const props = {
+    ...teamProps(admin),
+    emailDiagnostics: diagnostics,
+  };
+
+  render(<TeamSection {...props} />);
+
+  assert.ok(screen.getByRole("heading", { name: "Delivery health" }));
+  assert.ok(screen.getByText("12"));
+  assert.ok(screen.getByText("password_reset"));
+  assert.ok(screen.getByText("a***@example.com"));
+  assert.ok(screen.getByText("smtp password=[redacted] token=[redacted]"));
+
+  await user.click(screen.getByRole("button", { name: "Refresh" }));
+  assert.equal(props.onRefreshEmailDiagnostics.mock.calls.length, 1);
+});
+
+test("team email diagnostics expose loading, error and empty states", () => {
+  const { rerender } = render(
+    <TeamSection
+      {...teamProps(admin)}
+      isLoadingEmailDiagnostics={true}
+    />,
+  );
+
+  assert.ok(screen.getByText("Loading email diagnostics"));
+  assert.ok(screen.getByRole("button", { name: "Refreshing..." }));
+
+  rerender(
+    <TeamSection
+      {...teamProps(admin)}
+      emailDiagnosticsError="Could not load email diagnostics."
+    />,
+  );
+
+  assert.ok(screen.getByText("Could not load email diagnostics."));
+  assert.ok(screen.getByText("No email diagnostics loaded"));
 });

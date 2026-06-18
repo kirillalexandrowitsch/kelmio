@@ -3,6 +3,7 @@ import { type FormEvent } from "react";
 import { FormError } from "../../components/form-feedback";
 import {
   type CurrentUser,
+  type EmailDiagnostics,
   type TeamInvite,
   type TeamMember,
   type UpdateTeamMemberInput,
@@ -20,9 +21,12 @@ type TeamSectionProps = {
   canResetTeamMemberPassword: boolean;
   copiedTeamInviteId: string;
   currentUser: CurrentUser;
+  emailDiagnostics: EmailDiagnostics | null;
+  emailDiagnosticsError: string;
   isCreatingTeamInvite: boolean;
   isActive: boolean;
   isCreatingTeamMember: boolean;
+  isLoadingEmailDiagnostics: boolean;
   isLoadingTeamInvites: boolean;
   isLoadingTeamMembers: boolean;
   onCancelResetPassword: () => void;
@@ -35,6 +39,7 @@ type TeamSectionProps = {
   onInviteRoleChange: (value: TeamMember["role"]) => void;
   onPasswordChange: (value: string) => void;
   onRevokeTeamInvite: (invite: TeamInvite) => void;
+  onRefreshEmailDiagnostics: () => void;
   onResendTeamInvite: (invite: TeamInvite) => void;
   onResetPassword: (
     event: FormEvent<HTMLFormElement>,
@@ -73,9 +78,12 @@ export function TeamSection({
   canResetTeamMemberPassword,
   copiedTeamInviteId,
   currentUser,
+  emailDiagnostics,
+  emailDiagnosticsError,
   isCreatingTeamInvite,
   isActive,
   isCreatingTeamMember,
+  isLoadingEmailDiagnostics,
   isLoadingTeamInvites,
   isLoadingTeamMembers,
   onCancelResetPassword,
@@ -88,6 +96,7 @@ export function TeamSection({
   onInviteRoleChange,
   onPasswordChange,
   onRevokeTeamInvite,
+  onRefreshEmailDiagnostics,
   onResendTeamInvite,
   onResetPassword,
   onResetPasswordChange,
@@ -383,6 +392,100 @@ export function TeamSection({
             )}
           </section>
 
+          <section
+            className="email-diagnostics-panel"
+            aria-label="Email delivery diagnostics"
+          >
+            <header className="section-header">
+              <div>
+                <p className="eyebrow">Email diagnostics</p>
+                <h2>Delivery health</h2>
+              </div>
+              <button
+                className="small-button"
+                disabled={isLoadingEmailDiagnostics}
+                onClick={onRefreshEmailDiagnostics}
+                type="button"
+              >
+                {isLoadingEmailDiagnostics ? "Refreshing..." : "Refresh"}
+              </button>
+            </header>
+
+            <p className="muted">
+              Read-only outbox diagnostics for local email troubleshooting. Raw
+              template data and provider secrets are not shown.
+            </p>
+
+            <FormError message={emailDiagnosticsError} />
+
+            {emailDiagnostics ? (
+              <>
+                <div className="email-diagnostics-counts">
+                  <article>
+                    <span>Total</span>
+                    <strong>{emailDiagnostics.total}</strong>
+                  </article>
+                  <article>
+                    <span>Pending</span>
+                    <strong>{emailDiagnostics.counts.pending}</strong>
+                  </article>
+                  <article>
+                    <span>Processing</span>
+                    <strong>{emailDiagnostics.counts.processing}</strong>
+                  </article>
+                  <article>
+                    <span>Sent</span>
+                    <strong>{emailDiagnostics.counts.sent}</strong>
+                  </article>
+                  <article>
+                    <span>Failed</span>
+                    <strong>{emailDiagnostics.counts.failed}</strong>
+                  </article>
+                </div>
+
+                <div className="email-diagnostics-age">
+                  <span>
+                    Oldest pending:{" "}
+                    {formatEmailDiagnosticsDate(emailDiagnostics.oldest_pending_at)}
+                  </span>
+                  <span>
+                    Oldest processing:{" "}
+                    {formatEmailDiagnosticsDate(
+                      emailDiagnostics.oldest_processing_started_at,
+                    )}
+                  </span>
+                </div>
+
+                {emailDiagnostics.recent_terminal_failures.length > 0 ? (
+                  <div className="email-failure-list">
+                    <h3>Recent terminal failures</h3>
+                    {emailDiagnostics.recent_terminal_failures.map((failure) => (
+                      <article className="email-failure-card" key={failure.id}>
+                        <div>
+                          <strong>{failure.email_type}</strong>
+                          <span>{failure.recipient_email}</span>
+                        </div>
+                        <p>{failure.last_error || "No sanitized error message"}</p>
+                        <small>
+                          Attempts: {failure.attempt_count} · Updated{" "}
+                          {formatEmailDiagnosticsDate(failure.updated_at)}
+                        </small>
+                      </article>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="project-empty">No terminal failures</div>
+                )}
+              </>
+            ) : (
+              <div className="project-empty">
+                {isLoadingEmailDiagnostics
+                  ? "Loading email diagnostics"
+                  : "No email diagnostics loaded"}
+              </div>
+            )}
+          </section>
+
           <form className="team-member-form" onSubmit={onCreateTeamMember}>
             <label>
               <span>Email</span>
@@ -462,4 +565,17 @@ export function TeamSection({
       )}
     </section>
   );
+}
+
+function formatEmailDiagnosticsDate(value: string | null) {
+  if (!value) {
+    return "None";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "Unknown";
+  }
+
+  return date.toLocaleString();
 }

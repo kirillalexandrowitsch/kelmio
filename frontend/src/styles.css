@@ -2238,6 +2238,86 @@ h1 {
   gap: 8px;
 }
 
+.email-diagnostics-panel {
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid #d9e1dc;
+  border-radius: 12px;
+  background: #fbfcfb;
+}
+
+.email-diagnostics-counts {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(100px, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.email-diagnostics-counts article {
+  padding: 10px;
+  border: 1px solid #dce5df;
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+.email-diagnostics-counts span,
+.email-diagnostics-age span,
+.email-failure-card small {
+  color: #607064;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.email-diagnostics-counts strong {
+  display: block;
+  margin-top: 4px;
+  color: #17241d;
+  font-size: 22px;
+}
+
+.email-diagnostics-age {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.email-failure-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.email-failure-list h3 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.email-failure-card {
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid #ead0ca;
+  border-radius: 10px;
+  background: #fff8f6;
+}
+
+.email-failure-card div {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.email-failure-card p {
+  margin: 0;
+  color: #6d342a;
+  font-size: 13px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
 .team-member-row {
   display: grid;
   grid-template-columns: 42px minmax(220px, 1fr) auto minmax(280px, auto);
@@ -3638,6 +3718,7 @@ h1 {
   .issues-layout,
   .team-invite-form,
   .team-invite-card,
+  .email-diagnostics-counts,
   .team-member-row,
   .team-member-form,
   .sprint-filters,

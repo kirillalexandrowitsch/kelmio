@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -163,6 +164,82 @@ func TestEmailOutboxReclaimsStaleProcessing(t *testing.T) {
 	}
 }
 
+func TestEmailOutboxDiagnosticsIntegration(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	db := newEmailOutboxIntegrationDB(t, ctx)
+	store := NewStore(db)
+	now := time.Date(2026, 6, 18, 10, 0, 0, 0, time.UTC)
+	store.now = func() time.Time { return now }
+
+	workspaceID := insertEmailOutboxWorkspace(t, ctx, db)
+	otherWorkspaceID := insertEmailOutboxWorkspace(t, ctx, db)
+
+	pendingInput := validEnqueueInput("pending@example.com", "diag-pending")
+	pendingInput.WorkspaceID = &workspaceID
+	pending, err := store.Enqueue(ctx, pendingInput)
+	if err != nil {
+		t.Fatalf("enqueue pending: %v", err)
+	}
+
+	processingInput := validEnqueueInput("processing@example.com", "diag-processing")
+	processingInput.WorkspaceID = &workspaceID
+	processing, err := store.Enqueue(ctx, processingInput)
+	if err != nil {
+		t.Fatalf("enqueue processing: %v", err)
+	}
+	claimed, err := store.ClaimBatch(ctx, 10, 5*time.Minute)
+	if err != nil {
+		t.Fatalf("claim batch: %v", err)
+	}
+	if len(claimed) != 2 {
+		t.Fatalf("claimed = %d, want 2", len(claimed))
+	}
+	if err := store.MarkRetry(ctx, pending, errors.New("smtp failed"), 5); err != nil {
+		t.Fatalf("mark pending retry: %v", err)
+	}
+	if err := store.MarkFailed(ctx, processing.ID, errors.New("smtp password=secret token=raw-token")); err != nil {
+		t.Fatalf("mark failed: %v", err)
+	}
+
+	sentInput := validEnqueueInput("sent@example.com", "diag-sent")
+	sentInput.WorkspaceID = &workspaceID
+	sent, err := store.Enqueue(ctx, sentInput)
+	if err != nil {
+		t.Fatalf("enqueue sent: %v", err)
+	}
+	if err := store.MarkSent(ctx, sent.ID); err != nil {
+		t.Fatalf("mark sent: %v", err)
+	}
+
+	otherInput := validEnqueueInput("other@example.com", "diag-other")
+	otherInput.WorkspaceID = &otherWorkspaceID
+	if _, err := store.Enqueue(ctx, otherInput); err != nil {
+		t.Fatalf("enqueue other workspace: %v", err)
+	}
+
+	diagnostics, err := LoadDiagnostics(ctx, db, workspaceID)
+	if err != nil {
+		t.Fatalf("load diagnostics: %v", err)
+	}
+	if diagnostics.Total != 3 || diagnostics.Counts.Pending != 1 || diagnostics.Counts.Processing != 0 || diagnostics.Counts.Sent != 1 || diagnostics.Counts.Failed != 1 {
+		t.Fatalf("diagnostics counts = %#v", diagnostics)
+	}
+	if diagnostics.OldestPendingAt == nil {
+		t.Fatal("OldestPendingAt is nil")
+	}
+	if len(diagnostics.RecentTerminalFailures) != 1 {
+		t.Fatalf("recent failures = %#v, want 1", diagnostics.RecentTerminalFailures)
+	}
+	failure := diagnostics.RecentTerminalFailures[0]
+	if failure.RecipientEmail != "p***@example.com" {
+		t.Fatalf("masked recipient = %q", failure.RecipientEmail)
+	}
+	if strings.Contains(failure.LastError, "secret") || strings.Contains(failure.LastError, "raw-token") {
+		t.Fatalf("last error leaked sensitive value: %q", failure.LastError)
+	}
+}
+
 func validEnqueueInput(recipient string, deduplicationKey string) EnqueueInput {
 	return EnqueueInput{
 		EmailType:      TypeSystemTest,
@@ -173,6 +250,19 @@ func validEnqueueInput(recipient string, deduplicationKey string) EnqueueInput {
 		},
 		DeduplicationKey: deduplicationKey,
 	}
+}
+
+func insertEmailOutboxWorkspace(t *testing.T, ctx context.Context, db *pgxpool.Pool) string {
+	t.Helper()
+	var workspaceID string
+	if err := db.QueryRow(ctx, `
+		INSERT INTO workspaces (name)
+		VALUES ($1)
+		RETURNING id::text
+	`, fmt.Sprintf("Email Outbox %d", time.Now().UnixNano())).Scan(&workspaceID); err != nil {
+		t.Fatalf("insert workspace: %v", err)
+	}
+	return workspaceID
 }
 
 func assertOutboxCount(t *testing.T, ctx context.Context, db *pgxpool.Pool, deduplicationKey string, want int) {
