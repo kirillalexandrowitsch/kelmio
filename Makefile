@@ -1,6 +1,6 @@
 SHELL := /bin/sh
 
-.PHONY: help doctor dev down logs ps db-up wait-db migrate-up seed setup-db backup restore restore-check backend-dev email-worker email-diagnostics monitoring-up monitoring-check monitoring-down backend-test backend-integration-test frontend-install frontend-dev frontend-build frontend-test frontend-e2e-install frontend-e2e smoke-api smoke-production prod-config-check prod-compose-check prod-stack-qa verify
+.PHONY: help doctor dev down logs ps db-up wait-db migrate-up seed setup-db backup backup-runner-once restore restore-check backend-dev email-worker email-diagnostics monitoring-up monitoring-check monitoring-down backend-test backend-integration-test frontend-install frontend-dev frontend-build frontend-test frontend-e2e-install frontend-e2e smoke-api smoke-production prod-config-check prod-compose-check prod-stack-qa verify
 
 help:
 	@printf '%s\n' 'Available commands:'
@@ -15,6 +15,7 @@ help:
 	@printf '%s\n' '  make seed             Create local admin seed data'
 	@printf '%s\n' '  make setup-db         Start DB, migrate, and seed'
 	@printf '%s\n' '  make backup           Create compressed PostgreSQL backup in backups/'
+	@printf '%s\n' '  make backup-runner-once Create one scheduled-format backup through the worker'
 	@printf '%s\n' '  make restore          Restore BACKUP into selected PostgreSQL database'
 	@printf '%s\n' '  make restore-check    Verify BACKUP in isolated temporary PostgreSQL'
 	@printf '%s\n' '  make backend-dev      Run backend locally'
@@ -70,6 +71,10 @@ setup-db: db-up wait-db migrate-up seed
 backup:
 	sh scripts/backup-db.sh
 
+backup-runner-once:
+	@mkdir -p "$${BACKUP_DIR:-backups}"
+	docker compose --profile monitoring run --rm backup-worker --once
+
 restore:
 	@if [ -z "$(BACKUP)" ]; then printf '%s\n' 'Usage: BACKUP=backups/file.sql.gz RESTORE_CONFIRM=I_UNDERSTAND make restore' >&2; exit 2; fi
 	sh scripts/restore-db.sh "$(BACKUP)"
@@ -88,14 +93,15 @@ email-diagnostics:
 	sh scripts/email-diagnostics.sh
 
 monitoring-up:
-	docker compose --profile monitoring up -d alertmanager prometheus grafana
+	@mkdir -p "$${BACKUP_DIR:-backups}"
+	docker compose --profile monitoring up -d backup-worker alertmanager prometheus grafana
 
 monitoring-check:
 	sh scripts/check-monitoring.sh
 
 monitoring-down:
-	docker compose --profile monitoring stop grafana prometheus alertmanager
-	docker compose --profile monitoring rm -f grafana prometheus alertmanager
+	docker compose --profile monitoring stop grafana prometheus alertmanager backup-worker
+	docker compose --profile monitoring rm -f grafana prometheus alertmanager backup-worker
 
 backend-test:
 	cd backend && go test ./...

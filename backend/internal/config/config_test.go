@@ -84,6 +84,21 @@ func TestLoadDevelopmentDefaults(t *testing.T) {
 	if cfg.EmailWorkerMetricsPort != "9091" {
 		t.Fatalf("EmailWorkerMetricsPort = %q, want 9091", cfg.EmailWorkerMetricsPort)
 	}
+	if cfg.BackupInterval != 24*time.Hour {
+		t.Fatalf("BackupInterval = %s, want 24h", cfg.BackupInterval)
+	}
+	if cfg.BackupRetryInterval != 5*time.Minute {
+		t.Fatalf("BackupRetryInterval = %s, want 5m", cfg.BackupRetryInterval)
+	}
+	if cfg.BackupRetentionCount != 7 {
+		t.Fatalf("BackupRetentionCount = %d, want 7", cfg.BackupRetentionCount)
+	}
+	if cfg.BackupDir != "backups" {
+		t.Fatalf("BackupDir = %q, want backups", cfg.BackupDir)
+	}
+	if cfg.BackupMetricsPort != "9092" {
+		t.Fatalf("BackupMetricsPort = %q, want 9092", cfg.BackupMetricsPort)
+	}
 }
 
 func TestLoadProductionRequiresPublicAppURL(t *testing.T) {
@@ -215,6 +230,31 @@ func TestLoadRejectsInvalidWorkerMetricsPort(t *testing.T) {
 	_, err := Load()
 	if err == nil || !strings.Contains(err.Error(), "EMAIL_WORKER_METRICS_PORT must be a valid port") {
 		t.Fatalf("Load() error = %v, want invalid worker metrics port error", err)
+	}
+}
+
+func TestLoadRejectsInvalidBackupConfig(t *testing.T) {
+	testCases := []struct {
+		name    string
+		key     string
+		value   string
+		message string
+	}{
+		{name: "interval", key: "BACKUP_INTERVAL", value: "invalid", message: "BACKUP_INTERVAL must be greater than 0"},
+		{name: "retry interval", key: "BACKUP_RETRY_INTERVAL", value: "0s", message: "BACKUP_RETRY_INTERVAL must be greater than 0"},
+		{name: "retention", key: "BACKUP_RETENTION_COUNT", value: "0", message: "BACKUP_RETENTION_COUNT must be greater than 0"},
+		{name: "metrics port", key: "BACKUP_METRICS_PORT", value: "70000", message: "BACKUP_METRICS_PORT must be a valid port"},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			clearConfigEnv(t)
+			t.Setenv(testCase.key, testCase.value)
+			_, err := Load()
+			if err == nil || !strings.Contains(err.Error(), testCase.message) {
+				t.Fatalf("Load() error = %v, want %q", err, testCase.message)
+			}
+		})
 	}
 }
 
@@ -476,6 +516,11 @@ func clearConfigEnv(t *testing.T) {
 		"METRICS_ENABLED",
 		"METRICS_AUTH_TOKEN",
 		"EMAIL_WORKER_METRICS_PORT",
+		"BACKUP_INTERVAL",
+		"BACKUP_RETRY_INTERVAL",
+		"BACKUP_RETENTION_COUNT",
+		"BACKUP_DIR",
+		"BACKUP_METRICS_PORT",
 		"POSTGRES_HOST",
 		"POSTGRES_PORT",
 		"POSTGRES_DB",

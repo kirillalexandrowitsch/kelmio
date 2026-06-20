@@ -107,6 +107,39 @@ services:
     depends_on:
       - backend
 
+  backup-worker:
+    profiles:
+      - monitoring
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: backup-worker
+    image: team-task-tracker-backup-worker:local
+    container_name: team-task-tracker-backup-worker
+    environment:
+      APP_ENV: development
+      DATABASE_URL: postgres://${POSTGRES_USER:-team_task_tracker}:${POSTGRES_PASSWORD:-team_task_tracker}@postgres:5432/${POSTGRES_DB:-team_task_tracker}?sslmode=disable
+      METRICS_ENABLED: ${METRICS_ENABLED:-true}
+      METRICS_AUTH_TOKEN: ${METRICS_AUTH_TOKEN:-}
+      BACKUP_INTERVAL: ${BACKUP_INTERVAL:-24h}
+      BACKUP_RETRY_INTERVAL: ${BACKUP_RETRY_INTERVAL:-5m}
+      BACKUP_RETENTION_COUNT: ${BACKUP_RETENTION_COUNT:-7}
+      BACKUP_DIR: /backups
+      BACKUP_METRICS_PORT: ${BACKUP_METRICS_PORT:-9092}
+    ports:
+      - "${BACKUP_METRICS_PORT:-9092}:${BACKUP_METRICS_PORT:-9092}"
+    volumes:
+      - ${BACKUP_DIR:-./backups}:/backups
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:$${BACKUP_METRICS_PORT}/healthz >/dev/null 2>&1"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
   alertmanager:
     profiles:
       - monitoring
@@ -145,6 +178,8 @@ services:
       backend:
         condition: service_started
       email-worker:
+        condition: service_started
+      backup-worker:
         condition: service_started
       alertmanager:
         condition: service_healthy

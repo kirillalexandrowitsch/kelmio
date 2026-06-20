@@ -62,12 +62,32 @@ groups:
 
   - name: team-task-tracker-operations
     rules:
+      - alert: BackupRunnerUnavailable
+        expr: up{job="backup-worker"} == 0
+        for: 30s
+        labels:
+          severity: critical
+          service: backup-worker
+        annotations:
+          summary: Scheduled backup runner is unavailable
+          description: Prometheus has not scraped the backup worker metrics endpoint for 30 seconds.
+
+      - alert: BackupFailed
+        expr: team_task_tracker_backup_last_result{job="backup-worker",result="failure"} == 1
+        for: 30s
+        labels:
+          severity: warning
+          service: backup-worker
+        annotations:
+          summary: Latest scheduled backup failed
+          description: The backup worker could not complete its latest PostgreSQL backup attempt.
+
       - alert: BackupStale
-        expr: (team_task_tracker_backup_last_success_timestamp_seconds{job="backend"} > 0) and ((time() - team_task_tracker_backup_last_success_timestamp_seconds{job="backend"}) > 93600)
+        expr: (team_task_tracker_backup_last_success_timestamp_seconds{job="backup-worker"} > 0) and ((time() - team_task_tracker_backup_last_success_timestamp_seconds{job="backup-worker"}) > 93600)
         for: 5m
         labels:
           severity: warning
-          service: backup
+          service: backup-worker
         annotations:
           summary: Latest successful backup is stale
           description: No successful backup has been recorded in the last 26 hours.

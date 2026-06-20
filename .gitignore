@@ -24,7 +24,7 @@ frontend/test-results/
 
 # Docker/local data
 .docker/
-backups/
+/backups/
 tmp/
 
 # Editors

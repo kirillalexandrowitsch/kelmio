@@ -662,7 +662,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "(time() - team_task_tracker_backup_last_success_timestamp_seconds{job=\"backend\"}) and (team_task_tracker_backup_last_success_timestamp_seconds{job=\"backend\"} > 0)",
+          "expr": "(time() - team_task_tracker_backup_last_success_timestamp_seconds{job=\"backup-worker\"}) and (team_task_tracker_backup_last_success_timestamp_seconds{job=\"backup-worker\"} > 0)",
           "instant": true,
           "legendFormat": "Backup age",
           "range": false,
@@ -743,6 +743,149 @@
         }
       ],
       "title": "Restore drill age",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "team-task-tracker-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "options": {
+                "-1": {
+                  "color": "red",
+                  "text": "Failed"
+                },
+                "0": {
+                  "color": "gray",
+                  "text": "Waiting"
+                },
+                "1": {
+                  "color": "green",
+                  "text": "Successful"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "gray",
+                "value": 0
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 12,
+        "x": 0,
+        "y": 21
+      },
+      "id": 12,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "team_task_tracker_backup_last_result{job=\"backup-worker\",result=\"success\"} - team_task_tracker_backup_last_result{job=\"backup-worker\",result=\"failure\"}",
+          "instant": true,
+          "legendFormat": "Latest backup",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "Latest scheduled backup",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "team-task-tracker-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 12,
+        "x": 12,
+        "y": 21
+      },
+      "id": 13,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "team_task_tracker_backup_artifacts{job=\"backup-worker\"}",
+          "instant": true,
+          "legendFormat": "Artifacts",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "Retained scheduled backups",
       "type": "stat"
     }
   ],

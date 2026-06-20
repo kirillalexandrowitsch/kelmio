@@ -49,6 +49,11 @@ type Config struct {
 	MetricsEnabled          bool
 	MetricsAuthToken        string
 	EmailWorkerMetricsPort  string
+	BackupInterval          time.Duration
+	BackupRetryInterval     time.Duration
+	BackupRetentionCount    int
+	BackupDir               string
+	BackupMetricsPort       string
 }
 
 func Load() (Config, error) {
@@ -81,6 +86,11 @@ func Load() (Config, error) {
 		MetricsAuthToken:        env("METRICS_AUTH_TOKEN", ""),
 		MetricsEnabled:          metricsEnabled(appEnv),
 		EmailWorkerMetricsPort:  env("EMAIL_WORKER_METRICS_PORT", "9091"),
+		BackupInterval:          durationEnv("BACKUP_INTERVAL", 24*time.Hour),
+		BackupRetryInterval:     durationEnv("BACKUP_RETRY_INTERVAL", 5*time.Minute),
+		BackupRetentionCount:    intEnv("BACKUP_RETENTION_COUNT", 7),
+		BackupDir:               env("BACKUP_DIR", "backups"),
+		BackupMetricsPort:       env("BACKUP_METRICS_PORT", "9092"),
 	}
 
 	if cfg.AppEnv == EnvProduction && cfg.FrontendURL == "" {
@@ -122,6 +132,7 @@ func (cfg Config) Validate() error {
 	}
 	problems = append(problems, validateEmailConfig(cfg)...)
 	problems = append(problems, validateMetricsConfig(cfg)...)
+	problems = append(problems, validateBackupConfig(cfg)...)
 
 	if cfg.AppEnv == EnvProduction {
 		problems = append(problems, validateProduction(cfg)...)
@@ -352,6 +363,26 @@ func validateMetricsConfig(cfg Config) []string {
 	}
 	if cfg.AppEnv == EnvProduction && cfg.MetricsEnabled && len(strings.TrimSpace(cfg.MetricsAuthToken)) < 32 {
 		problems = append(problems, "METRICS_AUTH_TOKEN must be at least 32 characters in production when METRICS_ENABLED=true")
+	}
+	return problems
+}
+
+func validateBackupConfig(cfg Config) []string {
+	var problems []string
+	if cfg.BackupInterval <= 0 {
+		problems = append(problems, "BACKUP_INTERVAL must be greater than 0")
+	}
+	if cfg.BackupRetryInterval <= 0 {
+		problems = append(problems, "BACKUP_RETRY_INTERVAL must be greater than 0")
+	}
+	if cfg.BackupRetentionCount <= 0 {
+		problems = append(problems, "BACKUP_RETENTION_COUNT must be greater than 0")
+	}
+	if strings.TrimSpace(cfg.BackupDir) == "" {
+		problems = append(problems, "BACKUP_DIR is required")
+	}
+	if err := validateNamedPort(cfg.BackupMetricsPort, "BACKUP_METRICS_PORT"); err != nil {
+		problems = append(problems, err.Error())
 	}
 	return problems
 }

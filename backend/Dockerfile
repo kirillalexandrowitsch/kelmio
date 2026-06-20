@@ -10,6 +10,7 @@ FROM deps AS build
 COPY . .
 
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/bin/api ./cmd/api
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/bin/backup-worker ./cmd/backup-worker
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/bin/bootstrap-admin ./cmd/bootstrap-admin
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/bin/email-worker ./cmd/email-worker
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/bin/migrate ./cmd/migrate
@@ -31,6 +32,16 @@ USER app
 EXPOSE 8080
 
 CMD ["/app/bin/api"]
+
+FROM postgres:16-alpine AS backup-worker
+
+WORKDIR /app
+
+COPY --from=build /out/bin/backup-worker /app/bin/backup-worker
+
+EXPOSE 9092
+
+ENTRYPOINT ["/app/bin/backup-worker"]
 
 FROM deps AS dev
 

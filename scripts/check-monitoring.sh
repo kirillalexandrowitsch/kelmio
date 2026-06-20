@@ -26,6 +26,24 @@ wait_for_url() {
   done
 }
 
+wait_for_prometheus_value() {
+  description=$1
+  query=$2
+  pattern=$3
+  attempts=0
+  while :; do
+    response=$(curl -fsS --get --data-urlencode "query=$query" "$PROMETHEUS_URL/api/v1/query")
+    if printf '%s' "$response" | grep -Eq "$pattern"; then
+      return 0
+    fi
+    attempts=$((attempts + 1))
+    if [ "$attempts" -ge 60 ]; then
+      fail "$description did not become available"
+    fi
+    sleep 1
+  done
+}
+
 published_port() {
   service=$1
   container_port=$2
@@ -92,19 +110,28 @@ wait_for_url Grafana "$GRAFANA_URL/api/health"
 wait_for_url Alertmanager "$ALERTMANAGER_URL/-/ready"
 
 printf '%s\n' 'Checking Prometheus scrape targets...'
-for job in backend email-worker prometheus; do
+for job in backend email-worker backup-worker prometheus; do
   query=$(printf 'up{job="%s"}' "$job")
-  response=$(curl -fsS --get --data-urlencode "query=$query" "$PROMETHEUS_URL/api/v1/query")
-  printf '%s' "$response" | grep -Eq '"value":\[[^]]*,"1"\]' || fail "Prometheus target $job is not up"
+  wait_for_prometheus_value "Prometheus target $job" "$query" '"value":\[[^]]*,"1"\]'
 done
 
 printf '%s\n' 'Checking Prometheus alert rules and Alertmanager discovery...'
 rules=$(curl -fsS "$PROMETHEUS_URL/api/v1/rules?type=alert")
-for rule in BackendMetricsUnavailable DatabaseNotReady EmailWorkerUnavailable EmailWorkerHeartbeatStale EmailDeliveryFailures EmailWorkerBatchErrors BackupStale RestoreDrillStale; do
+for rule in BackendMetricsUnavailable DatabaseNotReady EmailWorkerUnavailable EmailWorkerHeartbeatStale EmailDeliveryFailures EmailWorkerBatchErrors BackupRunnerUnavailable BackupFailed BackupStale RestoreDrillStale; do
   printf '%s' "$rules" | grep -q "\"name\":\"$rule\"" || fail "Prometheus did not load alert rule $rule"
 done
 alertmanagers=$(curl -fsS "$PROMETHEUS_URL/api/v1/alertmanagers")
 printf '%s' "$alertmanagers" | grep -q 'alertmanager:9093' || fail 'Prometheus did not discover Alertmanager'
+
+printf '%s\n' 'Checking scheduled backup metrics...'
+wait_for_prometheus_value \
+  'backup worker successful scheduled backup result' \
+  'team_task_tracker_backup_last_result{job="backup-worker",result="success"}' \
+  '"value":\[[^]]*,"1"\]'
+wait_for_prometheus_value \
+  'backup worker retained scheduled artifact' \
+  'team_task_tracker_backup_artifacts{job="backup-worker"}' \
+  '"value":\[[^]]*,"[1-9][0-9]*"\]'
 
 printf '%s\n' 'Checking Grafana provisioning...'
 grafana_health=$(curl -fsS "$GRAFANA_URL/api/health")
