@@ -1,0 +1,83 @@
+groups:
+  - name: team-task-tracker-runtime
+    rules:
+      - alert: BackendMetricsUnavailable
+        expr: up{job="backend"} == 0
+        for: 30s
+        labels:
+          severity: critical
+          service: backend
+        annotations:
+          summary: Backend metrics endpoint is unavailable
+          description: Prometheus has not scraped the backend metrics endpoint for 30 seconds.
+
+      - alert: DatabaseNotReady
+        expr: team_task_tracker_database_ready{job="backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: postgres
+        annotations:
+          summary: Application database is not ready
+          description: The backend database readiness collector has reported an unavailable database for one minute.
+
+      - alert: EmailWorkerUnavailable
+        expr: up{job="email-worker"} == 0
+        for: 30s
+        labels:
+          severity: critical
+          service: email-worker
+        annotations:
+          summary: Email worker metrics endpoint is unavailable
+          description: Prometheus has not scraped the email worker metrics endpoint for 30 seconds.
+
+      - alert: EmailWorkerHeartbeatStale
+        expr: team_task_tracker_email_worker_heartbeat_timestamp_seconds{job="email-worker"} == 0 or (time() - team_task_tracker_email_worker_heartbeat_timestamp_seconds{job="email-worker"}) > 60
+        for: 1m
+        labels:
+          severity: warning
+          service: email-worker
+        annotations:
+          summary: Email worker heartbeat is stale
+          description: The email worker has not completed a polling heartbeat in more than one minute.
+
+      - alert: EmailDeliveryFailures
+        expr: team_task_tracker_email_outbox_records{job="backend",status="failed"} > 0
+        for: 30s
+        labels:
+          severity: warning
+          service: email-worker
+        annotations:
+          summary: Email outbox contains terminal failures
+          description: At least one email exhausted all configured delivery attempts.
+
+      - alert: EmailWorkerBatchErrors
+        expr: increase(team_task_tracker_email_worker_batch_errors_total{job="email-worker"}[5m]) > 0
+        labels:
+          severity: warning
+          service: email-worker
+        annotations:
+          summary: Email worker batch processing failed
+          description: The email worker recorded a claim or processing-loop error during the last five minutes.
+
+  - name: team-task-tracker-operations
+    rules:
+      - alert: BackupStale
+        expr: (team_task_tracker_backup_last_success_timestamp_seconds{job="backend"} > 0) and ((time() - team_task_tracker_backup_last_success_timestamp_seconds{job="backend"}) > 93600)
+        for: 5m
+        labels:
+          severity: warning
+          service: backup
+        annotations:
+          summary: Latest successful backup is stale
+          description: No successful backup has been recorded in the last 26 hours.
+
+      - alert: RestoreDrillStale
+        expr: (team_task_tracker_restore_drill_last_success_timestamp_seconds{job="backend"} > 0) and ((time() - team_task_tracker_restore_drill_last_success_timestamp_seconds{job="backend"}) > 604800)
+        for: 5m
+        labels:
+          severity: warning
+          service: restore-drill
+        annotations:
+          summary: Latest successful restore drill is stale
+          description: No successful restore drill has been recorded in the last seven days.

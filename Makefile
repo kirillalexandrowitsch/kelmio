@@ -1,6 +1,6 @@
 SHELL := /bin/sh
 
-.PHONY: help doctor dev down logs ps db-up wait-db migrate-up seed setup-db backup restore restore-check backend-dev email-worker email-diagnostics backend-test backend-integration-test frontend-install frontend-dev frontend-build frontend-test frontend-e2e-install frontend-e2e smoke-api smoke-production prod-config-check prod-compose-check prod-stack-qa verify
+.PHONY: help doctor dev down logs ps db-up wait-db migrate-up seed setup-db backup restore restore-check backend-dev email-worker email-diagnostics monitoring-up monitoring-check monitoring-down backend-test backend-integration-test frontend-install frontend-dev frontend-build frontend-test frontend-e2e-install frontend-e2e smoke-api smoke-production prod-config-check prod-compose-check prod-stack-qa verify
 
 help:
 	@printf '%s\n' 'Available commands:'
@@ -20,6 +20,9 @@ help:
 	@printf '%s\n' '  make backend-dev      Run backend locally'
 	@printf '%s\n' '  make email-worker     Run email delivery worker locally'
 	@printf '%s\n' '  make email-diagnostics Show read-only email outbox diagnostics'
+	@printf '%s\n' '  make monitoring-up    Start local Prometheus, Grafana, and Alertmanager'
+	@printf '%s\n' '  make monitoring-check Validate the running local monitoring stack'
+	@printf '%s\n' '  make monitoring-down  Stop and remove local monitoring containers'
 	@printf '%s\n' '  make backend-test     Run Go tests'
 	@printf '%s\n' '  make backend-integration-test Run Go integration tests against local PostgreSQL'
 	@printf '%s\n' '  make frontend-install Install frontend dependencies'
@@ -84,6 +87,16 @@ email-worker:
 email-diagnostics:
 	sh scripts/email-diagnostics.sh
 
+monitoring-up:
+	docker compose --profile monitoring up -d alertmanager prometheus grafana
+
+monitoring-check:
+	sh scripts/check-monitoring.sh
+
+monitoring-down:
+	docker compose --profile monitoring stop grafana prometheus alertmanager
+	docker compose --profile monitoring rm -f grafana prometheus alertmanager
+
 backend-test:
 	cd backend && go test ./...
 
@@ -133,6 +146,7 @@ verify:
 	sh -n scripts/restore-db.sh
 	sh -n scripts/restore-check-db.sh
 	sh -n scripts/email-diagnostics.sh
+	sh -n scripts/check-monitoring.sh
 	./scripts/doctor.sh
 	cd backend && go test ./...
 	cd frontend && npm test
