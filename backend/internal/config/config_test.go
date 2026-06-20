@@ -99,6 +99,15 @@ func TestLoadDevelopmentDefaults(t *testing.T) {
 	if cfg.BackupMetricsPort != "9092" {
 		t.Fatalf("BackupMetricsPort = %q, want 9092", cfg.BackupMetricsPort)
 	}
+	if !cfg.RestoreDrillEnabled {
+		t.Fatal("RestoreDrillEnabled = false, want true in development")
+	}
+	if !strings.Contains(cfg.RestoreDrillDatabaseURL, "localhost:15433/restore_drill") {
+		t.Fatalf("RestoreDrillDatabaseURL = %q, want localhost isolated database", cfg.RestoreDrillDatabaseURL)
+	}
+	if cfg.RestoreDrillTimeout != 5*time.Minute {
+		t.Fatalf("RestoreDrillTimeout = %s, want 5m", cfg.RestoreDrillTimeout)
+	}
 }
 
 func TestLoadProductionRequiresPublicAppURL(t *testing.T) {
@@ -244,6 +253,7 @@ func TestLoadRejectsInvalidBackupConfig(t *testing.T) {
 		{name: "retry interval", key: "BACKUP_RETRY_INTERVAL", value: "0s", message: "BACKUP_RETRY_INTERVAL must be greater than 0"},
 		{name: "retention", key: "BACKUP_RETENTION_COUNT", value: "0", message: "BACKUP_RETENTION_COUNT must be greater than 0"},
 		{name: "metrics port", key: "BACKUP_METRICS_PORT", value: "70000", message: "BACKUP_METRICS_PORT must be a valid port"},
+		{name: "restore timeout", key: "RESTORE_DRILL_TIMEOUT", value: "0s", message: "RESTORE_DRILL_TIMEOUT must be greater than 0"},
 	}
 
 	for _, testCase := range testCases {
@@ -255,6 +265,29 @@ func TestLoadRejectsInvalidBackupConfig(t *testing.T) {
 				t.Fatalf("Load() error = %v, want %q", err, testCase.message)
 			}
 		})
+	}
+}
+
+func TestLoadRestoreDrillRequiresValidDatabaseURL(t *testing.T) {
+	clearConfigEnv(t)
+	t.Setenv("RESTORE_DRILL_ENABLED", "true")
+	t.Setenv("RESTORE_DRILL_DATABASE_URL", "mysql://localhost/restore")
+
+	_, err := Load()
+	if err == nil || !strings.Contains(err.Error(), "RESTORE_DRILL_DATABASE_URL must use postgres or postgresql scheme") {
+		t.Fatalf("Load() error = %v, want restore drill database URL error", err)
+	}
+}
+
+func TestLoadProductionAllowsDisabledRestoreDrill(t *testing.T) {
+	setValidProductionEnv(t)
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.RestoreDrillEnabled {
+		t.Fatal("RestoreDrillEnabled = true, want false in production by default")
 	}
 }
 
@@ -521,6 +554,9 @@ func clearConfigEnv(t *testing.T) {
 		"BACKUP_RETENTION_COUNT",
 		"BACKUP_DIR",
 		"BACKUP_METRICS_PORT",
+		"RESTORE_DRILL_ENABLED",
+		"RESTORE_DRILL_DATABASE_URL",
+		"RESTORE_DRILL_TIMEOUT",
 		"POSTGRES_HOST",
 		"POSTGRES_PORT",
 		"POSTGRES_DB",

@@ -151,37 +151,6 @@ func TestSanitizeDumpErrorRemovesCredentials(t *testing.T) {
 	}
 }
 
-func TestPostgresEnvironmentSeparatesConnectionFields(t *testing.T) {
-	environment, err := postgresEnvironment("postgres://backup-user:p%40ss%3Aword@database.internal:15432/task_tracker?sslmode=require")
-	if err != nil {
-		t.Fatalf("postgresEnvironment returned error: %v", err)
-	}
-	values := make(map[string]string, len(environment))
-	for _, item := range environment {
-		key, value, found := strings.Cut(item, "=")
-		if found {
-			values[key] = value
-		}
-	}
-	if values["PGHOST"] != "database.internal" || values["PGPORT"] != "15432" {
-		t.Fatalf("unexpected host environment: %#v", values)
-	}
-	if values["PGDATABASE"] != "task_tracker" || values["PGUSER"] != "backup-user" {
-		t.Fatalf("unexpected database environment: %#v", values)
-	}
-	if values["PGPASSWORD"] != "p@ss:word" || values["PGSSLMODE"] != "require" {
-		t.Fatalf("unexpected secure connection environment: %#v", values)
-	}
-}
-
-func TestPostgresEnvironmentRejectsInvalidURL(t *testing.T) {
-	for _, databaseURL := range []string{"", "mysql://localhost/tasks", "postgres:///tasks", "postgres://localhost"} {
-		if _, err := postgresEnvironment(databaseURL); err == nil {
-			t.Fatalf("expected %q to be rejected", databaseURL)
-		}
-	}
-}
-
 func createArtifact(t *testing.T, dir string, name string, modifiedAt time.Time) {
 	t.Helper()
 	path := filepath.Join(dir, name)

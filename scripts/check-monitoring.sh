@@ -117,7 +117,7 @@ done
 
 printf '%s\n' 'Checking Prometheus alert rules and Alertmanager discovery...'
 rules=$(curl -fsS "$PROMETHEUS_URL/api/v1/rules?type=alert")
-for rule in BackendMetricsUnavailable DatabaseNotReady EmailWorkerUnavailable EmailWorkerHeartbeatStale EmailDeliveryFailures EmailWorkerBatchErrors BackupRunnerUnavailable BackupFailed BackupStale RestoreDrillStale; do
+for rule in BackendMetricsUnavailable DatabaseNotReady EmailWorkerUnavailable EmailWorkerHeartbeatStale EmailDeliveryFailures EmailWorkerBatchErrors BackupRunnerUnavailable BackupFailed BackupStale RestoreDrillUnavailable RestoreDrillFailed RestoreDrillStale; do
   printf '%s' "$rules" | grep -q "\"name\":\"$rule\"" || fail "Prometheus did not load alert rule $rule"
 done
 alertmanagers=$(curl -fsS "$PROMETHEUS_URL/api/v1/alertmanagers")
@@ -131,6 +131,14 @@ wait_for_prometheus_value \
 wait_for_prometheus_value \
   'backup worker retained scheduled artifact' \
   'team_task_tracker_backup_artifacts{job="backup-worker"}' \
+  '"value":\[[^]]*,"[1-9][0-9]*"\]'
+wait_for_prometheus_value \
+  'successful isolated restore drill result' \
+  'team_task_tracker_restore_drill_last_result{job="backup-worker",result="success"}' \
+  '"value":\[[^]]*,"1"\]'
+wait_for_prometheus_value \
+  'isolated restore drill migration verification' \
+  'team_task_tracker_restore_drill_last_success_timestamp_seconds{job="backup-worker"}' \
   '"value":\[[^]]*,"[1-9][0-9]*"\]'
 
 printf '%s\n' 'Checking Grafana provisioning...'

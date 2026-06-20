@@ -44,8 +44,6 @@ type AppMetrics struct {
 
 	workerBatchErrors        float64
 	workerHeartbeatTimestamp float64
-	restoreLastSuccess       float64
-	restoreDrillDuration     float64
 }
 
 type httpMetricKey struct {
@@ -206,8 +204,6 @@ func (m *AppMetrics) render() string {
 	workerAttempts := cloneStringMap(m.workerAttempts)
 	workerBatchErrors := m.workerBatchErrors
 	workerHeartbeat := m.workerHeartbeatTimestamp
-	restoreLastSuccess := m.restoreLastSuccess
-	restoreDrillDuration := m.restoreDrillDuration
 	m.mu.Unlock()
 
 	writeHelpType(&builder, "http_requests_total", "Total HTTP requests by method, normalized route, and status code.", "counter")
@@ -246,11 +242,6 @@ func (m *AppMetrics) render() string {
 
 	writeHelpType(&builder, "email_worker_heartbeat_timestamp_seconds", "Unix timestamp of the latest email worker poll loop heartbeat.", "gauge")
 	writeMetric(&builder, "email_worker_heartbeat_timestamp_seconds", nil, workerHeartbeat)
-
-	writeHelpType(&builder, "restore_drill_last_success_timestamp_seconds", "Unix timestamp of the latest successful restore drill. Zero until the scheduled backup runner is added.", "gauge")
-	writeMetric(&builder, "restore_drill_last_success_timestamp_seconds", nil, restoreLastSuccess)
-	writeHelpType(&builder, "restore_drill_duration_seconds", "Duration of the latest restore drill in seconds. Zero until the scheduled backup runner is added.", "gauge")
-	writeMetric(&builder, "restore_drill_duration_seconds", nil, restoreDrillDuration)
 
 	return builder.String()
 }

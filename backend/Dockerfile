@@ -38,6 +38,7 @@ FROM postgres:16-alpine AS backup-worker
 WORKDIR /app
 
 COPY --from=build /out/bin/backup-worker /app/bin/backup-worker
+COPY migrations /app/migrations
 
 EXPOSE 9092
 

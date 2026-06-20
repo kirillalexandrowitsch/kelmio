@@ -40,8 +40,9 @@ BACKUP=backups/team-task-tracker-20260605-120000.sql.gz RESTORE_CONFIRM=I_UNDERS
 
 ## Scheduled Local Backups
 
-The localhost monitoring profile includes a dedicated backup worker. It creates
-one backup immediately, then runs every 24 hours by default:
+The localhost monitoring profile includes a dedicated backup worker and an
+isolated PostgreSQL restore target. It creates one backup immediately, restores
+and verifies it, then runs every 24 hours by default:
 
 ```sh
 make monitoring-up
@@ -59,14 +60,36 @@ Create one scheduled-format backup without starting the monitoring stack:
 make backup-runner-once
 ```
 
-The worker keeps the latest seven scheduled backups by default. Retention runs
-only after a successful dump, never removes the newest scheduled backup, and
-does not touch files created by `make backup`.
+Verify the latest scheduled backup again without creating another artifact:
 
-Prometheus scrapes backup status from the worker. Grafana displays the latest
-result, backup age, and retained artifact count. The backup worker belongs only
-to the localhost `monitoring` profile; production-like Compose keeps the manual
-backup flow documented below.
+```sh
+make restore-drill-once
+```
+
+`backup-runner-once` and the scheduled worker report success only after the
+artifact is restored, the latest migration and core data are verified, and the
+isolated target is cleaned. The restore target uses ephemeral `tmpfs` storage,
+has no published port, and never connects to or modifies the source database.
+
+The worker keeps the latest seven scheduled backups by default. Retention runs
+only after a successful restore drill, never removes the previous verified
+backup after a failed drill, and does not touch files created by `make backup`.
+
+Machine-readable restore state is written atomically with mode `0600`:
+
+```text
+backups/restore-drill-state.json
+```
+
+It contains only artifact metadata, timestamps, SHA-256, migration version and
+stable error codes. Database credentials and raw `psql` output are never stored.
+
+Prometheus scrapes backup and restore status from the worker. Grafana displays
+the latest results, backup/restore age, drill duration and retained artifact
+count. `make smoke-operations` verifies valid restore, corrupted artifact
+rejection, recovery, target cleanup and source isolation. These services belong
+only to the localhost `monitoring` profile; production-like Compose keeps the
+manual backup flow documented below.
 
 ## Production Compose
 
@@ -112,5 +135,8 @@ The scripts support these variables:
 - `BACKUP_RETRY_INTERVAL`: delay after a failed scheduled backup, default `5m`.
 - `BACKUP_RETENTION_COUNT`: number of scheduled backups to retain, default `7`.
 - `BACKUP_METRICS_PORT`: localhost backup-worker metrics port, default `9092`.
+- `RESTORE_DRILL_ENABLED`: require restore verification for scheduled backups,
+  default `true` in development.
+- `RESTORE_DRILL_TIMEOUT`: maximum duration of an isolated drill, default `5m`.
 - `BACKUP`: backup path for `make restore` and `make restore-check`.
 - `RESTORE_CONFIRM`: must be `I_UNDERSTAND` for destructive restore.

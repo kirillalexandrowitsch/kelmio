@@ -107,6 +107,23 @@ services:
     depends_on:
       - backend
 
+  restore-drill-postgres:
+    profiles:
+      - monitoring
+    image: postgres:16-alpine
+    container_name: team-task-tracker-restore-drill-postgres
+    environment:
+      POSTGRES_DB: restore_drill
+      POSTGRES_USER: restore_drill
+      POSTGRES_PASSWORD: restore_drill
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U restore_drill -d restore_drill"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
   backup-worker:
     profiles:
       - monitoring
@@ -126,12 +143,18 @@ services:
       BACKUP_RETENTION_COUNT: ${BACKUP_RETENTION_COUNT:-7}
       BACKUP_DIR: /backups
       BACKUP_METRICS_PORT: ${BACKUP_METRICS_PORT:-9092}
+      RESTORE_DRILL_ENABLED: ${RESTORE_DRILL_ENABLED:-true}
+      RESTORE_DRILL_DATABASE_URL: postgres://restore_drill:restore_drill@restore-drill-postgres:5432/restore_drill?sslmode=disable
+      RESTORE_DRILL_TIMEOUT: ${RESTORE_DRILL_TIMEOUT:-5m}
+      MIGRATIONS_DIR: /app/migrations
     ports:
       - "${BACKUP_METRICS_PORT:-9092}:${BACKUP_METRICS_PORT:-9092}"
     volumes:
       - ${BACKUP_DIR:-./backups}:/backups
     depends_on:
       postgres:
+        condition: service_healthy
+      restore-drill-postgres:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:$${BACKUP_METRICS_PORT}/healthz >/dev/null 2>&1"]

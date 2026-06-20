@@ -54,6 +54,9 @@ type Config struct {
 	BackupRetentionCount    int
 	BackupDir               string
 	BackupMetricsPort       string
+	RestoreDrillEnabled     bool
+	RestoreDrillDatabaseURL string
+	RestoreDrillTimeout     time.Duration
 }
 
 func Load() (Config, error) {
@@ -91,6 +94,9 @@ func Load() (Config, error) {
 		BackupRetentionCount:    intEnv("BACKUP_RETENTION_COUNT", 7),
 		BackupDir:               env("BACKUP_DIR", "backups"),
 		BackupMetricsPort:       env("BACKUP_METRICS_PORT", "9092"),
+		RestoreDrillEnabled:     boolEnv("RESTORE_DRILL_ENABLED", appEnv == EnvDevelopment),
+		RestoreDrillDatabaseURL: restoreDrillDatabaseURL(appEnv),
+		RestoreDrillTimeout:     durationEnv("RESTORE_DRILL_TIMEOUT", 5*time.Minute),
 	}
 
 	if cfg.AppEnv == EnvProduction && cfg.FrontendURL == "" {
@@ -216,6 +222,16 @@ func smtpHost(appEnv string) string {
 		return env("SMTP_HOST", "")
 	}
 	return env("SMTP_HOST", "localhost")
+}
+
+func restoreDrillDatabaseURL(appEnv string) string {
+	if value := strings.TrimSpace(os.Getenv("RESTORE_DRILL_DATABASE_URL")); value != "" {
+		return value
+	}
+	if appEnv == EnvProduction {
+		return ""
+	}
+	return "postgres://restore_drill:restore_drill@localhost:15433/restore_drill?sslmode=disable"
 }
 
 func splitCSV(raw string) []string {
@@ -383,6 +399,16 @@ func validateBackupConfig(cfg Config) []string {
 	}
 	if err := validateNamedPort(cfg.BackupMetricsPort, "BACKUP_METRICS_PORT"); err != nil {
 		problems = append(problems, err.Error())
+	}
+	if cfg.RestoreDrillTimeout <= 0 {
+		problems = append(problems, "RESTORE_DRILL_TIMEOUT must be greater than 0")
+	}
+	if cfg.RestoreDrillEnabled {
+		if strings.TrimSpace(cfg.RestoreDrillDatabaseURL) == "" {
+			problems = append(problems, "RESTORE_DRILL_DATABASE_URL is required when RESTORE_DRILL_ENABLED=true")
+		} else if err := validateDatabaseURL(cfg.RestoreDrillDatabaseURL); err != nil {
+			problems = append(problems, strings.Replace(err.Error(), "DATABASE_URL", "RESTORE_DRILL_DATABASE_URL", 1))
+		}
 	}
 	return problems
 }

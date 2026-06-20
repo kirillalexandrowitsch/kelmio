@@ -702,7 +702,7 @@
               },
               {
                 "color": "orange",
-                "value": 604800
+                "value": 93600
               }
             ]
           },
@@ -735,7 +735,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "(time() - team_task_tracker_restore_drill_last_success_timestamp_seconds{job=\"backend\"}) and (team_task_tracker_restore_drill_last_success_timestamp_seconds{job=\"backend\"} > 0)",
+          "expr": "(time() - team_task_tracker_restore_drill_last_success_timestamp_seconds{job=\"backup-worker\"}) and (team_task_tracker_restore_drill_last_success_timestamp_seconds{job=\"backup-worker\"} > 0)",
           "instant": true,
           "legendFormat": "Restore drill age",
           "range": false,
@@ -886,6 +886,149 @@
         }
       ],
       "title": "Retained scheduled backups",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "team-task-tracker-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "options": {
+                "-1": {
+                  "color": "red",
+                  "text": "Failed"
+                },
+                "0": {
+                  "color": "gray",
+                  "text": "Waiting"
+                },
+                "1": {
+                  "color": "green",
+                  "text": "Verified"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "gray",
+                "value": 0
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 12,
+        "x": 0,
+        "y": 26
+      },
+      "id": 14,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "team_task_tracker_restore_drill_last_result{job=\"backup-worker\",result=\"success\"} - team_task_tracker_restore_drill_last_result{job=\"backup-worker\",result=\"failure\"}",
+          "instant": true,
+          "legendFormat": "Latest restore drill",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "Latest restore drill",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "team-task-tracker-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 60
+              }
+            ]
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 12,
+        "x": 12,
+        "y": 26
+      },
+      "id": 15,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "team_task_tracker_restore_drill_duration_seconds{job=\"backup-worker\"}",
+          "instant": true,
+          "legendFormat": "Duration",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "Restore drill duration",
       "type": "stat"
     }
   ],

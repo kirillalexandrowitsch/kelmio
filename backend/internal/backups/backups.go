@@ -14,6 +14,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"team-task-tracker/backend/internal/postgresenv"
 )
 
 const ScheduledPrefix = "team-task-tracker-scheduled-"
@@ -63,6 +65,18 @@ func NewRunner(databaseURL string, dir string, retentionCount int) *Runner {
 }
 
 func (r *Runner) RunOnce(ctx context.Context) (Result, error) {
+	result, err := r.Create(ctx)
+	if err != nil {
+		return result, err
+	}
+	removed, count, retentionErr := r.ApplyRetention()
+	result.RemovedCount = removed
+	result.ArtifactCount = count
+	result.RetentionError = retentionErr
+	return result, nil
+}
+
+func (r *Runner) Create(ctx context.Context) (Result, error) {
 	startedAt := r.now().UTC()
 	result := Result{StartedAt: startedAt}
 	if strings.TrimSpace(r.DatabaseURL) == "" {
@@ -128,16 +142,24 @@ func (r *Runner) RunOnce(ctx context.Context) (Result, error) {
 		return result, fmt.Errorf("inspect backup artifact: %w", err)
 	}
 	result.Artifact = Artifact{Path: finalPath, CreatedAt: info.ModTime().UTC(), Size: info.Size()}
-
-	removed, retentionErr := Prune(r.Dir, r.RetentionCount)
-	result.RemovedCount = removed
-	result.RetentionError = retentionErr
 	artifacts, listErr := List(r.Dir)
-	if listErr != nil && result.RetentionError == nil {
-		result.RetentionError = listErr
+	if listErr != nil {
+		return result, listErr
 	}
 	result.ArtifactCount = len(artifacts)
 	return result, nil
+}
+
+func (r *Runner) ApplyRetention() (int, int, error) {
+	removed, err := Prune(r.Dir, r.RetentionCount)
+	if err != nil {
+		return removed, 0, err
+	}
+	artifacts, err := List(r.Dir)
+	if err != nil {
+		return removed, 0, err
+	}
+	return removed, len(artifacts), nil
 }
 
 func List(dir string) ([]Artifact, error) {
@@ -210,21 +232,12 @@ func (d PGDumper) Dump(ctx context.Context, databaseURL string, output io.Writer
 	if command == "" {
 		command = "pg_dump"
 	}
-	connectionEnv, err := postgresEnvironment(databaseURL)
+	connectionEnv, err := postgresenv.FromURL(databaseURL)
 	if err != nil {
 		return err
 	}
 	cmd := exec.CommandContext(ctx, command, "--no-owner", "--no-privileges", "--schema=public")
-	cmd.Env = append(withoutEnvironment(
-		os.Environ(),
-		"PGHOST",
-		"PGPORT",
-		"PGDATABASE",
-		"PGUSER",
-		"PGPASSWORD",
-		"PGSSLMODE",
-		"PGCONNECT_TIMEOUT",
-	), connectionEnv...)
+	cmd.Env = connectionEnv
 	cmd.Stdout = output
 	var stderr strings.Builder
 	cmd.Stderr = &limitedWriter{Writer: &stderr, Remaining: 2048}
@@ -236,40 +249,6 @@ func (d PGDumper) Dump(ctx context.Context, databaseURL string, output io.Writer
 		return fmt.Errorf("pg_dump failed: %s", message)
 	}
 	return nil
-}
-
-func postgresEnvironment(databaseURL string) ([]string, error) {
-	parsed, err := url.Parse(strings.TrimSpace(databaseURL))
-	if err != nil || (parsed.Scheme != "postgres" && parsed.Scheme != "postgresql") {
-		return nil, errors.New("database URL must be a valid PostgreSQL URL")
-	}
-	database, err := url.PathUnescape(strings.TrimPrefix(parsed.EscapedPath(), "/"))
-	if err != nil || parsed.Hostname() == "" || database == "" {
-		return nil, errors.New("database URL must include a host and database name")
-	}
-	port := parsed.Port()
-	if port == "" {
-		port = "5432"
-	}
-	user := ""
-	password := ""
-	if parsed.User != nil {
-		user = parsed.User.Username()
-		password, _ = parsed.User.Password()
-	}
-	sslMode := parsed.Query().Get("sslmode")
-	if sslMode == "" {
-		sslMode = "disable"
-	}
-	return []string{
-		"PGHOST=" + parsed.Hostname(),
-		"PGPORT=" + port,
-		"PGDATABASE=" + database,
-		"PGUSER=" + user,
-		"PGPASSWORD=" + password,
-		"PGSSLMODE=" + sslMode,
-		"PGCONNECT_TIMEOUT=10",
-	}, nil
 }
 
 func (r *Runner) availablePath(now time.Time) string {
@@ -290,23 +269,6 @@ func (r *Runner) now() time.Time {
 
 func isScheduledName(name string) bool {
 	return strings.HasPrefix(name, ScheduledPrefix) && strings.HasSuffix(name, ".sql.gz")
-}
-
-func withoutEnvironment(values []string, names ...string) []string {
-	filtered := make([]string, 0, len(values))
-	for _, value := range values {
-		keep := true
-		for _, name := range names {
-			if strings.HasPrefix(value, name+"=") {
-				keep = false
-				break
-			}
-		}
-		if keep {
-			filtered = append(filtered, value)
-		}
-	}
-	return filtered
 }
 
 func sanitizeDumpError(message string, databaseURL string) string {

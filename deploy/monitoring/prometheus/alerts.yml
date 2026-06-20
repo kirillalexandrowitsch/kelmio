@@ -93,11 +93,31 @@ groups:
           description: No successful backup has been recorded in the last 26 hours.
 
       - alert: RestoreDrillStale
-        expr: (team_task_tracker_restore_drill_last_success_timestamp_seconds{job="backend"} > 0) and ((time() - team_task_tracker_restore_drill_last_success_timestamp_seconds{job="backend"}) > 604800)
+        expr: (team_task_tracker_restore_drill_last_success_timestamp_seconds{job="backup-worker"} > 0) and ((time() - team_task_tracker_restore_drill_last_success_timestamp_seconds{job="backup-worker"}) > 93600)
         for: 5m
         labels:
           severity: warning
           service: restore-drill
         annotations:
           summary: Latest successful restore drill is stale
-          description: No successful restore drill has been recorded in the last seven days.
+          description: No successful restore drill has been recorded in the last 26 hours.
+
+      - alert: RestoreDrillUnavailable
+        expr: absent(team_task_tracker_restore_drill_last_attempt_timestamp_seconds{job="backup-worker"}) or team_task_tracker_restore_drill_last_attempt_timestamp_seconds{job="backup-worker"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: restore-drill
+        annotations:
+          summary: Restore drill metrics are unavailable
+          description: The backup worker is not exposing restore drill operational metrics.
+
+      - alert: RestoreDrillFailed
+        expr: team_task_tracker_restore_drill_last_result{job="backup-worker",result="failure"} == 1
+        for: 30s
+        labels:
+          severity: critical
+          service: restore-drill
+        annotations:
+          summary: Latest restore drill failed
+          description: The latest scheduled backup could not be verified in isolated PostgreSQL.
