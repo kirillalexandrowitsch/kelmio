@@ -1,6 +1,6 @@
 SHELL := /bin/sh
 
-.PHONY: help doctor dev down logs ps db-up wait-db migrate-up seed setup-db backup backup-runner-once restore restore-check restore-drill-once smoke-operations backend-dev email-worker email-diagnostics monitoring-up monitoring-check monitoring-down backend-test backend-integration-test frontend-install frontend-dev frontend-build frontend-test frontend-e2e-install frontend-e2e smoke-api smoke-production prod-config-check prod-compose-check prod-stack-qa verify
+.PHONY: help doctor dev down logs ps db-up wait-db migrate-up seed setup-db backup backup-runner-once restore restore-check restore-drill-once smoke-operations smoke-email-delivery backend-dev email-worker email-diagnostics monitoring-up monitoring-check monitoring-down backend-test backend-integration-test frontend-install frontend-dev frontend-build frontend-test frontend-e2e-install frontend-e2e smoke-api smoke-production prod-config-check prod-compose-check prod-stack-qa verify
 
 help:
 	@printf '%s\n' 'Available commands:'
@@ -20,6 +20,7 @@ help:
 	@printf '%s\n' '  make restore-check    Verify BACKUP in isolated temporary PostgreSQL'
 	@printf '%s\n' '  make restore-drill-once Verify the latest scheduled backup through the operations worker'
 	@printf '%s\n' '  make smoke-operations Run backup and restore drill smoke checks'
+	@printf '%s\n' '  make smoke-email-delivery Verify email worker retry and Mailpit recovery'
 	@printf '%s\n' '  make backend-dev      Run backend locally'
 	@printf '%s\n' '  make email-worker     Run email delivery worker locally'
 	@printf '%s\n' '  make email-diagnostics Show read-only email outbox diagnostics'
@@ -92,6 +93,9 @@ restore-drill-once:
 smoke-operations:
 	sh scripts/smoke-operations.sh
 
+smoke-email-delivery:
+	sh scripts/smoke-email-delivery.sh
+
 backend-dev:
 	cd backend && go run ./cmd/api
 
@@ -116,7 +120,7 @@ backend-test:
 	cd backend && go test ./...
 
 backend-integration-test: wait-db
-	cd backend && go test -tags=integration ./internal/...
+	cd backend && go test -tags=integration ./internal/... ./cmd/email-worker
 
 frontend-install:
 	cd frontend && npm install
@@ -156,6 +160,7 @@ verify:
 	sh -n scripts/smoke-api.sh
 	sh -n scripts/smoke-production.sh
 	sh -n scripts/smoke-operations.sh
+	sh -n scripts/smoke-email-delivery.sh
 	sh -n scripts/qa-production-stack.sh
 	sh -n scripts/doctor.sh
 	sh -n scripts/backup-db.sh

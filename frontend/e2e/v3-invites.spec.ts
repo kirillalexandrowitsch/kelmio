@@ -35,6 +35,8 @@ test("V3 invite UI: admin creates invite and recipient accepts it", async ({
     await expect(inviteLinkInput).toHaveValue(/\/accept-invite\?token=/);
     await expect(inviteCard).toContainText("Email: Pending");
     const emailedInvite = await waitForValidInviteEmail(page, email);
+    await page.reload();
+    await expect(inviteCard).toContainText("Email: Sent");
 
     await logoutViaApi(page);
     await page.goto(emailedInvite.link);
@@ -104,6 +106,9 @@ test("V3 invite UI: admin revokes a pending invite", async ({ page }) => {
     new Set([createEmail.id]),
   );
   expect(resentEmail.link).toContain("/accept-invite?token=");
+  expect(resentEmail.id).not.toBe(createEmail.id);
+  await page.reload();
+  await expect(inviteCard).toContainText("Email: Sent");
 
   await inviteCard.getByRole("button", { name: "Revoke" }).click();
   await expect(inviteCard).toContainText("Revoked");

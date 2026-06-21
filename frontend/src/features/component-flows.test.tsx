@@ -664,6 +664,10 @@ test("team view exposes admin controls and member read-only state", () => {
   assert.ok(screen.getByRole("heading", { name: "Team management" }));
   assert.equal(screen.queryByRole("button", { name: "Create invite" }), null);
   assert.equal(screen.queryByRole("button", { name: "Create member" }), null);
+  assert.equal(
+    screen.queryByRole("region", { name: "Email delivery diagnostics" }),
+    null,
+  );
 });
 
 test("team invites show delivery state and resend controls", async () => {
@@ -698,6 +702,75 @@ test("team invites show delivery state and resend controls", async () => {
   assert.equal(props.onResendTeamInvite.mock.calls[0]?.[0], pendingInvite);
   await user.click(screen.getByRole("button", { name: "Copied" }));
   assert.equal(props.onCopyTeamInviteLink.mock.calls[0]?.[0], pendingInvite.id);
+});
+
+test("team invites expose delivery states and disable resend while pending", () => {
+  const baseInvite = {
+    id: "invite-base",
+    workspace_id: "workspace-1",
+    email: "delivery@example.com",
+    role: "member" as const,
+    status: "pending" as const,
+    created_by: admin.id,
+    created_at: "2026-06-17T10:00:00Z",
+    expires_at: "2026-06-24T10:00:00Z",
+    accepted_at: null,
+    revoked_at: null,
+    email_queued_at: "2026-06-17T10:00:00Z",
+    email_sent_at: null,
+  };
+  const teamInvites = (["not_sent", "pending", "processing", "sent", "failed"] as const).map(
+    (deliveryStatus, index) => ({
+      ...baseInvite,
+      id: `invite-${deliveryStatus}`,
+      email: `delivery-${index}@example.com`,
+      email_delivery_status: deliveryStatus,
+    }),
+  );
+
+  render(
+    <TeamSection
+      {...teamProps(admin)}
+      resendingTeamInviteIds={["invite-pending"]}
+      teamInvites={teamInvites}
+    />,
+  );
+
+  for (const label of ["Not sent", "Pending", "Processing", "Sent", "Failed"]) {
+    assert.ok(screen.getByText(`Email: ${label}`));
+  }
+  assert.ok(screen.getByRole("button", { name: "Resending..." }).hasAttribute("disabled"));
+});
+
+test("team invite resend failure remains visible without hiding the invite", () => {
+  const props = teamProps(admin);
+  render(
+    <TeamSection
+      {...props}
+      teamInvitesError="Could not resend invite email."
+      teamInvites={[
+        {
+          id: "invite-failed",
+          workspace_id: "workspace-1",
+          email: "failed@example.com",
+          role: "member",
+          status: "pending",
+          created_by: admin.id,
+          created_at: "2026-06-17T10:00:00Z",
+          expires_at: "2026-06-24T10:00:00Z",
+          accepted_at: null,
+          revoked_at: null,
+          email_delivery_status: "failed",
+          email_queued_at: "2026-06-17T10:00:00Z",
+          email_sent_at: null,
+        },
+      ]}
+    />,
+  );
+
+  assert.ok(screen.getByText("Could not resend invite email."));
+  assert.ok(screen.getByText("failed@example.com"));
+  assert.ok(screen.getByRole("button", { name: "Resend email" }));
 });
 
 test("team email diagnostics show counts, failures and refresh action", async () => {

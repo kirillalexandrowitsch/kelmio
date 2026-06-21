@@ -13,12 +13,17 @@ PROJECT_ID=""
 ISSUE_ID=""
 LABEL_ID=""
 SAVED_FILTER_ID=""
+TEAM_INVITE_ID=""
 SMOKE_MEMBER_ID=""
 CSRF_TOKEN=""
 MEMBER_CSRF_TOKEN=""
 TEMP_MEMBER_CSRF_TOKEN=""
 
 cleanup() {
+	if [ -n "$TEAM_INVITE_ID" ]; then
+		curl -fsS -b "$COOKIE_JAR" -H "X-CSRF-Token: $CSRF_TOKEN" -H "Content-Type: application/json" -d '{}' \
+			"$API_BASE_URL/api/v1/team/invites/$TEAM_INVITE_ID/revoke" >/dev/null 2>&1 || true
+	fi
 	if [ -n "$SMOKE_MEMBER_ID" ]; then
 		curl -fsS -b "$COOKIE_JAR" \
 			-X PATCH \
@@ -173,11 +178,21 @@ api_delete() {
 
 require_command curl
 require_command node
+require_command grep
 
 printf 'Checking backend health at %s\n' "$API_BASE_URL"
 curl -fsS "$API_BASE_URL/healthz" >/dev/null
 curl -fsS "$API_BASE_URL/readyz" | json_value 'data.database === "up"' >/dev/null
 curl -fsS "$API_BASE_URL/api/v1/version" | json_value 'typeof data.version === "string" && typeof data.commit === "string" && typeof data.environment === "string" && Object.prototype.hasOwnProperty.call(data, "build_time")' >/dev/null
+
+printf 'Checking Prometheus metrics safety\n'
+METRICS_BODY="$(curl -fsS "$API_BASE_URL/metrics")"
+printf '%s' "$METRICS_BODY" | grep -q 'team_task_tracker_http_requests_total'
+printf '%s' "$METRICS_BODY" | grep -q 'team_task_tracker_database_ready'
+if printf '%s' "$METRICS_BODY" | grep -Fq "$ADMIN_PASSWORD"; then
+	printf 'Metrics leaked the admin password\n' >&2
+	exit 1
+fi
 
 printf 'Checking unauthenticated session guard\n'
 if [ "$(api_status "/api/v1/auth/me")" != "401" ]; then
@@ -190,6 +205,7 @@ api_post "/api/v1/auth/login" "{\"login\":\"$ADMIN_LOGIN\",\"password\":\"$ADMIN
 CSRF_TOKEN="$(api_csrf_token_with_jar "$COOKIE_JAR")"
 
 ADMIN_USER_ID="$(api_get "/api/v1/auth/me" | json_value 'data.user.id')"
+ADMIN_EMAIL="$(api_get "/api/v1/auth/me" | json_value 'data.user.email')"
 
 printf 'Checking team members\n'
 api_get "/api/v1/team/members" | json_value "data.members.some((member) => member.id === \"$ADMIN_USER_ID\" && member.role === \"admin\")" >/dev/null
@@ -230,11 +246,31 @@ if [ "$(api_patch_status_with_jar "$MEMBER_COOKIE_JAR" "/api/v1/team/members/$AD
 	printf 'Expected member password reset to return 403\n' >&2
 	exit 1
 fi
+if [ "$(api_get_status_with_jar "$MEMBER_COOKIE_JAR" "/api/v1/email/diagnostics")" != "403" ]; then
+	printf 'Expected member email diagnostics to return 403\n' >&2
+	exit 1
+fi
 
 RUN_ID="$(date +%M%S)$$"
 PROJECT_KEY="$(printf 'S%s' "$RUN_ID" | cut -c1-10)"
 PROJECT_NAME="Smoke Project $RUN_ID"
 ISSUE_TITLE="Smoke issue $RUN_ID"
+
+printf 'Checking V5 password reset privacy and email diagnostics\n'
+RESET_MESSAGE_KNOWN="$(curl -fsS -H 'Content-Type: application/json' -d "{\"email\":\"$ADMIN_EMAIL\"}" "$API_BASE_URL/api/v1/auth/password-reset/request" | json_value 'data.message')"
+RESET_MESSAGE_UNKNOWN="$(curl -fsS -H 'Content-Type: application/json' -d "{\"email\":\"missing-$RUN_ID@example.com\"}" "$API_BASE_URL/api/v1/auth/password-reset/request" | json_value 'data.message')"
+if [ "$RESET_MESSAGE_KNOWN" != "$RESET_MESSAGE_UNKNOWN" ]; then
+	printf 'Password reset response disclosed account existence\n' >&2
+	exit 1
+fi
+api_get "/api/v1/email/diagnostics" | json_value 'typeof data.total === "number" && typeof data.counts.pending === "number" && Array.isArray(data.recent_terminal_failures) && data.recent_terminal_failures.every((failure) => !Object.prototype.hasOwnProperty.call(failure, "template_data"))' >/dev/null
+
+printf 'Checking V5 invite delivery metadata\n'
+TEAM_INVITE_EMAIL="smoke-invite-$RUN_ID@example.com"
+TEAM_INVITE_ID="$(api_post "/api/v1/team/invites" "{\"email\":\"$TEAM_INVITE_EMAIL\",\"role\":\"member\"}" | json_value 'data.email_delivery_status === "pending" && typeof data.email_queued_at === "string" && data.email_queued_at.length > 0 && data.id')"
+api_get "/api/v1/team/invites" | json_value "data.invites.some((invite) => invite.id === \"$TEAM_INVITE_ID\" && invite.email_delivery_status !== \"not_sent\" && !Object.prototype.hasOwnProperty.call(invite, \"accept_token\"))" >/dev/null
+api_post "/api/v1/team/invites/$TEAM_INVITE_ID/revoke" '{}' | json_value 'data.status === "revoked"' >/dev/null
+TEAM_INVITE_ID=""
 
 printf 'Creating project %s\n' "$PROJECT_KEY"
 PROJECT_ID="$(api_post "/api/v1/projects" "{\"key\":\"$PROJECT_KEY\",\"name\":\"$PROJECT_NAME\",\"description\":\"Created by API smoke test.\"}" | json_value 'data.id')"

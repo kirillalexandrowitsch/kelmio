@@ -78,7 +78,9 @@ jobs:
         run: sh -n scripts/*.sh
 
       - name: Validate development Compose config
-        run: docker compose config >/dev/null
+        run: |
+          docker compose config >/dev/null
+          docker compose --profile monitoring config >/dev/null
 
       - name: Validate production Compose config
         run: docker compose --env-file deploy/production.env.example -f docker-compose.prod.yml config >/dev/null

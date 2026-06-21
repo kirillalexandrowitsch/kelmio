@@ -1,4 +1,10 @@
-import { expect, test, type APIResponse, type Page } from "@playwright/test";
+import {
+  expect,
+  test,
+  type APIResponse,
+  type BrowserContext,
+  type Page,
+} from "@playwright/test";
 
 import type { TeamMember } from "../src/lib/api-types";
 
@@ -9,6 +15,7 @@ const appBaseURL = process.env.E2E_BASE_URL ?? "http://localhost:5173";
 const mailpitBaseURL = process.env.E2E_MAILPIT_BASE_URL ?? "http://localhost:8025";
 
 test("V5 password reset UI: request email, reset password, and sign in", async ({
+  browser,
   page,
 }) => {
   const runId = newRunId();
@@ -17,6 +24,7 @@ test("V5 password reset UI: request email, reset password, and sign in", async (
   const initialPassword = "initial12345";
   const temporaryPassword = `reset-${Date.now().toString(36)}-pass`;
   let memberId = "";
+  let resetContext: BrowserContext | null = null;
 
   try {
     await login(page);
@@ -29,30 +37,47 @@ test("V5 password reset UI: request email, reset password, and sign in", async (
     });
     memberId = member.id;
     await logoutViaApi(page);
+    await login(page, username, initialPassword);
 
-    await page.goto("/");
-    await page.getByRole("button", { name: "Forgot password?" }).click();
-    await expect(page.getByRole("heading", { name: "Reset your password" })).toBeVisible();
+    resetContext = await browser.newContext();
+    const resetPage = await resetContext.newPage();
 
-    await page.getByLabel("Email").fill(email);
-    await page.getByRole("button", { name: "Send reset link" }).click();
-    await expect(page.getByText("Password reset instructions sent")).toBeVisible();
-
-    const resetLink = await waitForValidPasswordResetLink(page, email);
-    await page.goto(resetLink);
+    await resetPage.goto("/");
+    await resetPage.getByRole("button", { name: "Forgot password?" }).click();
     await expect(
-      page.getByRole("heading", { name: "Choose a new password" }),
+      resetPage.getByRole("heading", { name: "Reset your password" }),
     ).toBeVisible();
-    await expect(page.getByText(email, { exact: true })).toBeVisible();
 
-    await page.getByLabel("New password").fill(temporaryPassword);
-    await page.getByLabel("Confirm password").fill(temporaryPassword);
-    await page.getByRole("button", { name: "Reset password" }).click();
-    await expect(page.getByText("Your password has been reset")).toBeVisible();
+    await resetPage.getByLabel("Email").fill(email);
+    await resetPage.getByRole("button", { name: "Send reset link" }).click();
+    await expect(
+      resetPage.getByText("Password reset instructions sent"),
+    ).toBeVisible();
 
-    await page.getByRole("button", { name: "Go to sign in" }).click();
-    await login(page, username, temporaryPassword);
+    const resetLink = await waitForValidPasswordResetLink(resetPage, email);
+    await resetPage.goto(resetLink);
+    await expect(
+      resetPage.getByRole("heading", { name: "Choose a new password" }),
+    ).toBeVisible();
+    await expect(resetPage.getByText(email, { exact: true })).toBeVisible();
+
+    await resetPage.getByLabel("New password").fill(temporaryPassword);
+    await resetPage.getByLabel("Confirm password").fill(temporaryPassword);
+    await resetPage.getByRole("button", { name: "Reset password" }).click();
+    await expect(resetPage.getByText("Your password has been reset")).toBeVisible();
+
+    const staleSessionResponse = await page.request.get(`${apiBaseURL}/api/v1/auth/me`);
+    expect(staleSessionResponse.status()).toBe(401);
+
+    const reusePage = await resetContext.newPage();
+    await reusePage.goto(resetLink);
+    await expect(reusePage.getByRole("alert")).toContainText("already used");
+    await reusePage.close();
+
+    await resetPage.getByRole("button", { name: "Go to sign in" }).click();
+    await login(resetPage, username, temporaryPassword);
   } finally {
+    await resetContext?.close().catch(() => undefined);
     if (memberId) {
       await logoutViaApi(page).catch(() => undefined);
       await login(page);

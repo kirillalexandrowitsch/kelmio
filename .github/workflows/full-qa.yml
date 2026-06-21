@@ -14,9 +14,9 @@ concurrency:
 
 jobs:
   full-qa:
-    name: V1 V2 V3 V4 full QA
+    name: V1 V2 V3 V4 V5 full QA
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
 
     steps:
       - name: Check out repository
@@ -57,11 +57,23 @@ jobs:
       - name: Run API smoke
         run: make smoke-api
 
+      - name: Run email delivery recovery smoke
+        run: make smoke-email-delivery
+
       - name: Run backend integration tests
         run: make backend-integration-test
 
       - name: Run browser e2e
         run: make frontend-e2e
+
+      - name: Run operations smoke
+        run: make smoke-operations
+
+      - name: Validate local monitoring stack
+        run: |
+          make monitoring-up
+          make monitoring-check
+          make monitoring-down
 
       - name: Validate production configuration
         run: |
@@ -74,6 +86,19 @@ jobs:
       - name: Run repository verification
         run: make verify
 
+      - name: Run backend static and race checks
+        working-directory: backend
+        run: |
+          go vet ./...
+          go test -race ./...
+
+      - name: Audit frontend dependencies
+        working-directory: frontend
+        run: npm audit --audit-level=high
+
+      - name: Check repository diff
+        run: git diff --check
+
       - name: Clean up Docker resources
         if: always()
-        run: docker compose down -v --remove-orphans
+        run: docker compose --profile monitoring down -v --remove-orphans
