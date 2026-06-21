@@ -54,7 +54,9 @@ docker run -d \
 	"$POSTGRES_IMAGE" >/dev/null
 
 attempts=60
-until docker exec "$CONTAINER_NAME" pg_isready -U "$CHECK_USER" -d "$CHECK_DB" >/dev/null 2>&1; do
+# The image's temporary init server accepts socket connections before it
+# shuts down. TCP is available only after the final server has started.
+until docker exec "$CONTAINER_NAME" pg_isready -h 127.0.0.1 -U "$CHECK_USER" -d "$CHECK_DB" >/dev/null 2>&1; do
 	attempts=$((attempts - 1))
 	if [ "$attempts" -le 0 ]; then
 		printf '%s\n' 'Timed out waiting for restore-check PostgreSQL.' >&2
@@ -63,15 +65,15 @@ until docker exec "$CONTAINER_NAME" pg_isready -U "$CHECK_USER" -d "$CHECK_DB" >
 	sleep 1
 done
 
-docker exec "$CONTAINER_NAME" psql -q -v ON_ERROR_STOP=1 -U "$CHECK_USER" -d "$CHECK_DB" -c "SET client_min_messages TO WARNING; DROP SCHEMA IF EXISTS public CASCADE;" >/dev/null
+docker exec "$CONTAINER_NAME" psql -q -v ON_ERROR_STOP=1 -h 127.0.0.1 -U "$CHECK_USER" -d "$CHECK_DB" -c "SET client_min_messages TO WARNING; DROP SCHEMA IF EXISTS public CASCADE;" >/dev/null
 
 if [ "${BACKUP##*.}" = "gz" ]; then
-	gzip -dc "$BACKUP" | docker exec -i "$CONTAINER_NAME" psql -q -v ON_ERROR_STOP=1 -U "$CHECK_USER" -d "$CHECK_DB" >/dev/null
+	gzip -dc "$BACKUP" | docker exec -i "$CONTAINER_NAME" psql -q -v ON_ERROR_STOP=1 -h 127.0.0.1 -U "$CHECK_USER" -d "$CHECK_DB" >/dev/null
 else
-	docker exec -i "$CONTAINER_NAME" psql -q -v ON_ERROR_STOP=1 -U "$CHECK_USER" -d "$CHECK_DB" <"$BACKUP" >/dev/null
+	docker exec -i "$CONTAINER_NAME" psql -q -v ON_ERROR_STOP=1 -h 127.0.0.1 -U "$CHECK_USER" -d "$CHECK_DB" <"$BACKUP" >/dev/null
 fi
 
-core_table_count=$(docker exec "$CONTAINER_NAME" psql -v ON_ERROR_STOP=1 -U "$CHECK_USER" -d "$CHECK_DB" -tAc "
+core_table_count=$(docker exec "$CONTAINER_NAME" psql -v ON_ERROR_STOP=1 -h 127.0.0.1 -U "$CHECK_USER" -d "$CHECK_DB" -tAc "
 	SELECT count(*)
 	FROM information_schema.tables
 	WHERE table_schema = 'public'
@@ -83,7 +85,7 @@ if [ "$core_table_count" != "5" ]; then
 	exit 1
 fi
 
-docker exec "$CONTAINER_NAME" psql -v ON_ERROR_STOP=1 -U "$CHECK_USER" -d "$CHECK_DB" -c "SELECT count(*) FROM workspaces;" >/dev/null
-docker exec "$CONTAINER_NAME" psql -v ON_ERROR_STOP=1 -U "$CHECK_USER" -d "$CHECK_DB" -c "SELECT count(*) FROM issues;" >/dev/null
+docker exec "$CONTAINER_NAME" psql -v ON_ERROR_STOP=1 -h 127.0.0.1 -U "$CHECK_USER" -d "$CHECK_DB" -c "SELECT count(*) FROM workspaces;" >/dev/null
+docker exec "$CONTAINER_NAME" psql -v ON_ERROR_STOP=1 -h 127.0.0.1 -U "$CHECK_USER" -d "$CHECK_DB" -c "SELECT count(*) FROM issues;" >/dev/null
 
 printf 'Restore check passed: %s\n' "$BACKUP"
