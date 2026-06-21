@@ -86,6 +86,11 @@ command -v node >/dev/null 2>&1 || fail 'node is required'
 
 printf '%s\n' 'Preparing email delivery services...'
 docker compose up -d postgres backend email-worker mailpit >/dev/null
+deadline=$(( $(date +%s) + 60 ))
+until curl -fsS "$API_BASE_URL/readyz" >/dev/null 2>&1; do
+	[ "$(date +%s)" -lt "$deadline" ] || fail 'backend did not become ready'
+	sleep 1
+done
 
 curl -fsS -b "$COOKIE_JAR" -c "$COOKIE_JAR" \
 	-H 'Content-Type: application/json' \
