@@ -204,13 +204,18 @@ administrative controls и automated/manual QA. Названия, UX и внут
 A version is complete only when:
 
 1. every capability assigned to it meets its acceptance summary;
-2. its detailed plan and README match actual behavior;
+2. its detailed plan, operations documentation and this baseline match actual
+   behavior;
 3. relevant unit, component, integration, smoke and browser tests pass;
 4. full regression confirms completed earlier capabilities remain intact;
 5. this matrix is updated in the final QA commit.
 
 The project is functionally closed only after `CLOSE-001` is complete and no
 included capability remains `planned`, `in_progress` or `deferred`.
+
+The root `README.md` is the final-state product cover and does not track
+per-version implementation status. V24 closure includes a final reconciliation
+of that cover with the completed capability matrix.
 
 ## 6. Reference Sources
 

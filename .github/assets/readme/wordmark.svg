@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 150" role="img" aria-labelledby="title desc">
+  <title id="title">Team Task Tracker</title>
+  <desc id="desc">Team Task Tracker wordmark with an original connected workflow symbol.</desc>
+  <rect width="760" height="150" rx="28" fill="#f7f8f4"/>
+  <g transform="translate(34 31)">
+    <rect width="88" height="88" rx="24" fill="#17211b"/>
+    <path d="M27 28 60 28 43 60" fill="none" stroke="#7fa18a" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="27" cy="28" r="8" fill="#a9d2b5"/>
+    <circle cx="60" cy="28" r="8" fill="#e4b879"/>
+    <circle cx="43" cy="60" r="8" fill="#8bc2ca"/>
+  </g>
+  <text x="150" y="70" fill="#17211b" font-family="Georgia, serif" font-size="42" letter-spacing="-1">Team Task Tracker</text>
+  <text x="152" y="101" fill="#657268" font-family="Aptos, Segoe UI, sans-serif" font-size="15" font-weight="700" letter-spacing="2.6">ONE CONNECTED WORK PLATFORM</text>
+</svg>

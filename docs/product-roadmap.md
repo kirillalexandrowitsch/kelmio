@@ -40,6 +40,17 @@ administration и provider-neutral AI-equivalent.
 - AI capabilities остаются provider-neutral и должны иметь детерминированный
   localhost test mode.
 
+### README Policy
+
+- Root `README.md` является final-state product cover, а не источником текущего
+  implementation status.
+- Фактическое состояние capabilities определяется только
+  [capability baseline](jira-family-capability-baseline.md) и version plans.
+- V6-V23 не включают отдельные README-update commits; они обновляют baseline,
+  version documentation и соответствующие operations guides.
+- V24 final parity audit сверяет README с завершенным продуктом и исправляет
+  только фактические, визуальные или legal расхождения.
+
 ## 3. Product Boundary
 
 ### Входит в целевой функциональный паритет

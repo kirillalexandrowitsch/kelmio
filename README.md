@@ -1,189 +1,186 @@
-# Team Task Tracker
+<p align="center">
+  <img src=".github/assets/readme/wordmark.svg" alt="Team Task Tracker" width="680">
+</p>
 
-Original localhost-only Jira-family functional-parity project, built with Go, React + TypeScript, PostgreSQL, and Docker.
+<h1 align="center">One local platform to plan, build, support, discover, and operate.</h1>
 
-Current status: V1-V4 and the post-V3 maintainability cleanup are fully completed. V5 is the next implementation stage in the V5-V24 roadmap.
+<p align="center">
+  Team Task Tracker connects software delivery, service management, product discovery,
+  assets, analytics, automation, and AI in one private work platform.
+</p>
 
-The long-term target is functional parity with the significant Jira platform, Jira Software, Jira Service Management, Jira Product Discovery, and Assets capabilities available on June 15, 2026. Team Task Tracker keeps its own product identity, interface, architecture, and source code. It does not copy Atlassian branding or proprietary implementation.
+<p align="center">
+  <a href="https://github.com/kirillalexandrowitsch/team-task-tracker/actions/workflows/ci.yml"><img src="https://github.com/kirillalexandrowitsch/team-task-tracker/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/kirillalexandrowitsch/team-task-tracker/actions/workflows/full-qa.yml"><img src="https://github.com/kirillalexandrowitsch/team-task-tracker/actions/workflows/full-qa.yml/badge.svg" alt="Full QA"></a>
+  <img src="https://img.shields.io/badge/local--first-private-4e795d" alt="Local-first">
+  <img src="https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white" alt="Go 1.26">
+  <img src="https://img.shields.io/badge/React-19-20232A?logo=react&logoColor=61DAFB" alt="React 19">
+  <img src="https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white" alt="PostgreSQL 16">
+  <img src="https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white" alt="Docker Compose">
+</p>
 
-## Features
+<p align="center">
+  <a href="#why-team-task-tracker">Why Team Task Tracker</a> |
+  <a href="#one-connected-platform">Platform</a> |
+  <a href="#product-experiences">Product Experiences</a> |
+  <a href="#platform-architecture">Architecture</a> |
+  <a href="#documentation">Documentation</a>
+</p>
 
-- Workspace authentication, admin/member roles, team management, and invite-link onboarding.
-- Projects, issues, board/list views, labels, comments, activity, hierarchy, subtasks, and issue links.
-- Sprint planning, active sprint board, story points, dashboard summary, and saved filters.
-- In-app notifications with unread state and read/read-all actions.
-- Project-specific workflows with custom statuses, enforced transition graphs, and atomic archive-with-replacement.
-- Project roles, dynamic project and active sprint boards, and synchronous single-pass automation with activity and notifications.
-- Production config validation, secure cookies, trusted-origin CORS, CSRF protection, login rate limiting, and security headers.
-- Production Docker images, single-origin Docker Compose stack, Caddy-managed HTTPS, backup/restore scripts, and first-admin bootstrap.
-- JSON production logs, `X-Request-ID`, runtime version metadata, pagination, performance indexes, GitHub Actions CI, API smoke, and Playwright e2e.
+<img src=".github/assets/readme/hero.webp" alt="Team Task Tracker unified operations overview" width="100%">
 
-V1-V4 scope and decisions are documented in:
+## Why Team Task Tracker
 
-- [docs/mvp-plan.md](docs/mvp-plan.md)
-- [docs/v2-plan.md](docs/v2-plan.md)
-- [docs/v3-plan.md](docs/v3-plan.md)
-- [docs/v1-v3-cleanup-plan.md](docs/v1-v3-cleanup-plan.md)
-- [docs/v4-plan.md](docs/v4-plan.md)
+Team Task Tracker is an original, localhost-first system for organizations that
+want one coherent operating model for work without handing their data or
+processes to a managed cloud. It combines the functional breadth of modern
+work management, agile delivery, service operations, product discovery, and
+configuration management while preserving a single identity, permission,
+workflow, search, and audit foundation.
 
-Long-term direction and the next stage are documented in:
+<table>
+  <tr>
+    <td width="50%">
+      <h3>Shape the platform around your teams</h3>
+      Configure work types, fields, screens, workflows, permissions, boards,
+      forms, queues, reports, and automation without fragmenting the data model.
+    </td>
+    <td width="50%">
+      <h3>Move from signal to outcome</h3>
+      Connect customer evidence, ideas, goals, plans, delivery work, releases,
+      services, incidents, changes, and assets in one traceable work graph.
+    </td>
+  </tr>
+  <tr>
+    <td width="50%">
+      <h3>Automate with control</h3>
+      Build transparent rules, approvals, integrations, and provider-neutral AI
+      assistance that always respects permissions and records what changed.
+    </td>
+    <td width="50%">
+      <h3>Own the complete system</h3>
+      Run the application, data, email, monitoring, backups, and restore drills
+      locally with no dependency on a hosting provider or managed SaaS account.
+    </td>
+  </tr>
+</table>
 
-- [docs/jira-family-capability-baseline.md](docs/jira-family-capability-baseline.md)
-- [docs/product-roadmap.md](docs/product-roadmap.md)
-- [docs/v5-plan.md](docs/v5-plan.md)
+## One Connected Platform
 
-The current estimate is V5-V24 and approximately 300-450 small, independently verifiable commits. The application and its complete release QA remain reproducible on localhost. Real hosting, a public domain, and deployment are not project-closure requirements.
+Every experience shares the same platform core. Teams can work differently
+without losing common identity, governance, history, or cross-domain context.
 
-## Stack
+<img src=".github/assets/readme/platform-map.svg" alt="Team Task Tracker connected platform map" width="100%">
 
-- Backend: Go modular monolith, `net/http`, `pgx`
-- Frontend: React + TypeScript, Vite
-- Database: PostgreSQL 16
-- Infrastructure: Docker Compose, Caddy for production-like HTTPS QA
-- Tests: Go unit/integration/race tests, Vitest/React Testing Library, API and production hardening smoke, Playwright e2e, fast and full GitHub Actions workflows
+## Product Experiences
 
-## V4 Workflows, Permissions, And Automation
+### Configurable work management
 
-Each project has its own ordered workflow statuses and allowed transition graph. Used statuses can be archived only with an active replacement, which moves affected issues atomically. The project board and active sprint board use the project's live workflow.
+Create rich work items, custom hierarchies, reusable field and workflow
+schemes, strict transition policies, dependencies, releases, and
+permission-aware views. Scrum and Kanban teams can shape boards, backlogs,
+ranking, swimlanes, WIP limits, quick filters, and card layouts around their
+delivery model.
 
-The API keeps the legacy immutable issue `status` key for V1-V3 compatibility, while the UI and additive API fields use workflow statuses. Sprint and dashboard completion metrics use workflow category `done`, not a hardcoded status key.
+<img src=".github/assets/readme/work-management.webp" alt="Configurable Team Task Tracker workflow board" width="100%">
 
-| Role | Project access |
+### Planning, goals, and analytics
+
+Coordinate initiatives across teams with dependency timelines, capacity and
+scenario planning, goals, releases, and delivery confidence. Turn the same
+live data into agile reports, cross-project analytics, dashboards, and
+scheduled decision-ready views.
+
+<img src=".github/assets/readme/planning-analytics.webp" alt="Portfolio planning and delivery analytics" width="100%">
+
+### Service management and operations
+
+Give customers a structured request portal and agents a unified workspace for
+queues, SLAs, approvals, incidents, problems, changes, services, on-call
+schedules, and escalations. Keep response work connected to owners,
+dependencies, delivery teams, and customer communication.
+
+<img src=".github/assets/readme/service-management.webp" alt="Service management queues, SLAs, incidents, and on-call operations" width="100%">
+
+### Product discovery
+
+Capture ideas, feedback, and evidence from every channel. Compare opportunities
+with configurable fields and formulas, prioritize transparently, publish
+roadmaps, and connect product bets directly to delivery progress and outcomes.
+
+<img src=".github/assets/readme/product-discovery.webp" alt="Product discovery opportunity landscape and evidence inbox" width="100%">
+
+### Assets and configuration management
+
+Model services, infrastructure, devices, applications, owners, and
+relationships with typed object schemas and searchable history. Use live
+configuration context to understand incident impact, assess change risk, and
+connect operational work to the systems it affects.
+
+<img src=".github/assets/readme/assets-configuration.webp" alt="Asset and service dependency graph" width="100%">
+
+### Automation, integrations, and AI
+
+Build organization-wide rules with scheduled and event-driven triggers,
+branching, smart values, related-entity actions, approvals, execution history,
+and diagnostics. Connect external systems through scoped APIs and reliable
+webhooks, then add provider-neutral AI for search, summarization, drafting,
+triage, and permission-checked actions.
+
+<img src=".github/assets/readme/automation-ai.webp" alt="Automation rule studio and AI operations assistant" width="100%">
+
+## Built For Every Team
+
+| Team | Connected experience |
 |---|---|
-| Workspace admin | Full access to every project |
-| Project lead | Manage project members, workflow, automation, issues, comments, and sprints |
-| Contributor | Create and update issues, comments, and sprints |
-| Viewer | Read-only project access |
-| No project membership | Cannot see project data |
+| Software delivery | Backlogs, boards, sprints, releases, development context, plans, and reports |
+| Product management | Ideas, insights, prioritization, goals, roadmaps, and outcome tracking |
+| Service teams | Portals, queues, request types, SLAs, approvals, and knowledge-driven support |
+| IT operations | Services, incidents, changes, on-call, assets, dependencies, and automation |
+| Leadership | Cross-team goals, portfolio scenarios, dashboards, risks, and delivery confidence |
+| Administrators | Organizations, workspaces, identities, groups, schemes, policies, audit, and diagnostics |
 
-Automation rules execute synchronously, atomically, and single-pass inside the originating issue transaction. Rule actions do not trigger additional rules; applied changes are recorded in issue activity and can create final-result notifications.
+## Private By Design
 
-## Local Development
+- **Local ownership:** application data, configuration, files, metrics, email,
+  backups, and AI provider settings remain under your control.
+- **Permission-aware by default:** every search result, report, automation,
+  integration, and AI action uses the same authorization model.
+- **Auditable operations:** work history, administrative changes, automation
+  executions, delivery attempts, and security-sensitive actions are traceable.
+- **Recoverable infrastructure:** health checks, metrics, alerts, durable
+  workers, scheduled backups, retention, and isolated restore drills are part
+  of the platform rather than afterthoughts.
 
-Requirements: Docker with Compose, Go, Node.js/npm, and `curl`.
+## Platform Architecture
 
-```sh
-make doctor
+Team Task Tracker is a modular Go and React platform backed by PostgreSQL. A
+single transactional domain model supports work, planning, service management,
+discovery, assets, governance, and audit. Durable workers handle email,
+automation, integrations, scheduled operations, and recovery paths. Versioned
+REST APIs, signed webhooks, local object storage, observability, and deterministic
+mock providers keep integrations and AI testable without external services.
 
-# terminal 1
-make dev
+The system is designed as one local installation with multiple isolated
+organizations and workspaces. Production-shaped security and operations can be
+validated entirely on localhost, including TLS, permissions, migrations,
+monitoring, backup, restore, and full browser regression.
 
-# terminal 2, after services are up
-make setup-db
-make smoke-api
-```
+## Documentation
 
-Open `http://localhost:5173` and sign in:
-
-```text
-username: admin
-password: admin12345
-```
-
-Development endpoints:
-
-- frontend: `http://localhost:5173`
-- backend health: `http://localhost:8080/healthz`
-- backend readiness: `http://localhost:8080/readyz`
-- runtime metadata: `http://localhost:8080/api/v1/version`
-- PostgreSQL: `localhost:15432`
-- Mailpit SMTP: `localhost:1025`
-- Mailpit UI: `http://localhost:8025`
-
-`make setup-db` applies migrations and runs the idempotent localhost demo seed. The V4 seed makes `admin` a DEMO project lead and `demo_member` a contributor, adds the custom `review` status, DEMO-11/12, automation rules, readable automation activity, and automation notifications alongside the existing V1-V3 demo data. Do not use the demo seed in production.
-
-Useful commands:
-
-```sh
-make help
-make dev
-make down
-make logs
-make setup-db
-make smoke-api
-make smoke-production
-make prod-stack-qa
-make frontend-e2e
-make verify
-GOCACHE=/private/tmp/team-task-tracker-gocache make backend-integration-test
-```
-
-## V4 Local QA Flow
-
-```sh
-make setup-db
-make smoke-api
-make frontend-e2e
-GOCACHE=/private/tmp/team-task-tracker-gocache make backend-integration-test
-GOCACHE=/private/tmp/team-task-tracker-gocache make verify
-```
-
-Manual V4 checks:
-
-- In Projects, manage lead/contributor/viewer roles and confirm viewer/no-membership restrictions.
-- In Workflow, create, edit, reorder, and archive a status with replacement, then save a restricted transition graph.
-- Open the project board and active sprint board and confirm both use the project's custom workflow columns.
-- Create an automation rule, trigger it from an issue, and verify the resulting issue activity and notification.
-
-## Production-Like Local QA
-
-The repository keeps a production-shaped Compose and Caddy stack so security,
-operations, upgrades, backup, and restore behavior can be verified locally.
-These guides remain the reference for that QA environment:
-
-- [Self-hosted deployment](docs/self-hosted-deployment.md)
+- [Jira family capability baseline](docs/jira-family-capability-baseline.md)
+- [Product roadmap](docs/product-roadmap.md)
+- [Self-hosted architecture and operations](docs/self-hosted-deployment.md)
 - [Backup and restore](docs/backup-restore.md)
-- [V3 local and production QA](docs/v3-local-production-qa.md)
+- [V5 operations foundation](docs/v5-plan.md)
 
-The production-like flow uses `docker-compose.prod.yml`, a private ignored `deploy/production.env`, Caddy HTTPS, explicit migrations, and a one-time first-admin bootstrap. The bootstrap refuses to run when workspace or user data already exists.
+---
 
-The backend accepts an explicit `DATABASE_URL` override. When it is absent, the production stack passes separate `POSTGRES_*` values and the backend safely constructs the PostgreSQL URL, including URL-encoding arbitrary strong passwords.
-
-Minimum production-like security requirements:
-
-- a real HTTPS origin for `PUBLIC_APP_URL` and exact `TRUSTED_ORIGINS`;
-- `SESSION_COOKIE_SECURE=true`;
-- private PostgreSQL password and 32+ character `CSRF_SECRET`;
-- private, strong bootstrap admin password removed from the env file after first use;
-- verified backup before every update.
-
-This stack is a localhost quality gate, not a commitment to select a hosting
-provider or perform a public deployment.
-
-## Verification
-
-Baseline checks:
-
-```sh
-make prod-config-check
-make prod-compose-check
-make prod-stack-qa
-make smoke-production
-make smoke-api
-make frontend-e2e
-make verify
-GOCACHE=/private/tmp/team-task-tracker-gocache make backend-integration-test
-git diff --check
-```
-
-`make prod-stack-qa` creates and removes an isolated production Compose stack with a special-character PostgreSQL password, migrations, first-admin bootstrap, internal TLS, hardening smoke, backup, and restore-check. `make smoke-api` covers V1-V4 business flows, including custom workflows, project roles, automation, activity, notifications, and V4 seed checks. `make smoke-production` covers request IDs, security headers, CORS, cookies, CSRF, request size limits, and login rate limiting. Playwright covers V1-V4 flows, including project membership, workflow settings and boards, permissions, automation management, activity, and notifications.
-
-The fast GitHub Actions workflow runs on every push and pull request. The separate `V1 V2 V3 V4 full QA` job can be started manually and also runs weekly; it covers the complete development, integration, browser, and isolated production-stack baseline.
-
-## Operations And Observability
-
-- Every backend response includes `X-Request-ID`; use it to correlate an incident with backend logs.
-- `APP_ENV=production` enables JSON logs without query strings, headers, cookies, bodies, passwords, or tokens.
-- `GET /api/v1/version` returns deployment version, commit, environment, and optional build time.
-- The login limiter is in-memory and single-node; it resets after backend restart and is not synchronized between backend instances.
-- Backups contain sensitive application data and must be stored privately outside Git.
-
-## V1-V4 Completion Status
-
-V1, V2, V3, V4, and the post-V3 cleanup are fully completed. On June 15, 2026, the final V1-V4 audit passed two consecutive idempotent database setups, unit/component/integration/race/vet checks, production and API smoke, all Playwright e2e scenarios, production config and Compose validation, isolated production-stack TLS/security/bootstrap/backup/restore QA, production builds, and dependency audit. The final polish also updated Vite to `8.0.16` to remove known high-severity build-tool vulnerabilities. No known V1-V4 blocker bugs remain.
-
-V5 begins the operations foundation for the full Jira-family roadmap. Future
-versions close capabilities tracked in the baseline through V24, when the
-project can be declared functionally complete after a full localhost parity
-audit. The closure gate does not require a real server, hosting provider,
-public domain, or production pilot.
+<p align="center">
+  <strong>Team Task Tracker is an independent product with its own name, design,
+  architecture, and source code.</strong><br>
+  It is not affiliated with, endorsed by, or sponsored by Atlassian. Jira,
+  Jira Service Management, Jira Product Discovery, and Assets are referenced
+  only to describe functional coverage; all related trademarks belong to their
+  respective owners.
+</p>
