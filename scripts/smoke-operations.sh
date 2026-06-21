@@ -20,6 +20,15 @@ cleanup() {
 	fi
 }
 
+read_restore_state() {
+	BACKUP_DIR="$QA_DIR" docker compose --profile monitoring run --rm --no-deps \
+		--entrypoint cat backup-worker /backups/restore-drill-state.json
+}
+
+state_value() {
+	printf '%s' "$1" | jq -r "$2"
+}
+
 trap cleanup EXIT INT TERM
 cd "$ROOT_DIR"
 
@@ -41,11 +50,10 @@ BACKUP_DIR="$QA_DIR" BACKUP_RETENTION_COUNT=2 docker compose --profile monitorin
 scheduled=$(find "$QA_DIR" -maxdepth 1 -type f -name 'team-task-tracker-scheduled-*.sql.gz' -print)
 [ "$(printf '%s\n' "$scheduled" | sed '/^$/d' | wc -l | tr -d ' ')" = "1" ] || fail 'expected exactly one scheduled backup'
 valid_backup=$scheduled
-state_file="$QA_DIR/restore-drill-state.json"
-[ -r "$state_file" ] || fail 'restore drill state was not created'
-[ "$(jq -r '.last_result' "$state_file")" = "success" ] || fail 'initial restore drill did not succeed'
-[ "$(jq -r '.last_success_migration_version' "$state_file")" -gt 0 ] || fail 'migration version was not verified'
-first_success=$(jq -r '.last_success_at' "$state_file")
+state=$(read_restore_state) || fail 'restore drill state was not created'
+[ "$(state_value "$state" '.last_result')" = "success" ] || fail 'initial restore drill did not succeed'
+[ "$(state_value "$state" '.last_success_migration_version')" -gt 0 ] || fail 'migration version was not verified'
+first_success=$(state_value "$state" '.last_success_at')
 
 printf '%s\n' 'Rejecting a corrupted latest backup...'
 corrupted="$QA_DIR/team-task-tracker-scheduled-20990101-000000.sql.gz"
@@ -53,15 +61,17 @@ printf '%s\n' 'corrupted backup' >"$corrupted"
 if BACKUP_DIR="$QA_DIR" docker compose --profile monitoring run --rm backup-worker --restore-only; then
 	fail 'corrupted backup unexpectedly passed restore drill'
 fi
-[ "$(jq -r '.last_result' "$state_file")" = "failure" ] || fail 'failed restore result was not persisted'
-[ "$(jq -r '.last_error_code' "$state_file")" = "artifact_invalid" ] || fail 'unexpected corrupted backup error code'
-[ "$(jq -r '.last_success_at' "$state_file")" = "$first_success" ] || fail 'previous successful restore state was lost'
+state=$(read_restore_state) || fail 'failed restore state was not persisted'
+[ "$(state_value "$state" '.last_result')" = "failure" ] || fail 'failed restore result was not persisted'
+[ "$(state_value "$state" '.last_error_code')" = "artifact_invalid" ] || fail 'unexpected corrupted backup error code'
+[ "$(state_value "$state" '.last_success_at')" = "$first_success" ] || fail 'previous successful restore state was lost'
 
 printf '%s\n' 'Recovering with the previous valid backup...'
 rm -f "$corrupted"
 BACKUP_DIR="$QA_DIR" docker compose --profile monitoring run --rm backup-worker --restore-only
-[ "$(jq -r '.last_result' "$state_file")" = "success" ] || fail 'restore drill did not recover'
-[ "$(jq -r '.last_backup_file' "$state_file")" = "$(basename "$valid_backup")" ] || fail 'recovery used an unexpected backup'
+state=$(read_restore_state) || fail 'recovered restore state was not persisted'
+[ "$(state_value "$state" '.last_result')" = "success" ] || fail 'restore drill did not recover'
+[ "$(state_value "$state" '.last_backup_file')" = "$(basename "$valid_backup")" ] || fail 'recovery used an unexpected backup'
 
 printf '%s\n' 'Checking isolated target cleanup and source isolation...'
 target_tables=$(docker compose --profile monitoring exec -T "$RESTORE_SERVICE" psql -U restore_drill -d restore_drill -Atc \
