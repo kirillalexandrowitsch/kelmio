@@ -1,5 +1,16 @@
 # Kelmio V5 Plan
 
+## Completion Status
+
+**V5 fully completed on June 22, 2026.**
+
+Account recovery, durable email delivery, diagnostics, application metrics,
+localhost monitoring, scheduled backups and automated restore verification are
+implemented and passed the final V1-V5 QA release gate. Operational guidance:
+[Email Delivery And Account Recovery](email-delivery.md),
+[Local Operations](local-operations.md) and
+[Backup And Restore](backup-restore.md).
+
 ## 1. Product Goal
 
 V1-V4 закрыли task tracking, planning, production-ready self-hosted foundation,
@@ -551,10 +562,26 @@ V5 полностью завершена, когда:
 Каждый commit должен быть небольшим, проходить релевантные tests и сохранять
 работоспособность завершенных V1-V4 flows.
 
-## 14. Decision For Next Step
+## 14. Final V5 QA Result
 
-Следующий шаг: реализовать commit `Finalize V5 QA polish`.
+V5 завершена 22 июня 2026 года. Все 14 критериев Definition of Done выполнены:
 
-После V5 проект продолжает разрабатываться и проверяться на localhost по
-roadmap V6-V24. Hosting provider, реальный deployment и production pilot не
-входят в критерии закрытия проекта.
+- два последовательных database setup подтвердили migration/seed idempotency;
+- backend unit/integration, race и vet checks прошли;
+- frontend unit/component tests, production build и dependency audit прошли;
+- production-sensitive, API, email recovery и operations smoke прошли;
+- все 14 Playwright V1-V5 browser scenarios прошли;
+- Prometheus, Grafana, Alertmanager, scheduled backup и restore drill checks
+  прошли;
+- production configuration, Caddy и isolated production-stack QA прошли;
+- manual admin/member QA подтвердил email diagnostics и permission isolation;
+- sensitive identifiers не обнаружены в logs, diagnostics или metrics;
+- известных V5 blocker bugs нет.
+
+Capabilities `PLAT-004` и `PLAT-005` отмечены `complete` в
+[product capability baseline](product-capability-baseline.md).
+
+Следующий этап должен начаться с отдельного `docs/v6-plan.md`. После V5 проект
+продолжает разрабатываться и проверяться на localhost по roadmap V6-V24.
+Hosting provider, реальный deployment и production pilot не входят в критерии
+закрытия проекта.

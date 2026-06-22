@@ -66,8 +66,8 @@ end-to-end результат, permission model, error handling, administrative 
 | PLAT-001 | Local Docker development and reproducible QA | V1-V4 | `complete` | Application, database, seed, smoke, integration and browser QA run locally |
 | PLAT-002 | Session authentication and account management | V1-V4 | `complete` | Secure login/logout/session lifecycle and self-service account editing |
 | PLAT-003 | Production-like security and operations baseline | V3 | `complete` | CSRF, secure config, logs, request IDs, backups, restore and clean-room stack QA |
-| PLAT-004 | Account recovery and durable system email | V5 | `planned` | Password reset, SMTP outbox, worker, diagnostics and reliable retries |
-| PLAT-005 | Metrics, alerts and scheduled restore verification | V5 | `planned` | Local Prometheus/Grafana/Alertmanager and automated backup restore drill |
+| PLAT-004 | Account recovery and durable system email | V5 | `complete` | Password reset, SMTP outbox, worker, diagnostics and reliable retries |
+| PLAT-005 | Metrics, alerts and scheduled restore verification | V5 | `complete` | Local Prometheus/Grafana/Alertmanager and automated backup restore drill |
 | PLAT-006 | Organizations, workspaces and site administration | V6 | `planned` | Multiple isolated organizations/workspaces with global and workspace admins |
 | PLAT-007 | Groups, directories and reusable role assignments | V6 | `planned` | Users and groups can be assigned consistently across workspaces and projects |
 | PLAT-008 | Personal preferences, profiles and notification preferences | V13 | `planned` | Users manage locale, appearance, communication and notification settings |
