@@ -52,7 +52,7 @@ func TestSMTPClientDeliversToFakeServer(t *testing.T) {
 	err := client.Send(ctx, Message{
 		To:       []string{"member@example.com"},
 		Subject:  "SMTP smoke",
-		TextBody: "Hello from Team Task Tracker",
+		TextBody: "Hello from Kelmio",
 	})
 	if err != nil {
 		t.Fatalf("Send() error = %v", err)
@@ -60,7 +60,7 @@ func TestSMTPClientDeliversToFakeServer(t *testing.T) {
 
 	select {
 	case body := <-received:
-		if !strings.Contains(body, "Hello from Team Task Tracker") {
+		if !strings.Contains(body, "Hello from Kelmio") {
 			t.Fatalf("message body = %q, want text body", body)
 		}
 		if !strings.Contains(body, "To: member@example.com") {
@@ -99,7 +99,7 @@ func validSMTPConfig(host string, port int) config.Config {
 		SMTPHost:      host,
 		SMTPPort:      port,
 		SMTPFromEmail: "no-reply@example.com",
-		SMTPFromName:  "Team Task Tracker",
+		SMTPFromName:  "Kelmio",
 		SMTPTLSMode:   config.SMTPTLSModeNone,
 	}
 }
@@ -176,7 +176,7 @@ func TestRenderMessageUsesConfiguredSender(t *testing.T) {
 		t.Fatalf("normalizeMessage() error = %v", err)
 	}
 	rendered := string(renderMessage(msg))
-	if !strings.Contains(rendered, `From: "Team Task Tracker" <no-reply@example.com>`) {
+	if !strings.Contains(rendered, `From: "Kelmio" <no-reply@example.com>`) {
 		t.Fatalf("rendered message = %q, want configured sender", rendered)
 	}
 }

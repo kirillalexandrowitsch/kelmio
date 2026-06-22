@@ -51,7 +51,7 @@ func renderTeamInvite(email Email) (mailer.Message, error) {
 	}
 	workspaceName, _ := stringField(email.TemplateData, "workspace_name")
 	if workspaceName == "" {
-		workspaceName = "Team Task Tracker"
+		workspaceName = "Kelmio"
 	}
 	inviterDisplayName, _ := stringField(email.TemplateData, "inviter_display_name")
 	if inviterDisplayName == "" {
@@ -85,11 +85,11 @@ func renderPasswordReset(email Email) (mailer.Message, error) {
 	if displayName == "" {
 		displayName = "there"
 	}
-	textBody := fmt.Sprintf("Hi %s,\n\nUse this link to reset your Team Task Tracker password:\n%s\n\nIf you did not request this reset, you can ignore this email.", displayName, resetURL)
-	htmlBody := fmt.Sprintf("<p>Hi %s,</p><p>Use this link to reset your Team Task Tracker password:</p><p><a href=\"%s\">Reset password</a></p><p>If you did not request this reset, you can ignore this email.</p>", htmlEscape(displayName), htmlEscape(resetURL))
+	textBody := fmt.Sprintf("Hi %s,\n\nUse this link to reset your Kelmio password:\n%s\n\nIf you did not request this reset, you can ignore this email.", displayName, resetURL)
+	htmlBody := fmt.Sprintf("<p>Hi %s,</p><p>Use this link to reset your Kelmio password:</p><p><a href=\"%s\">Reset password</a></p><p>If you did not request this reset, you can ignore this email.</p>", htmlEscape(displayName), htmlEscape(resetURL))
 	return mailer.Message{
 		To:       []string{email.RecipientEmail},
-		Subject:  "Reset your Team Task Tracker password",
+		Subject:  "Reset your Kelmio password",
 		TextBody: textBody,
 		HTMLBody: htmlBody,
 	}, nil

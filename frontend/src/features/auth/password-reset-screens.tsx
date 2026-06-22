@@ -65,9 +65,9 @@ export function ForgotPasswordScreen({ onGoToSignIn }: ForgotPasswordScreenProps
     <main className="auth-shell">
       <section className="auth-panel">
         <div className="brand auth-brand">
-          <span className="brand-mark">TT</span>
+          <span className="brand-mark">K</span>
           <div>
-            <strong>Team Task Tracker</strong>
+            <strong>Kelmio</strong>
             <span>Account recovery</span>
           </div>
         </div>
@@ -219,9 +219,9 @@ export function ResetPasswordScreen({
     <main className="auth-shell">
       <section className="auth-panel">
         <div className="brand auth-brand">
-          <span className="brand-mark">TT</span>
+          <span className="brand-mark">K</span>
           <div>
-            <strong>Team Task Tracker</strong>
+            <strong>Kelmio</strong>
             <span>Account recovery</span>
           </div>
         </div>

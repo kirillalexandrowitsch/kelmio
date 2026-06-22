@@ -2,7 +2,7 @@
   "annotations": {
     "list": []
   },
-  "description": "Local operational signals for the Team Task Tracker API, database, email delivery, backups, and restore drills.",
+  "description": "Local operational signals for the Kelmio API, database, email delivery, backups, and restore drills.",
   "editable": false,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
@@ -1048,7 +1048,7 @@
   },
   "timepicker": {},
   "timezone": "browser",
-  "title": "Team Task Tracker Operations",
+  "title": "Kelmio Operations",
   "uid": "team-task-tracker-operations",
   "version": 1,
   "weekStart": ""

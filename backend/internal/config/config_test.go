@@ -60,7 +60,7 @@ func TestLoadDevelopmentDefaults(t *testing.T) {
 	if cfg.SMTPFromEmail != "no-reply@team-task-tracker.local" {
 		t.Fatalf("SMTPFromEmail = %q, want local sender", cfg.SMTPFromEmail)
 	}
-	if cfg.SMTPFromName != "Team Task Tracker" {
+	if cfg.SMTPFromName != "Kelmio" {
 		t.Fatalf("SMTPFromName = %q, want product sender", cfg.SMTPFromName)
 	}
 	if !cfg.EmailDeliveryEnabled {
@@ -591,7 +591,7 @@ func setValidProductionEmailEnv(t *testing.T) {
 	t.Setenv("SMTP_USERNAME", "smtp-user")
 	t.Setenv("SMTP_PASSWORD", "smtp-password")
 	t.Setenv("SMTP_FROM_EMAIL", "no-reply@example.com")
-	t.Setenv("SMTP_FROM_NAME", "Team Task Tracker")
+	t.Setenv("SMTP_FROM_NAME", "Kelmio")
 	t.Setenv("SMTP_TLS_MODE", SMTPTLSModeStartTLS)
 	t.Setenv("EMAIL_WORKER_POLL_INTERVAL", "5s")
 	t.Setenv("EMAIL_MAX_ATTEMPTS", "7")

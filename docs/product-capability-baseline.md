@@ -1,14 +1,13 @@
-# Jira Family Functional Parity Baseline
+# Kelmio Product Capability Baseline
 
 ## 1. Purpose
 
-Этот документ является измеримым источником истины для долгосрочной цели Team
-Task Tracker: создать оригинальный localhost-only продукт с функциональным
-паритетом Jira family по состоянию на **15 июня 2026 года**.
+Этот документ является измеримым источником истины для долгосрочной цели
+Kelmio: создать оригинальную localhost-only платформу для управления работой,
+планирования, service operations, product discovery и administration.
 
 Baseline фиксирует значимые пользовательские, административные и operations
-capabilities. Он не требует копирования бренда, интерфейса, исходного кода или
-внутренней инфраструктуры Atlassian.
+capabilities, которые должны работать как единая независимая система.
 
 Каждый будущий version plan должен:
 
@@ -18,38 +17,35 @@ capabilities. Он не требует копирования бренда, ин
   criteria;
 - обновлять этот baseline в финальном QA-коммите версии.
 
-## 2. Snapshot And Product Boundary
+## 2. Product Boundary
 
 ### Включено
 
-- Jira platform и Jira Software;
-- Jira Service Management;
-- Jira Product Discovery;
-- Assets и configuration management;
+- configurable work management и agile delivery;
+- service management и customer self-service;
+- product discovery и portfolio planning;
+- assets и configuration management;
 - встроенные workflows, automation, forms, reports и administration;
-- provider-neutral AI-equivalent для значимых Jira AI scenarios;
+- provider-neutral AI assistance для значимых product scenarios;
 - optional реальные integrations с localhost mocks для воспроизводимого QA;
 - responsive PWA как mobile-capability;
 - multi-organization и multi-workspace модель внутри одной локальной установки.
 
 ### Не включено
 
-- отдельные продукты Atlassian: Confluence, Jira Align, Loom, Trello и Bitbucket;
-- Atlassian Marketplace и паритет с тысячами сторонних приложений;
-- Atlassian branding, визуальный дизайн, proprietary code и API compatibility;
+- отдельные системы для документов, video collaboration, source hosting и team chat;
+- паритет с тысячами сторонних marketplace applications;
+- копирование чужого branding, визуального дизайна, proprietary code и API;
 - SaaS billing, managed cloud, real hosting provider и public deployment;
 - native iOS/Android applications;
-- инфраструктурный масштаб, data residency и compliance certifications
-  Atlassian Cloud;
-- будущие Jira capabilities, появившиеся после 15 июня 2026 года, пока они
-  отдельно не приняты в baseline.
+- public-cloud infrastructure scale, external data residency и formal compliance certifications;
+- новые capabilities, которые не были явно приняты в baseline.
 
-### Правило функционального паритета
+### Правило завершения capability
 
-Capability считается `complete`, когда Team Task Tracker предоставляет
-эквивалентный end-to-end результат, permission model, error handling,
-administrative controls и automated/manual QA. Названия, UX и внутреннее
-устройство могут отличаться.
+Capability считается `complete`, когда Kelmio предоставляет полный
+end-to-end результат, permission model, error handling, administrative controls
+и automated/manual QA.
 
 ## 3. Status Model
 
@@ -148,7 +144,7 @@ administrative controls и automated/manual QA. Названия, UX и внут
 | DEV-003 | GitHub, GitLab and Slack integrations | V15 | `planned` | Optional real integrations and localhost mocks cover key collaboration flows |
 | DEV-004 | Extension points without Marketplace parity | V15 | `planned` | Documented internal extension contracts support selected custom integrations |
 
-### Jira Service Management
+### Service Management
 
 | ID | Capability | Target | Status | Acceptance summary |
 |---|---|---:|---|---|
@@ -172,7 +168,7 @@ administrative controls и automated/manual QA. Названия, UX и внут
 | KNOW-002 | Portal knowledge search and deflection | V19 | `planned` | Request intake suggests relevant articles and measures deflection |
 | KNOW-003 | Article lifecycle, feedback and analytics | V19 | `planned` | Knowledge owners manage reviews, feedback and usefulness metrics |
 
-### Jira Product Discovery
+### Product Discovery
 
 | ID | Capability | Target | Status | Acceptance summary |
 |---|---|---:|---|---|
@@ -197,7 +193,7 @@ administrative controls и automated/manual QA. Названия, UX и внут
 | UX-002 | Accessibility and keyboard navigation | V23 | `planned` | Critical flows meet documented accessibility and keyboard acceptance criteria |
 | UX-003 | Localization foundation and locale-aware formatting | V23 | `planned` | UI supports translation catalogs and locale-aware dates/numbers |
 | UX-004 | Large-dataset performance and scale QA | V23 | `planned` | Defined datasets and concurrency targets pass performance budgets locally |
-| CLOSE-001 | Full Jira family parity audit | V24 | `planned` | Every included capability is complete and full V1-V24 QA is green |
+| CLOSE-001 | Full product capability audit | V24 | `planned` | Every included capability is complete and full V1-V24 QA is green |
 
 ## 5. Version Completion Rule
 
@@ -217,14 +213,9 @@ The root `README.md` is the final-state product cover and does not track
 per-version implementation status. V24 closure includes a final reconciliation
 of that cover with the completed capability matrix.
 
-## 6. Reference Sources
+## 6. Baseline Governance
 
-The snapshot is based on official Atlassian product and support documentation:
-
-- [Jira features](https://www.atlassian.com/software/jira/features)
-- [Jira Service Management features](https://www.atlassian.com/software/jira/service-management/features)
-- [Assets documentation](https://support.atlassian.com/assets/docs/get-started-with-assets/)
-- [Jira Product Discovery documentation](https://support.atlassian.com/jira-product-discovery/docs/what-is-jira-product-discovery/)
-
-References provide product capability context only. Team Task Tracker remains an
-independent implementation with its own product identity.
+This matrix is the sole source of implementation status for Kelmio. Capability
+scope changes require an explicit version target, acceptance summary and QA
+evidence. V24 performs the final reconciliation between this baseline, the
+product roadmap, operational documentation and actual behavior.

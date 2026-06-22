@@ -80,7 +80,7 @@ func Load() (Config, error) {
 		SMTPUsername:            env("SMTP_USERNAME", ""),
 		SMTPPassword:            env("SMTP_PASSWORD", ""),
 		SMTPFromEmail:           env("SMTP_FROM_EMAIL", "no-reply@team-task-tracker.local"),
-		SMTPFromName:            env("SMTP_FROM_NAME", "Team Task Tracker"),
+		SMTPFromName:            env("SMTP_FROM_NAME", "Kelmio"),
 		SMTPTLSMode:             strings.ToLower(env("SMTP_TLS_MODE", SMTPTLSModeNone)),
 		EmailDeliveryEnabled:    boolEnv("EMAIL_DELIVERY_ENABLED", appEnv == EnvDevelopment),
 		EmailWorkerPollInterval: durationEnv("EMAIL_WORKER_POLL_INTERVAL", 10*time.Second),

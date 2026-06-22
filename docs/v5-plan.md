@@ -1,4 +1,4 @@
-# Team Task Tracker V5 Plan
+# Kelmio V5 Plan
 
 ## 1. Product Goal
 
@@ -6,7 +6,7 @@ V1-V4 закрыли task tracking, planning, production-ready self-hosted found
 project workflows, project permissions и synchronous automation.
 
 Цель V5: добавить account recovery и локально воспроизводимую operations
-foundation для долгосрочного Jira family functional-parity roadmap.
+foundation для долгосрочного Kelmio product roadmap.
 
 V5 должна дать пользователям и администраторам:
 
@@ -25,7 +25,7 @@ public deployment, домен и production pilot не входят в целе�
 проекта.
 
 V5 закрывает capabilities `PLAT-004` и `PLAT-005` из
-[Jira family capability baseline](jira-family-capability-baseline.md).
+[product capability baseline](product-capability-baseline.md).
 
 ## 2. V5 Boundary
 

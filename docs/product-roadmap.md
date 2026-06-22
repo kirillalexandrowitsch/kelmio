@@ -1,4 +1,4 @@
-# Team Task Tracker Product Roadmap
+# Kelmio Product Roadmap
 
 ## 1. Product Direction
 
@@ -6,21 +6,20 @@ V1-V4 сформировали стабильную основу: task tracking,
 production-like self-hosted foundation, project workflows, project permissions
 и synchronous automation.
 
-Долгосрочная цель Team Task Tracker: создать оригинальный localhost-only
-продукт с функциональным паритетом Jira family по состоянию на **15 июня 2026
-года**.
+Долгосрочная цель Kelmio: создать оригинальную localhost-only платформу,
+которая объединяет work management, agile delivery, service operations,
+product discovery, assets, reports, administration и provider-neutral AI.
 
-Целевой scope включает Jira platform, Jira Software, Jira Service Management,
-Jira Product Discovery, Assets, встроенные automation, reports, forms,
-administration и provider-neutral AI-equivalent.
+Целевой scope включает конфигурируемые work items и workflows, planning,
+service management, product discovery, Assets, automation, reports, forms,
+administration и provider-neutral AI assistance.
 
-Проект сохраняет собственные название, интерфейс, архитектуру и исходный код.
-Функциональный паритет не означает копирование бренда, UX или proprietary
-реализации Atlassian.
+Kelmio сохраняет собственные название, интерфейс, архитектуру, product model
+и исходный код.
 
 До полного закрытия продукта запланированы V5-V24. Ориентировочная оценка:
 **300-450 небольших проверяемых коммитов**. Полнота измеряется через
-[Jira family capability baseline](jira-family-capability-baseline.md).
+[product capability baseline](product-capability-baseline.md).
 
 ## 2. Product Principles
 
@@ -45,7 +44,7 @@ administration и provider-neutral AI-equivalent.
 - Root `README.md` является final-state product cover, а не источником текущего
   implementation status.
 - Фактическое состояние capabilities определяется только
-  [capability baseline](jira-family-capability-baseline.md) и version plans.
+  [capability baseline](product-capability-baseline.md) и version plans.
 - V6-V23 не включают отдельные README-update commits; они обновляют baseline,
   version documentation и соответствующие operations guides.
 - V24 final parity audit сверяет README с завершенным продуктом и исправляет
@@ -55,9 +54,9 @@ administration и provider-neutral AI-equivalent.
 
 ### Входит в целевой функциональный паритет
 
-- Jira platform и Jira Software;
-- Jira Service Management;
-- Jira Product Discovery;
+- configurable work management и agile delivery;
+- service management и customer self-service;
+- product discovery и portfolio planning;
 - Assets и configuration management;
 - multi-organization и multi-workspace administration;
 - significant built-in administration, automation, reporting, forms и AI
@@ -66,15 +65,13 @@ administration и provider-neutral AI-equivalent.
 
 ### Не входит
 
-- Confluence, Jira Align, Loom, Trello, Bitbucket и другие отдельные продукты;
-- Atlassian Marketplace и паритет со сторонними приложениями;
-- Atlassian branding, source code и визуальная копия интерфейса;
+- отдельные products для document collaboration, team chat, video и source hosting;
+- паритет со всеми сторонними marketplace applications;
+- копирование чужого branding, source code и визуального интерфейса;
 - SaaS billing, managed multi-tenant cloud и real hosting provider;
 - public deployment и production pilot;
-- infrastructure scale, data residency и compliance certifications Atlassian
-  Cloud;
-- возможности Jira, появившиеся после snapshot 15 июня 2026 года, если они не
-  приняты отдельным решением.
+- public-cloud infrastructure scale, external data residency и formal compliance certifications;
+- capabilities, которые не были явно приняты в product baseline.
 
 ## 4. V5: Account Recovery And Operations Foundation
 
@@ -93,7 +90,7 @@ Capability groups: `PLAT-004`, `PLAT-005`.
 
 ## 5. V6: Organizations, Multi-Workspace And Identity Administration
 
-Цель V6: превратить single-workspace foundation в локальную Jira-family
+Цель V6: превратить single-workspace foundation в локальную multi-organization
 platform с несколькими изолированными организациями и workspaces.
 
 Основные результаты:
@@ -109,7 +106,7 @@ Capability groups: `PLAT-006`, `PLAT-007`.
 
 ## 6. V7: Configurable Work Items, Fields And Schemes
 
-Цель V7: сделать модель work items и workflows конфигурируемой на уровне Jira.
+Цель V7: сделать модель work items и workflows полностью конфигурируемой.
 
 Основные результаты:
 
@@ -184,7 +181,7 @@ Capability groups: `PLAN-002`-`PLAN-004`.
 
 ## 11. V12: Reports, Dashboards And Analytics
 
-Цель V12: закрыть Jira-like reporting и decision support.
+Цель V12: закрыть advanced reporting и decision support.
 
 Основные результаты:
 
@@ -245,7 +242,7 @@ Capability groups: `DEV-001`-`DEV-004`.
 
 ## 15. V16: Service Management Request Portal, Queues And SLAs
 
-Цель V16: реализовать основу Jira Service Management.
+Цель V16: реализовать основу service management.
 
 Основные результаты:
 
@@ -305,7 +302,7 @@ Capability groups: `KNOW-001`-`KNOW-003`.
 
 ## 19. V20: Product Discovery, Ideas, Insights And Roadmaps
 
-Цель V20: закрыть Jira Product Discovery workflows.
+Цель V20: закрыть product discovery workflows.
 
 Основные результаты:
 
@@ -320,7 +317,7 @@ Capability groups: `JPD-001`-`JPD-005`.
 
 ## 20. V21: Governance, Security, Audit And Administration
 
-Цель V21: завершить Jira-family administrative и governance controls.
+Цель V21: завершить platform-wide administrative и governance controls.
 
 Основные результаты:
 
@@ -335,7 +332,7 @@ Capability groups: `WORK-008`, `GOV-001`-`GOV-004`.
 
 ## 21. V22: AI Assistance, Intelligent Search And Virtual Agent
 
-Цель V22: предоставить provider-neutral equivalents значимых Jira AI scenarios.
+Цель V22: предоставить provider-neutral AI assistance для значимых product scenarios.
 
 Основные результаты:
 
@@ -364,9 +361,9 @@ Capability groups: `SEARCH-006`, `AI-001`-`AI-003`.
 
 Capability groups: `UX-001`-`UX-004`.
 
-## 23. V24: Final Jira Family Parity Audit And Closure
+## 23. V24: Final Product Capability Audit And Closure
 
-Цель V24: доказать полный functional parity выбранного snapshot и закрыть
+Цель V24: доказать полноту выбранного capability baseline и закрыть
 проектную разработку.
 
 Основные результаты:
@@ -394,7 +391,7 @@ Capability group: `CLOSE-001`.
 7. Optional реальные integrations имеют рабочие adapters и localhost mocks.
 8. AI capabilities работают provider-neutral и имеют deterministic test mode.
 9. Документация соответствует фактическим setup, administration и workflows.
-10. Нет известных blocker bugs во включенном Jira-family snapshot.
+10. Нет известных blocker bugs во включенном product baseline.
 
 Реальный deployment, hosting provider, public domain и production pilot не
 являются условиями закрытия проекта.

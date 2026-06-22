@@ -1,11 +1,11 @@
 <p align="center">
-  <img src=".github/assets/readme/wordmark.svg" alt="Team Task Tracker" width="680">
+  <img src=".github/assets/readme/wordmark.svg" alt="Kelmio" width="680">
 </p>
 
 <h1 align="center">One local platform to plan, build, support, discover, and operate.</h1>
 
 <p align="center">
-  Team Task Tracker connects software delivery, service management, product discovery,
+  Kelmio connects software delivery, service management, product discovery,
   assets, analytics, automation, and AI in one private work platform.
 </p>
 
@@ -20,18 +20,18 @@
 </p>
 
 <p align="center">
-  <a href="#why-team-task-tracker">Why Team Task Tracker</a> |
+  <a href="#why-kelmio">Why Kelmio</a> |
   <a href="#one-connected-platform">Platform</a> |
   <a href="#product-experiences">Product Experiences</a> |
   <a href="#platform-architecture">Architecture</a> |
   <a href="#documentation">Documentation</a>
 </p>
 
-<img src=".github/assets/readme/hero.webp" alt="Team Task Tracker unified operations overview" width="100%">
+<img src=".github/assets/readme/hero.webp" alt="Kelmio unified operations overview" width="100%">
 
-## Why Team Task Tracker
+## Why Kelmio
 
-Team Task Tracker is an original, localhost-first system for organizations that
+Kelmio is an original, localhost-first system for organizations that
 want one coherent operating model for work without handing their data or
 processes to a managed cloud. It combines the functional breadth of modern
 work management, agile delivery, service operations, product discovery, and
@@ -70,7 +70,7 @@ workflow, search, and audit foundation.
 Every experience shares the same platform core. Teams can work differently
 without losing common identity, governance, history, or cross-domain context.
 
-<img src=".github/assets/readme/platform-map.svg" alt="Team Task Tracker connected platform map" width="100%">
+<img src=".github/assets/readme/platform-map.svg" alt="Kelmio connected platform map" width="100%">
 
 ## Product Experiences
 
@@ -82,7 +82,7 @@ permission-aware views. Scrum and Kanban teams can shape boards, backlogs,
 ranking, swimlanes, WIP limits, quick filters, and card layouts around their
 delivery model.
 
-<img src=".github/assets/readme/work-management.webp" alt="Configurable Team Task Tracker workflow board" width="100%">
+<img src=".github/assets/readme/work-management.webp" alt="Configurable Kelmio workflow board" width="100%">
 
 ### Planning, goals, and analytics
 
@@ -154,7 +154,7 @@ triage, and permission-checked actions.
 
 ## Platform Architecture
 
-Team Task Tracker is a modular Go and React platform backed by PostgreSQL. A
+Kelmio is a modular Go and React platform backed by PostgreSQL. A
 single transactional domain model supports work, planning, service management,
 discovery, assets, governance, and audit. Durable workers handle email,
 automation, integrations, scheduled operations, and recovery paths. Versioned
@@ -168,7 +168,7 @@ monitoring, backup, restore, and full browser regression.
 
 ## Documentation
 
-- [Jira family capability baseline](docs/jira-family-capability-baseline.md)
+- [Product capability baseline](docs/product-capability-baseline.md)
 - [Product roadmap](docs/product-roadmap.md)
 - [Self-hosted architecture and operations](docs/self-hosted-deployment.md)
 - [Backup and restore](docs/backup-restore.md)
@@ -177,10 +177,6 @@ monitoring, backup, restore, and full browser regression.
 ---
 
 <p align="center">
-  <strong>Team Task Tracker is an independent product with its own name, design,
-  architecture, and source code.</strong><br>
-  It is not affiliated with, endorsed by, or sponsored by Atlassian. Jira,
-  Jira Service Management, Jira Product Discovery, and Assets are referenced
-  only to describe functional coverage; all related trademarks belong to their
-  respective owners.
+  <strong>Kelmio is an original independent product with its own name, design,
+  architecture, product model, and source code.</strong>
 </p>

@@ -18,7 +18,7 @@ export function BootingScreen() {
   return (
     <main className="auth-shell">
       <section className="auth-panel auth-panel-compact">
-        <span className="brand-mark">TT</span>
+        <span className="brand-mark">K</span>
         <p className="eyebrow">Checking session</p>
       </section>
     </main>
@@ -40,9 +40,9 @@ export function SignInScreen({
     <main className="auth-shell">
       <section className="auth-panel">
         <div className="brand auth-brand">
-          <span className="brand-mark">TT</span>
+          <span className="brand-mark">K</span>
           <div>
-            <strong>Team Task Tracker</strong>
+            <strong>Kelmio</strong>
             <span>Local workspace</span>
           </div>
         </div>

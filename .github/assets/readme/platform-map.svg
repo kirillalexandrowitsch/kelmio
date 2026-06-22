@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 820" role="img" aria-labelledby="title desc">
-  <title id="title">Team Task Tracker platform architecture</title>
+  <title id="title">Kelmio platform architecture</title>
   <desc id="desc">A connected platform map linking work management, planning, service management, product discovery, assets, analytics, automation and AI to a shared platform core.</desc>
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f7f8f4"/><stop offset="1" stop-color="#e8eee8"/></linearGradient>

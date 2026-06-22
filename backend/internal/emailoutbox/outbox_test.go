@@ -89,7 +89,7 @@ func TestRenderPasswordResetTemplate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Render() error = %v", err)
 	}
-	if msg.Subject != "Reset your Team Task Tracker password" {
+	if msg.Subject != "Reset your Kelmio password" {
 		t.Fatalf("Subject = %q", msg.Subject)
 	}
 	if !strings.Contains(msg.TextBody, "secret-token") || !strings.Contains(msg.HTMLBody, "Reset password") {

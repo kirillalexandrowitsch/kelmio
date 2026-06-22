@@ -15,9 +15,9 @@ export function AppSidebar({ activeSection, onNavigate }: AppSidebarProps) {
   return (
     <aside className="sidebar">
       <div className="brand">
-        <span className="brand-mark">TT</span>
+        <span className="brand-mark">K</span>
         <div>
-          <strong>Team Task Tracker</strong>
+          <strong>Kelmio</strong>
           <span>Local workspace</span>
         </div>
       </div>

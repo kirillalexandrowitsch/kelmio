@@ -1,6 +1,6 @@
 # Self-Hosted Deployment
 
-This guide deploys Team Task Tracker on a single Linux host with Docker Compose, PostgreSQL, and Caddy-managed HTTPS.
+This guide deploys Kelmio on a single Linux host with Docker Compose, PostgreSQL, and Caddy-managed HTTPS.
 
 The production stack is intended for a small team on one backend instance. It is not a multi-node or managed SaaS deployment.
 
