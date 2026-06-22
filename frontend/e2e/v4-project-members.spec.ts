@@ -45,7 +45,6 @@ test("V4 project members UI: admin and lead manage access while viewer is read-o
       managedCard.getByLabel(`Project role for ${managed.displayName}`),
     ).toHaveValue("viewer");
     await removeProjectMember(page, managedCard);
-    await expect(managedCard).toHaveCount(0);
 
     await addProjectMember(page, leadMember.id, "lead");
     await addProjectMember(page, viewerMember.id, "viewer");
@@ -133,6 +132,7 @@ function projectMemberCard(page: Page, email: string) {
 async function removeProjectMember(page: Page, card: Locator) {
   page.once("dialog", (dialog) => dialog.accept());
   await card.getByRole("button", { name: "Remove" }).click();
+  await expect(card).toHaveCount(0);
 }
 
 async function login(page: Page, loginValue = adminLogin, password = adminPassword) {
