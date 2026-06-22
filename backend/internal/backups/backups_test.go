@@ -36,7 +36,7 @@ func TestRunnerCreatesAtomicCompressedBackup(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RunOnce() error = %v", err)
 	}
-	if filepath.Base(result.Artifact.Path) != "team-task-tracker-scheduled-20260620-120000.sql.gz" {
+	if filepath.Base(result.Artifact.Path) != "kelmio-scheduled-20260620-120000.sql.gz" {
 		t.Fatalf("artifact = %q", result.Artifact.Path)
 	}
 	if result.ArtifactCount != 1 || result.RemovedCount != 0 || result.RetentionError != nil {
@@ -79,8 +79,8 @@ func TestRunnerCreatesAtomicCompressedBackup(t *testing.T) {
 
 func TestRunnerFailureDoesNotPruneOrLeaveTemporaryFiles(t *testing.T) {
 	dir := t.TempDir()
-	createArtifact(t, dir, "team-task-tracker-scheduled-20260618-120000.sql.gz", time.Date(2026, 6, 18, 12, 0, 0, 0, time.UTC))
-	createArtifact(t, dir, "team-task-tracker-scheduled-20260619-120000.sql.gz", time.Date(2026, 6, 19, 12, 0, 0, 0, time.UTC))
+	createArtifact(t, dir, "kelmio-scheduled-20260618-120000.sql.gz", time.Date(2026, 6, 18, 12, 0, 0, 0, time.UTC))
+	createArtifact(t, dir, "kelmio-scheduled-20260619-120000.sql.gz", time.Date(2026, 6, 19, 12, 0, 0, 0, time.UTC))
 
 	runner := NewRunner("postgres://postgres/app", dir, 1)
 	runner.Dumper = fakeDumper{err: errors.New("dump failed")}
@@ -100,10 +100,10 @@ func TestRunnerFailureDoesNotPruneOrLeaveTemporaryFiles(t *testing.T) {
 func TestPruneKeepsNewestScheduledArtifactsOnly(t *testing.T) {
 	dir := t.TempDir()
 	for day := 17; day <= 20; day++ {
-		name := time.Date(2026, 6, day, 12, 0, 0, 0, time.UTC).Format("team-task-tracker-scheduled-20060102-150405.sql.gz")
+		name := time.Date(2026, 6, day, 12, 0, 0, 0, time.UTC).Format("kelmio-scheduled-20060102-150405.sql.gz")
 		createArtifact(t, dir, name, time.Date(2026, 6, day, 12, 0, 0, 0, time.UTC))
 	}
-	createArtifact(t, dir, "team-task-tracker-20260601-120000.sql.gz", time.Date(2026, 6, 1, 12, 0, 0, 0, time.UTC))
+	createArtifact(t, dir, "kelmio-20260601-120000.sql.gz", time.Date(2026, 6, 1, 12, 0, 0, 0, time.UTC))
 
 	removed, err := Prune(dir, 2)
 	if err != nil {
@@ -119,15 +119,15 @@ func TestPruneKeepsNewestScheduledArtifactsOnly(t *testing.T) {
 	if len(artifacts) != 2 || !strings.Contains(artifacts[0].Path, "20260620") || !strings.Contains(artifacts[1].Path, "20260619") {
 		t.Fatalf("scheduled artifacts = %#v", artifacts)
 	}
-	if _, err := os.Stat(filepath.Join(dir, "team-task-tracker-20260601-120000.sql.gz")); err != nil {
+	if _, err := os.Stat(filepath.Join(dir, "kelmio-20260601-120000.sql.gz")); err != nil {
 		t.Fatalf("manual backup was removed: %v", err)
 	}
 }
 
 func TestPruneRetentionOneKeepsNewest(t *testing.T) {
 	dir := t.TempDir()
-	createArtifact(t, dir, "team-task-tracker-scheduled-20260619-120000.sql.gz", time.Date(2026, 6, 19, 12, 0, 0, 0, time.UTC))
-	createArtifact(t, dir, "team-task-tracker-scheduled-20260620-120000.sql.gz", time.Date(2026, 6, 20, 12, 0, 0, 0, time.UTC))
+	createArtifact(t, dir, "kelmio-scheduled-20260619-120000.sql.gz", time.Date(2026, 6, 19, 12, 0, 0, 0, time.UTC))
+	createArtifact(t, dir, "kelmio-scheduled-20260620-120000.sql.gz", time.Date(2026, 6, 20, 12, 0, 0, 0, time.UTC))
 
 	if _, err := Prune(dir, 1); err != nil {
 		t.Fatalf("Prune() error = %v", err)

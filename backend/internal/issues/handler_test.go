@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"team-task-tracker/backend/internal/auth"
-	"team-task-tracker/backend/internal/automations"
+	"kelmio/backend/internal/auth"
+	"kelmio/backend/internal/automations"
 )
 
 const testIssueID = "6d5257d4-002e-44da-8925-d9108699c504"

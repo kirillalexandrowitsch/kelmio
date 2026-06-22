@@ -2,7 +2,7 @@
 set -eu
 
 BACKUP=${BACKUP:-${1:-}}
-CONTAINER_NAME=${RESTORE_CHECK_CONTAINER:-team-task-tracker-restore-check-$(date -u +"%Y%m%d%H%M%S")-$$}
+CONTAINER_NAME=${RESTORE_CHECK_CONTAINER:-kelmio-restore-check-$(date -u +"%Y%m%d%H%M%S")-$$}
 VOLUME_NAME=${RESTORE_CHECK_VOLUME:-${CONTAINER_NAME}-data}
 POSTGRES_IMAGE=${RESTORE_CHECK_POSTGRES_IMAGE:-postgres:16-alpine}
 CHECK_DB=restore_check

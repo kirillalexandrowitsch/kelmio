@@ -79,7 +79,7 @@ func Load() (Config, error) {
 		SMTPPort:                intEnv("SMTP_PORT", 1025),
 		SMTPUsername:            env("SMTP_USERNAME", ""),
 		SMTPPassword:            env("SMTP_PASSWORD", ""),
-		SMTPFromEmail:           env("SMTP_FROM_EMAIL", "no-reply@team-task-tracker.local"),
+		SMTPFromEmail:           env("SMTP_FROM_EMAIL", "no-reply@kelmio.local"),
 		SMTPFromName:            env("SMTP_FROM_NAME", "Kelmio"),
 		SMTPTLSMode:             strings.ToLower(env("SMTP_TLS_MODE", SMTPTLSModeNone)),
 		EmailDeliveryEnabled:    boolEnv("EMAIL_DELIVERY_ENABLED", appEnv == EnvDevelopment),
@@ -165,9 +165,9 @@ func databaseURL(appEnv string) string {
 
 	host := "localhost"
 	port := "15432"
-	database := "team_task_tracker"
-	user := "team_task_tracker"
-	password := "team_task_tracker"
+	database := "kelmio"
+	user := "kelmio"
+	password := "kelmio"
 	if appEnv == EnvProduction {
 		host = ""
 		port = "5432"

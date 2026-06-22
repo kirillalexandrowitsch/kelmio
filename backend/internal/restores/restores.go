@@ -16,7 +16,7 @@ import (
 	"strings"
 	"time"
 
-	"team-task-tracker/backend/internal/postgresenv"
+	"kelmio/backend/internal/postgresenv"
 )
 
 const StateFilename = "restore-drill-state.json"

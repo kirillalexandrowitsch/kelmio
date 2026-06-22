@@ -6,7 +6,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"team-task-tracker/backend/internal/auth"
+	"kelmio/backend/internal/auth"
 )
 
 type Querier interface {

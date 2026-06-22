@@ -462,7 +462,7 @@ make setup-db
 make smoke-api
 make frontend-e2e
 make verify
-GOCACHE=/private/tmp/team-task-tracker-gocache make backend-integration-test
+GOCACHE=/private/tmp/kelmio-gocache make backend-integration-test
 git diff --check
 ```
 

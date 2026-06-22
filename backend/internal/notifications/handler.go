@@ -17,8 +17,8 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"team-task-tracker/backend/internal/auth"
-	"team-task-tracker/backend/internal/pagination"
+	"kelmio/backend/internal/auth"
+	"kelmio/backend/internal/pagination"
 )
 
 const (

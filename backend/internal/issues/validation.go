@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"team-task-tracker/backend/internal/auth"
+	"kelmio/backend/internal/auth"
 )
 
 func normalizeCreateIssue(req createIssueRequest) (normalizedCreateIssue, error) {

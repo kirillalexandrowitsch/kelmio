@@ -38,7 +38,7 @@ func (e *fakeExecutor) Cleanup(context.Context) error {
 
 func TestRunnerRecordsSuccessfulVerifiedRestore(t *testing.T) {
 	dir := t.TempDir()
-	artifact := writeGzipArtifact(t, dir, "team-task-tracker-scheduled-20260620-120000.sql.gz", "SELECT 1;")
+	artifact := writeGzipArtifact(t, dir, "kelmio-scheduled-20260620-120000.sql.gz", "SELECT 1;")
 	executor := &fakeExecutor{verification: validVerification(17)}
 	times := []time.Time{
 		time.Date(2026, 6, 20, 12, 0, 0, 0, time.UTC),
@@ -71,14 +71,14 @@ func TestRunnerRecordsSuccessfulVerifiedRestore(t *testing.T) {
 
 func TestRunnerFailurePreservesPreviousSuccessAndCleansTarget(t *testing.T) {
 	dir := t.TempDir()
-	good := writeGzipArtifact(t, dir, "team-task-tracker-scheduled-20260619-120000.sql.gz", "SELECT 1;")
+	good := writeGzipArtifact(t, dir, "kelmio-scheduled-20260619-120000.sql.gz", "SELECT 1;")
 	goodExecutor := &fakeExecutor{verification: validVerification(17)}
 	goodRunner := Runner{Executor: goodExecutor, StatePath: StatePath(dir), ExpectedMigrationVersion: 17}
 	if _, err := goodRunner.Run(context.Background(), good); err != nil {
 		t.Fatalf("initial Run() error = %v", err)
 	}
 
-	failed := writeGzipArtifact(t, dir, "team-task-tracker-scheduled-20260620-120000.sql.gz", "SELECT 2;")
+	failed := writeGzipArtifact(t, dir, "kelmio-scheduled-20260620-120000.sql.gz", "SELECT 2;")
 	failedExecutor := &fakeExecutor{restoreErr: errors.New("provider included a secret")}
 	failedRunner := Runner{Executor: failedExecutor, StatePath: StatePath(dir), ExpectedMigrationVersion: 17}
 	if _, err := failedRunner.Run(context.Background(), failed); ErrorCode(err) != ErrorRestoreFailed {
@@ -101,7 +101,7 @@ func TestRunnerFailurePreservesPreviousSuccessAndCleansTarget(t *testing.T) {
 
 func TestRunnerRejectsInvalidArtifactBeforeReset(t *testing.T) {
 	dir := t.TempDir()
-	artifact := filepath.Join(dir, "team-task-tracker-scheduled-broken.sql.gz")
+	artifact := filepath.Join(dir, "kelmio-scheduled-broken.sql.gz")
 	if err := os.WriteFile(artifact, []byte("not gzip"), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -117,7 +117,7 @@ func TestRunnerRejectsInvalidArtifactBeforeReset(t *testing.T) {
 
 func TestRunnerRejectsIncompleteVerification(t *testing.T) {
 	dir := t.TempDir()
-	artifact := writeGzipArtifact(t, dir, "team-task-tracker-scheduled-20260620-120000.sql.gz", "SELECT 1;")
+	artifact := writeGzipArtifact(t, dir, "kelmio-scheduled-20260620-120000.sql.gz", "SELECT 1;")
 	executor := &fakeExecutor{verification: Verification{MigrationVersion: 16, CoreTableCount: 6, WorkspaceCount: 1, UserCount: 1, MembershipCount: 1}}
 	runner := Runner{Executor: executor, StatePath: StatePath(dir), ExpectedMigrationVersion: 17}
 	if _, err := runner.Run(context.Background(), artifact); ErrorCode(err) != ErrorVerification {

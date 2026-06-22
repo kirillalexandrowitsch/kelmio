@@ -18,10 +18,10 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/crypto/bcrypt"
 
-	"team-task-tracker/backend/internal/auth"
-	"team-task-tracker/backend/internal/database"
-	"team-task-tracker/backend/internal/migrations"
-	"team-task-tracker/backend/internal/projectaccess"
+	"kelmio/backend/internal/auth"
+	"kelmio/backend/internal/database"
+	"kelmio/backend/internal/migrations"
+	"kelmio/backend/internal/projectaccess"
 )
 
 func TestProjectMemberLifecycleIntegration(t *testing.T) {
@@ -273,7 +273,7 @@ func newProjectMemberIntegrationDB(t *testing.T, ctx context.Context) *pgxpool.P
 	t.Helper()
 	databaseURL := os.Getenv("DATABASE_URL")
 	if databaseURL == "" {
-		databaseURL = "postgres://team_task_tracker:team_task_tracker@localhost:15432/team_task_tracker?sslmode=disable"
+		databaseURL = "postgres://kelmio:kelmio@localhost:15432/kelmio?sslmode=disable"
 	}
 	adminDB, err := database.Connect(ctx, databaseURL)
 	if err != nil {

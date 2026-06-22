@@ -8,9 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	"team-task-tracker/backend/internal/auth"
-	"team-task-tracker/backend/internal/config"
-	"team-task-tracker/backend/internal/csrf"
+	"kelmio/backend/internal/auth"
+	"kelmio/backend/internal/config"
+	"kelmio/backend/internal/csrf"
 )
 
 func TestProductionLoggerEmitsJSON(t *testing.T) {
@@ -123,7 +123,7 @@ func TestRequestLoggerIncludesResponseMetadataAndExcludesSensitiveData(t *testin
 
 	request := httptest.NewRequest(http.MethodPost, "/api/v1/issues?password=secret", strings.NewReader("super-secret-password"))
 	request.Header.Set(requestIDHeader, "req-12345678")
-	request.Header.Set("Cookie", "team_task_tracker_session=session-token")
+	request.Header.Set("Cookie", "kelmio_session=session-token")
 	request.Header.Set(csrf.HeaderName, "csrf-secret")
 	recorder := httptest.NewRecorder()
 	handler.ServeHTTP(recorder, request)
@@ -631,7 +631,7 @@ func testVersionConfig() config.Config {
 	return config.Config{
 		AppEnv:      config.EnvProduction,
 		Port:        "8080",
-		DatabaseURL: "postgres://team_task_tracker:team_task_tracker@postgres:5432/team_task_tracker?sslmode=disable",
+		DatabaseURL: "postgres://kelmio:kelmio@postgres:5432/kelmio?sslmode=disable",
 		CSRFSecret:  "0123456789abcdef0123456789abcdef",
 		AppVersion:  "v3.0.0",
 		BuildCommit: "abcdef123456",

@@ -10,8 +10,8 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/kirillalexandrowitsch/team-task-tracker/actions/workflows/ci.yml"><img src="https://github.com/kirillalexandrowitsch/team-task-tracker/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="https://github.com/kirillalexandrowitsch/team-task-tracker/actions/workflows/full-qa.yml"><img src="https://github.com/kirillalexandrowitsch/team-task-tracker/actions/workflows/full-qa.yml/badge.svg" alt="Full QA"></a>
+  <a href="https://github.com/kirillalexandrowitsch/kelmio/actions/workflows/ci.yml"><img src="https://github.com/kirillalexandrowitsch/kelmio/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/kirillalexandrowitsch/kelmio/actions/workflows/full-qa.yml"><img src="https://github.com/kirillalexandrowitsch/kelmio/actions/workflows/full-qa.yml/badge.svg" alt="Full QA"></a>
   <img src="https://img.shields.io/badge/local--first-private-4e795d" alt="Local-first">
   <img src="https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white" alt="Go 1.26">
   <img src="https://img.shields.io/badge/React-19-20232A?logo=react&logoColor=61DAFB" alt="React 19">

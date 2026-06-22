@@ -9,9 +9,9 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 
-	"team-task-tracker/backend/internal/auth"
-	"team-task-tracker/backend/internal/automations"
-	"team-task-tracker/backend/internal/projectaccess"
+	"kelmio/backend/internal/auth"
+	"kelmio/backend/internal/automations"
+	"kelmio/backend/internal/projectaccess"
 )
 
 type rowScanner interface {

@@ -12,9 +12,9 @@ import (
 	"testing"
 	"time"
 
-	"team-task-tracker/backend/internal/backups"
-	appmetrics "team-task-tracker/backend/internal/metrics"
-	"team-task-tracker/backend/internal/restores"
+	"kelmio/backend/internal/backups"
+	appmetrics "kelmio/backend/internal/metrics"
+	"kelmio/backend/internal/restores"
 )
 
 type stubBackupRunner struct {
@@ -63,7 +63,7 @@ func (r *stubRestoreRunner) Run(_ context.Context, path string) (restores.Result
 }
 
 func TestPerformCycleVerifiesBeforeRetention(t *testing.T) {
-	backupRunner := &stubBackupRunner{result: backups.Result{Artifact: backups.Artifact{Path: "/backups/team-task-tracker-scheduled.sql.gz", Size: 42}}}
+	backupRunner := &stubBackupRunner{result: backups.Result{Artifact: backups.Artifact{Path: "/backups/kelmio-scheduled.sql.gz", Size: 42}}}
 	drillRunner := &stubRestoreRunner{}
 	outcome := performCycle(context.Background(), discardLogger(), backupRunner, drillRunner, appmetrics.NewBackupMetrics(time.Time{}, 0), "", time.Second)
 	if !outcome.success || outcome.pendingPath != "" {

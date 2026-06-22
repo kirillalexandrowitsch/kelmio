@@ -1,4 +1,4 @@
-name: team-task-tracker-prod
+name: kelmio-prod
 
 services:
   postgres:
@@ -21,7 +21,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
       target: production
-    image: team-task-tracker-backend:prod
+    image: kelmio-backend:prod
     environment:
       APP_ENV: production
       BACKEND_PORT: "8080"
@@ -70,7 +70,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
       target: production
-    image: team-task-tracker-backend:prod
+    image: kelmio-backend:prod
     command:
       - /app/bin/bootstrap-admin
     environment:
@@ -122,7 +122,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
       target: production
-    image: team-task-tracker-backend:prod
+    image: kelmio-backend:prod
     command:
       - /app/bin/email-worker
     environment:
@@ -173,7 +173,7 @@ services:
       target: production
       args:
         VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api}
-    image: team-task-tracker-frontend:prod
+    image: kelmio-frontend:prod
     expose:
       - "8080"
     depends_on:

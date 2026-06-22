@@ -19,12 +19,12 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/crypto/bcrypt"
 
-	"team-task-tracker/backend/internal/csrf"
-	"team-task-tracker/backend/internal/emailoutbox"
-	"team-task-tracker/backend/internal/ratelimit"
+	"kelmio/backend/internal/csrf"
+	"kelmio/backend/internal/emailoutbox"
+	"kelmio/backend/internal/ratelimit"
 )
 
-const SessionCookieName = "team_task_tracker_session"
+const SessionCookieName = "kelmio_session"
 const defaultPasswordResetTTL = 30 * time.Minute
 
 var errInvalidCredentials = errors.New("invalid credentials")

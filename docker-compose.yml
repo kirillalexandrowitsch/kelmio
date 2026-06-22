@@ -1,11 +1,13 @@
+name: kelmio
+
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: team-task-tracker-postgres
+    container_name: kelmio-postgres
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-team_task_tracker}
-      POSTGRES_USER: ${POSTGRES_USER:-team_task_tracker}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-team_task_tracker}
+      POSTGRES_DB: ${POSTGRES_DB:-kelmio}
+      POSTGRES_USER: ${POSTGRES_USER:-kelmio}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-kelmio}
     ports:
       - "${POSTGRES_PORT:-15432}:5432"
     volumes:
@@ -18,7 +20,7 @@ services:
 
   mailpit:
     image: axllent/mailpit:latest
-    container_name: team-task-tracker-mailpit
+    container_name: kelmio-mailpit
     ports:
       - "${MAILPIT_SMTP_PORT:-1025}:1025"
       - "${MAILPIT_UI_PORT:-8025}:8025"
@@ -27,17 +29,17 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: team-task-tracker-backend
+    container_name: kelmio-backend
     environment:
       APP_ENV: ${APP_ENV:-development}
       BACKEND_PORT: ${BACKEND_PORT:-8080}
-      DATABASE_URL: postgres://${POSTGRES_USER:-team_task_tracker}:${POSTGRES_PASSWORD:-team_task_tracker}@postgres:5432/${POSTGRES_DB:-team_task_tracker}?sslmode=disable
+      DATABASE_URL: postgres://${POSTGRES_USER:-kelmio}:${POSTGRES_PASSWORD:-kelmio}@postgres:5432/${POSTGRES_DB:-kelmio}?sslmode=disable
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
       SMTP_HOST: ${SMTP_HOST:-mailpit}
       SMTP_PORT: ${SMTP_PORT:-1025}
       SMTP_USERNAME: ${SMTP_USERNAME:-}
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
-      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-no-reply@team-task-tracker.local}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-no-reply@kelmio.local}
       SMTP_FROM_NAME: ${SMTP_FROM_NAME:-Kelmio}
       SMTP_TLS_MODE: ${SMTP_TLS_MODE:-none}
       EMAIL_DELIVERY_ENABLED: ${EMAIL_DELIVERY_ENABLED:-true}
@@ -61,18 +63,18 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: team-task-tracker-email-worker
+    container_name: kelmio-email-worker
     command: go run ./cmd/email-worker
     environment:
       APP_ENV: ${APP_ENV:-development}
       BACKEND_PORT: ${BACKEND_PORT:-8080}
-      DATABASE_URL: postgres://${POSTGRES_USER:-team_task_tracker}:${POSTGRES_PASSWORD:-team_task_tracker}@postgres:5432/${POSTGRES_DB:-team_task_tracker}?sslmode=disable
+      DATABASE_URL: postgres://${POSTGRES_USER:-kelmio}:${POSTGRES_PASSWORD:-kelmio}@postgres:5432/${POSTGRES_DB:-kelmio}?sslmode=disable
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
       SMTP_HOST: ${SMTP_HOST:-mailpit}
       SMTP_PORT: ${SMTP_PORT:-1025}
       SMTP_USERNAME: ${SMTP_USERNAME:-}
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
-      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-no-reply@team-task-tracker.local}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-no-reply@kelmio.local}
       SMTP_FROM_NAME: ${SMTP_FROM_NAME:-Kelmio}
       SMTP_TLS_MODE: ${SMTP_TLS_MODE:-none}
       EMAIL_DELIVERY_ENABLED: ${EMAIL_DELIVERY_ENABLED:-true}
@@ -96,7 +98,7 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: team-task-tracker-frontend
+    container_name: kelmio-frontend
     environment:
       VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8080}
     ports:
@@ -111,7 +113,7 @@ services:
     profiles:
       - monitoring
     image: postgres:16-alpine
-    container_name: team-task-tracker-restore-drill-postgres
+    container_name: kelmio-restore-drill-postgres
     environment:
       POSTGRES_DB: restore_drill
       POSTGRES_USER: restore_drill
@@ -131,11 +133,11 @@ services:
       context: ./backend
       dockerfile: Dockerfile
       target: backup-worker
-    image: team-task-tracker-backup-worker:local
-    container_name: team-task-tracker-backup-worker
+    image: kelmio-backup-worker:local
+    container_name: kelmio-backup-worker
     environment:
       APP_ENV: development
-      DATABASE_URL: postgres://${POSTGRES_USER:-team_task_tracker}:${POSTGRES_PASSWORD:-team_task_tracker}@postgres:5432/${POSTGRES_DB:-team_task_tracker}?sslmode=disable
+      DATABASE_URL: postgres://${POSTGRES_USER:-kelmio}:${POSTGRES_PASSWORD:-kelmio}@postgres:5432/${POSTGRES_DB:-kelmio}?sslmode=disable
       METRICS_ENABLED: ${METRICS_ENABLED:-true}
       METRICS_AUTH_TOKEN: ${METRICS_AUTH_TOKEN:-}
       BACKUP_INTERVAL: ${BACKUP_INTERVAL:-24h}
@@ -167,7 +169,7 @@ services:
     profiles:
       - monitoring
     image: prom/alertmanager:v0.33.0
-    container_name: team-task-tracker-alertmanager
+    container_name: kelmio-alertmanager
     command:
       - --config.file=/etc/alertmanager/alertmanager.yml
       - --storage.path=/alertmanager
@@ -186,7 +188,7 @@ services:
     profiles:
       - monitoring
     image: prom/prometheus:v3.12.0
-    container_name: team-task-tracker-prometheus
+    container_name: kelmio-prometheus
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.path=/prometheus
@@ -216,7 +218,7 @@ services:
     profiles:
       - monitoring
     image: grafana/grafana:13.0.2
-    container_name: team-task-tracker-grafana
+    container_name: kelmio-grafana
     environment:
       GF_AUTH_ANONYMOUS_ENABLED: "true"
       GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer

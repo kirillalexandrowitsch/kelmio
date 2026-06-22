@@ -14,8 +14,8 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"team-task-tracker/backend/internal/auth"
-	"team-task-tracker/backend/internal/automations"
+	"kelmio/backend/internal/auth"
+	"kelmio/backend/internal/automations"
 )
 
 var colorPattern = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)

@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"team-task-tracker/backend/internal/mailer"
+	"kelmio/backend/internal/mailer"
 )
 
 func TestNormalizeEnqueueInput(t *testing.T) {

@@ -13,12 +13,12 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"team-task-tracker/backend/internal/auth"
-	"team-task-tracker/backend/internal/automations"
-	"team-task-tracker/backend/internal/database"
-	"team-task-tracker/backend/internal/migrations"
-	"team-task-tracker/backend/internal/notifications"
-	"team-task-tracker/backend/internal/pagination"
+	"kelmio/backend/internal/auth"
+	"kelmio/backend/internal/automations"
+	"kelmio/backend/internal/database"
+	"kelmio/backend/internal/migrations"
+	"kelmio/backend/internal/notifications"
+	"kelmio/backend/internal/pagination"
 )
 
 func TestIssueHierarchyIntegration(t *testing.T) {
@@ -795,7 +795,7 @@ func newIssueIntegrationDB(t *testing.T, ctx context.Context) *pgxpool.Pool {
 
 	databaseURL := os.Getenv("DATABASE_URL")
 	if databaseURL == "" {
-		databaseURL = "postgres://team_task_tracker:team_task_tracker@localhost:15432/team_task_tracker?sslmode=disable"
+		databaseURL = "postgres://kelmio:kelmio@localhost:15432/kelmio?sslmode=disable"
 	}
 
 	adminDB, err := database.Connect(ctx, databaseURL)

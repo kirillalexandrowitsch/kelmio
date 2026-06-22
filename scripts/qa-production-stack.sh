@@ -1,14 +1,14 @@
 #!/bin/sh
 set -eu
 
-PROJECT_NAME="${PROD_QA_PROJECT_NAME:-team-task-tracker-v3-qa-$$}"
+PROJECT_NAME="${PROD_QA_PROJECT_NAME:-kelmio-prod-qa-$$}"
 HTTP_PORT="${PROD_QA_HTTP_PORT:-18080}"
 HTTPS_PORT="${PROD_QA_HTTPS_PORT:-18443}"
 PUBLIC_HOST="${PROD_QA_PUBLIC_HOST:-tasks.localhost}"
 ADMIN_USERNAME="${PROD_QA_ADMIN_USERNAME:-production_admin}"
 ADMIN_PASSWORD="${PROD_QA_ADMIN_PASSWORD:-qa-admin-password-123}"
 POSTGRES_PASSWORD="${PROD_QA_POSTGRES_PASSWORD:-qa:strong@password#value}"
-QA_DIR="$(mktemp -d "${TMPDIR:-/tmp}/team-task-tracker-prod-qa.XXXXXX")"
+QA_DIR="$(mktemp -d "${TMPDIR:-/tmp}/kelmio-prod-qa.XXXXXX")"
 ENV_FILE="$QA_DIR/production.env"
 BACKUP_DIR="$QA_DIR/backups"
 PUBLIC_URL="https://$PUBLIC_HOST:$HTTPS_PORT"
@@ -44,8 +44,8 @@ PUBLIC_APP_URL=$PUBLIC_URL
 TRUSTED_ORIGINS=$PUBLIC_URL
 VITE_API_BASE_URL=/api
 
-POSTGRES_DB=team_task_tracker
-POSTGRES_USER=team_task_tracker
+POSTGRES_DB=kelmio
+POSTGRES_USER=kelmio
 POSTGRES_PASSWORD=$POSTGRES_PASSWORD
 POSTGRES_HOST=postgres
 POSTGRES_PORT=5432

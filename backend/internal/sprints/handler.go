@@ -12,9 +12,9 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"team-task-tracker/backend/internal/auth"
-	"team-task-tracker/backend/internal/notifications"
-	"team-task-tracker/backend/internal/projectaccess"
+	"kelmio/backend/internal/auth"
+	"kelmio/backend/internal/notifications"
+	"kelmio/backend/internal/projectaccess"
 )
 
 var uuidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)

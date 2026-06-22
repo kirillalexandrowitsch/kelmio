@@ -57,7 +57,7 @@ func TestLoadDevelopmentDefaults(t *testing.T) {
 	if cfg.SMTPTLSMode != SMTPTLSModeNone {
 		t.Fatalf("SMTPTLSMode = %q, want none", cfg.SMTPTLSMode)
 	}
-	if cfg.SMTPFromEmail != "no-reply@team-task-tracker.local" {
+	if cfg.SMTPFromEmail != "no-reply@kelmio.local" {
 		t.Fatalf("SMTPFromEmail = %q, want local sender", cfg.SMTPFromEmail)
 	}
 	if cfg.SMTPFromName != "Kelmio" {
@@ -418,8 +418,8 @@ func TestLoadProductionBuildsEncodedDatabaseURLFromPostgresEnv(t *testing.T) {
 	t.Setenv("DATABASE_URL", "")
 	t.Setenv("POSTGRES_HOST", "postgres")
 	t.Setenv("POSTGRES_PORT", "5432")
-	t.Setenv("POSTGRES_DB", "team_task_tracker")
-	t.Setenv("POSTGRES_USER", "team_task_tracker")
+	t.Setenv("POSTGRES_DB", "kelmio")
+	t.Setenv("POSTGRES_USER", "kelmio")
 	t.Setenv("POSTGRES_PASSWORD", "strong:pass@word# value")
 	t.Setenv("POSTGRES_SSLMODE", "disable")
 
@@ -432,7 +432,7 @@ func TestLoadProductionBuildsEncodedDatabaseURLFromPostgresEnv(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parse DatabaseURL: %v", err)
 	}
-	if parsed.Hostname() != "postgres" || parsed.Path != "/team_task_tracker" {
+	if parsed.Hostname() != "postgres" || parsed.Path != "/kelmio" {
 		t.Fatalf("DatabaseURL = %q", cfg.DatabaseURL)
 	}
 	password, ok := parsed.User.Password()
@@ -481,7 +481,7 @@ func TestLoadRejectsDatabaseURLWithoutDatabaseName(t *testing.T) {
 
 func TestLoadRejectsDatabaseURLFragment(t *testing.T) {
 	clearConfigEnv(t)
-	t.Setenv("DATABASE_URL", "postgres://user:password@postgres:5432/team_task_tracker?sslmode=disable#fragment")
+	t.Setenv("DATABASE_URL", "postgres://user:password@postgres:5432/kelmio?sslmode=disable#fragment")
 
 	_, err := Load()
 	if err == nil || !strings.Contains(err.Error(), "DATABASE_URL must not include a fragment") {
@@ -573,7 +573,7 @@ func setValidProductionEnv(t *testing.T) {
 	clearConfigEnv(t)
 	t.Setenv("APP_ENV", EnvProduction)
 	t.Setenv("BACKEND_PORT", "8080")
-	t.Setenv("DATABASE_URL", "postgres://team_task_tracker:team_task_tracker@postgres:5432/team_task_tracker?sslmode=disable")
+	t.Setenv("DATABASE_URL", "postgres://kelmio:kelmio@postgres:5432/kelmio?sslmode=disable")
 	t.Setenv("PUBLIC_APP_URL", "https://tasks.example.com")
 	t.Setenv("TRUSTED_ORIGINS", "https://tasks.example.com")
 	t.Setenv("SESSION_TTL", "24h")

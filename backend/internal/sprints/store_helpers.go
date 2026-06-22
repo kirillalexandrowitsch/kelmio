@@ -9,7 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 
-	"team-task-tracker/backend/internal/notifications"
+	"kelmio/backend/internal/notifications"
 )
 
 func getSprintForUpdate(ctx context.Context, querier sprintQuerier, workspaceID string, sprintID string, forUpdate bool) (sprintResponse, error) {

@@ -15,8 +15,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/crypto/bcrypt"
 
-	"team-task-tracker/backend/internal/auth"
-	"team-task-tracker/backend/internal/automations"
+	"kelmio/backend/internal/auth"
+	"kelmio/backend/internal/automations"
 )
 
 var emailPattern = regexp.MustCompile(`^[^@\s]+@[^@\s]+\.[^@\s]+$`)

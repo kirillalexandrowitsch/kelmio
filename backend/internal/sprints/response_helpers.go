@@ -10,8 +10,8 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
-	"team-task-tracker/backend/internal/auth"
-	"team-task-tracker/backend/internal/projectaccess"
+	"kelmio/backend/internal/auth"
+	"kelmio/backend/internal/projectaccess"
 )
 
 func nullableText(value pgtype.Text) *string {

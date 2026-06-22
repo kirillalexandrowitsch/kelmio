@@ -7,7 +7,7 @@ ADMIN_PASSWORD="${ADMIN_PASSWORD:-admin12345}"
 COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.yml}"
 POSTGRES_SERVICE="${POSTGRES_SERVICE:-postgres}"
 
-cookie_jar="$(mktemp "${TMPDIR:-/tmp}/team-task-tracker-email-diagnostics.XXXXXX")"
+cookie_jar="$(mktemp "${TMPDIR:-/tmp}/kelmio-email-diagnostics.XXXXXX")"
 cleanup() {
 	rm -f "$cookie_jar"
 }

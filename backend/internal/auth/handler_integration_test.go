@@ -16,10 +16,10 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/crypto/bcrypt"
 
-	"team-task-tracker/backend/internal/csrf"
-	"team-task-tracker/backend/internal/database"
-	"team-task-tracker/backend/internal/migrations"
-	"team-task-tracker/backend/internal/ratelimit"
+	"kelmio/backend/internal/csrf"
+	"kelmio/backend/internal/database"
+	"kelmio/backend/internal/migrations"
+	"kelmio/backend/internal/ratelimit"
 )
 
 func TestLoginRateLimitBlocksAndSuccessfulLoginResets(t *testing.T) {
@@ -325,7 +325,7 @@ func setupAuthIntegrationWorkspace(t *testing.T) (context.Context, *pgxpool.Pool
 
 	databaseURL := os.Getenv("DATABASE_URL")
 	if databaseURL == "" {
-		databaseURL = "postgres://team_task_tracker:team_task_tracker@localhost:15432/team_task_tracker?sslmode=disable"
+		databaseURL = "postgres://kelmio:kelmio@localhost:15432/kelmio?sslmode=disable"
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)

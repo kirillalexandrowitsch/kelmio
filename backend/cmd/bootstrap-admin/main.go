@@ -7,9 +7,9 @@ import (
 	"os"
 	"time"
 
-	"team-task-tracker/backend/internal/bootstrap"
-	"team-task-tracker/backend/internal/config"
-	"team-task-tracker/backend/internal/database"
+	"kelmio/backend/internal/bootstrap"
+	"kelmio/backend/internal/config"
+	"kelmio/backend/internal/database"
 )
 
 func main() {

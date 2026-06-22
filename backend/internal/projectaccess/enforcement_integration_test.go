@@ -16,15 +16,15 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/crypto/bcrypt"
 
-	"team-task-tracker/backend/internal/auth"
-	"team-task-tracker/backend/internal/database"
-	"team-task-tracker/backend/internal/issues"
-	"team-task-tracker/backend/internal/migrations"
-	"team-task-tracker/backend/internal/notifications"
-	"team-task-tracker/backend/internal/projectmembers"
-	"team-task-tracker/backend/internal/projects"
-	"team-task-tracker/backend/internal/sprints"
-	"team-task-tracker/backend/internal/workflows"
+	"kelmio/backend/internal/auth"
+	"kelmio/backend/internal/database"
+	"kelmio/backend/internal/issues"
+	"kelmio/backend/internal/migrations"
+	"kelmio/backend/internal/notifications"
+	"kelmio/backend/internal/projectmembers"
+	"kelmio/backend/internal/projects"
+	"kelmio/backend/internal/sprints"
+	"kelmio/backend/internal/workflows"
 )
 
 func TestProjectPermissionEnforcementIntegration(t *testing.T) {
@@ -213,7 +213,7 @@ func newAccessIntegrationDB(t *testing.T, ctx context.Context) *pgxpool.Pool {
 	t.Helper()
 	databaseURL := os.Getenv("DATABASE_URL")
 	if databaseURL == "" {
-		databaseURL = "postgres://team_task_tracker:team_task_tracker@localhost:15432/team_task_tracker?sslmode=disable"
+		databaseURL = "postgres://kelmio:kelmio@localhost:15432/kelmio?sslmode=disable"
 	}
 	adminDB, err := database.Connect(ctx, databaseURL)
 	if err != nil {

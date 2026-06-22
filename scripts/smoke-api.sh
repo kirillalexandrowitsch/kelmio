@@ -6,9 +6,9 @@ ADMIN_LOGIN="${ADMIN_LOGIN:-admin}"
 ADMIN_PASSWORD="${ADMIN_PASSWORD:-admin12345}"
 MEMBER_LOGIN="${MEMBER_LOGIN:-demo_member}"
 MEMBER_PASSWORD="${MEMBER_PASSWORD:-demo12345}"
-COOKIE_JAR="$(mktemp "${TMPDIR:-/tmp}/team-task-tracker-smoke.XXXXXX")"
-MEMBER_COOKIE_JAR="$(mktemp "${TMPDIR:-/tmp}/team-task-tracker-smoke-member.XXXXXX")"
-TEMP_MEMBER_COOKIE_JAR="$(mktemp "${TMPDIR:-/tmp}/team-task-tracker-smoke-v2-member.XXXXXX")"
+COOKIE_JAR="$(mktemp "${TMPDIR:-/tmp}/kelmio-smoke.XXXXXX")"
+MEMBER_COOKIE_JAR="$(mktemp "${TMPDIR:-/tmp}/kelmio-smoke-member.XXXXXX")"
+TEMP_MEMBER_COOKIE_JAR="$(mktemp "${TMPDIR:-/tmp}/kelmio-smoke-v2-member.XXXXXX")"
 PROJECT_ID=""
 ISSUE_ID=""
 LABEL_ID=""
@@ -187,8 +187,8 @@ curl -fsS "$API_BASE_URL/api/v1/version" | json_value 'typeof data.version === "
 
 printf 'Checking Prometheus metrics safety\n'
 METRICS_BODY="$(curl -fsS "$API_BASE_URL/metrics")"
-printf '%s' "$METRICS_BODY" | grep -q 'team_task_tracker_http_requests_total'
-printf '%s' "$METRICS_BODY" | grep -q 'team_task_tracker_database_ready'
+printf '%s' "$METRICS_BODY" | grep -q 'kelmio_http_requests_total'
+printf '%s' "$METRICS_BODY" | grep -q 'kelmio_database_ready'
 if printf '%s' "$METRICS_BODY" | grep -Fq "$ADMIN_PASSWORD"; then
 	printf 'Metrics leaked the admin password\n' >&2
 	exit 1

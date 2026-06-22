@@ -15,10 +15,10 @@ import (
 	"strings"
 	"time"
 
-	"team-task-tracker/backend/internal/postgresenv"
+	"kelmio/backend/internal/postgresenv"
 )
 
-const ScheduledPrefix = "team-task-tracker-scheduled-"
+const ScheduledPrefix = "kelmio-scheduled-"
 
 var postgresURLPasswordPattern = regexp.MustCompile(`(?i)(postgres(?:ql)?://[^:/?#]+:)[^@/?#]+@`)
 
@@ -97,7 +97,7 @@ func (r *Runner) Create(ctx context.Context) (Result, error) {
 	}
 
 	finalPath := r.availablePath(startedAt)
-	temporary, err := os.CreateTemp(r.Dir, ".team-task-tracker-scheduled-*.tmp")
+	temporary, err := os.CreateTemp(r.Dir, ".kelmio-scheduled-*.tmp")
 	if err != nil {
 		return result, fmt.Errorf("create temporary backup: %w", err)
 	}

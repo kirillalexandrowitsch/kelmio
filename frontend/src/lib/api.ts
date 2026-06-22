@@ -140,7 +140,7 @@ export type {
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080";
 
-export const API_UNAUTHORIZED_EVENT = "team-task-tracker:unauthorized";
+export const API_UNAUTHORIZED_EVENT = "kelmio:unauthorized";
 
 let csrfToken: string | null = null;
 let csrfTokenRequest: Promise<string> | null = null;

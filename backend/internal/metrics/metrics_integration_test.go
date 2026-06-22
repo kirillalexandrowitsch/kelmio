@@ -15,8 +15,8 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"team-task-tracker/backend/internal/database"
-	"team-task-tracker/backend/internal/migrations"
+	"kelmio/backend/internal/database"
+	"kelmio/backend/internal/migrations"
 )
 
 func TestMetricsCollectorsIntegration(t *testing.T) {
@@ -43,11 +43,11 @@ func TestMetricsCollectorsIntegration(t *testing.T) {
 
 	body := recorder.Body.String()
 	for _, expected := range []string{
-		"team_task_tracker_database_ready 1",
-		`team_task_tracker_email_outbox_records{status="pending"} 1`,
-		`team_task_tracker_email_outbox_records{status="processing"} 1`,
-		`team_task_tracker_email_outbox_records{status="sent"} 1`,
-		`team_task_tracker_email_outbox_records{status="failed"} 1`,
+		"kelmio_database_ready 1",
+		`kelmio_email_outbox_records{status="pending"} 1`,
+		`kelmio_email_outbox_records{status="processing"} 1`,
+		`kelmio_email_outbox_records{status="sent"} 1`,
+		`kelmio_email_outbox_records{status="failed"} 1`,
 	} {
 		if !strings.Contains(body, expected) {
 			t.Fatalf("metrics output missing %q:\n%s", expected, body)
@@ -65,7 +65,7 @@ func newMetricsIntegrationDB(t *testing.T, ctx context.Context) *pgxpool.Pool {
 
 	databaseURL := os.Getenv("DATABASE_URL")
 	if databaseURL == "" {
-		databaseURL = "postgres://team_task_tracker:team_task_tracker@localhost:15432/team_task_tracker?sslmode=disable"
+		databaseURL = "postgres://kelmio:kelmio@localhost:15432/kelmio?sslmode=disable"
 	}
 
 	adminDB, err := database.Connect(ctx, databaseURL)

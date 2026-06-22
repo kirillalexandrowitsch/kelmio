@@ -50,22 +50,22 @@ fi
 printf 'Restoring PostgreSQL backup into service "%s"...\n' "$POSTGRES_SERVICE"
 
 compose exec -T "$POSTGRES_SERVICE" sh -c '
-	db_name=${1:-${POSTGRES_DB:-team_task_tracker}}
-	db_user=${2:-${POSTGRES_USER:-team_task_tracker}}
+	db_name=${1:-${POSTGRES_DB:-kelmio}}
+	db_user=${2:-${POSTGRES_USER:-kelmio}}
 	psql -q -v ON_ERROR_STOP=1 -U "$db_user" -d "$db_name" \
 		-c "SET client_min_messages TO WARNING; DROP SCHEMA IF EXISTS public CASCADE;"
 ' sh "$POSTGRES_DB_OVERRIDE" "$POSTGRES_USER_OVERRIDE" >/dev/null
 
 if [ "${BACKUP##*.}" = "gz" ]; then
 	gzip -dc "$BACKUP" | compose exec -T "$POSTGRES_SERVICE" sh -c '
-		db_name=${1:-${POSTGRES_DB:-team_task_tracker}}
-		db_user=${2:-${POSTGRES_USER:-team_task_tracker}}
+		db_name=${1:-${POSTGRES_DB:-kelmio}}
+		db_user=${2:-${POSTGRES_USER:-kelmio}}
 		exec psql -q -v ON_ERROR_STOP=1 -U "$db_user" -d "$db_name"
 	' sh "$POSTGRES_DB_OVERRIDE" "$POSTGRES_USER_OVERRIDE" >/dev/null
 else
 	compose exec -T "$POSTGRES_SERVICE" sh -c '
-		db_name=${1:-${POSTGRES_DB:-team_task_tracker}}
-		db_user=${2:-${POSTGRES_USER:-team_task_tracker}}
+		db_name=${1:-${POSTGRES_DB:-kelmio}}
+		db_user=${2:-${POSTGRES_USER:-kelmio}}
 		exec psql -q -v ON_ERROR_STOP=1 -U "$db_user" -d "$db_name"
 	' sh "$POSTGRES_DB_OVERRIDE" "$POSTGRES_USER_OVERRIDE" <"$BACKUP" >/dev/null
 fi

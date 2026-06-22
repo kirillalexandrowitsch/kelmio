@@ -21,22 +21,23 @@ make backup
 The command writes a file like:
 
 ```text
-backups/team-task-tracker-20260605-120000.sql.gz
+backups/kelmio-20260605-120000.sql.gz
 ```
 
 Verify a backup safely in an isolated temporary PostgreSQL container:
 
 ```sh
-BACKUP=backups/team-task-tracker-20260605-120000.sql.gz make restore-check
+BACKUP=backups/kelmio-20260605-120000.sql.gz make restore-check
 ```
 
 Restore into the currently selected Compose PostgreSQL database:
 
 ```sh
-BACKUP=backups/team-task-tracker-20260605-120000.sql.gz RESTORE_CONFIRM=I_UNDERSTAND make restore
+BACKUP=backups/kelmio-20260605-120000.sql.gz RESTORE_CONFIRM=I_UNDERSTAND make restore
 ```
 
 `make restore` is destructive. It drops and recreates the selected database `public` schema before loading the backup.
+Backup and restore commands validate file format rather than filename, so archives created before the Kelmio rename remain supported.
 
 ## Scheduled Local Backups
 
@@ -51,7 +52,7 @@ make monitoring-up
 Scheduled files use a separate name so retention never removes manual backups:
 
 ```text
-backups/team-task-tracker-scheduled-20260620-120000.sql.gz
+backups/kelmio-scheduled-20260620-120000.sql.gz
 ```
 
 Create one scheduled-format backup without starting the monitoring stack:
@@ -102,13 +103,13 @@ COMPOSE_FILE=docker-compose.prod.yml ENV_FILE=deploy/production.env make backup
 Before restoring to production, validate the backup away from production:
 
 ```sh
-BACKUP=backups/team-task-tracker-20260605-120000.sql.gz make restore-check
+BACKUP=backups/kelmio-20260605-120000.sql.gz make restore-check
 ```
 
 Then restore only if you intentionally want to replace the selected production database schema:
 
 ```sh
-COMPOSE_FILE=docker-compose.prod.yml ENV_FILE=deploy/production.env BACKUP=backups/team-task-tracker-20260605-120000.sql.gz RESTORE_CONFIRM=I_UNDERSTAND make restore
+COMPOSE_FILE=docker-compose.prod.yml ENV_FILE=deploy/production.env BACKUP=backups/kelmio-20260605-120000.sql.gz RESTORE_CONFIRM=I_UNDERSTAND make restore
 ```
 
 ## Before-Update Flow

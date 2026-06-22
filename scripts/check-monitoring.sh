@@ -5,7 +5,7 @@ set -eu
 ROOT_DIR=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
 PROMETHEUS_IMAGE=prom/prometheus:v3.12.0
 ALERTMANAGER_IMAGE=prom/alertmanager:v0.33.0
-SMOKE_ALERT=TeamTaskTrackerMonitoringSmoke
+SMOKE_ALERT=KelmioMonitoringSmoke
 ALERT_POSTED=false
 
 fail() {
@@ -126,28 +126,28 @@ printf '%s' "$alertmanagers" | grep -q 'alertmanager:9093' || fail 'Prometheus d
 printf '%s\n' 'Checking scheduled backup metrics...'
 wait_for_prometheus_value \
   'backup worker successful scheduled backup result' \
-  'team_task_tracker_backup_last_result{job="backup-worker",result="success"}' \
+  'kelmio_backup_last_result{job="backup-worker",result="success"}' \
   '"value":\[[^]]*,"1"\]'
 wait_for_prometheus_value \
   'backup worker retained scheduled artifact' \
-  'team_task_tracker_backup_artifacts{job="backup-worker"}' \
+  'kelmio_backup_artifacts{job="backup-worker"}' \
   '"value":\[[^]]*,"[1-9][0-9]*"\]'
 wait_for_prometheus_value \
   'successful isolated restore drill result' \
-  'team_task_tracker_restore_drill_last_result{job="backup-worker",result="success"}' \
+  'kelmio_restore_drill_last_result{job="backup-worker",result="success"}' \
   '"value":\[[^]]*,"1"\]'
 wait_for_prometheus_value \
   'isolated restore drill migration verification' \
-  'team_task_tracker_restore_drill_last_success_timestamp_seconds{job="backup-worker"}' \
+  'kelmio_restore_drill_last_success_timestamp_seconds{job="backup-worker"}' \
   '"value":\[[^]]*,"[1-9][0-9]*"\]'
 
 printf '%s\n' 'Checking Grafana provisioning...'
 grafana_health=$(curl -fsS "$GRAFANA_URL/api/health")
 printf '%s' "$grafana_health" | grep -q '"database"' || fail 'Grafana health response is incomplete'
-datasource=$(curl -fsS "$GRAFANA_URL/api/datasources/uid/team-task-tracker-prometheus")
-printf '%s' "$datasource" | grep -q '"uid":"team-task-tracker-prometheus"' || fail 'Grafana Prometheus datasource is missing'
-dashboards=$(curl -fsS "$GRAFANA_URL/api/search?query=Team%20Task%20Tracker%20Operations")
-printf '%s' "$dashboards" | grep -q '"uid":"team-task-tracker-operations"' || fail 'Grafana operations dashboard is missing'
+datasource=$(curl -fsS "$GRAFANA_URL/api/datasources/uid/kelmio-prometheus")
+printf '%s' "$datasource" | grep -q '"uid":"kelmio-prometheus"' || fail 'Grafana Prometheus datasource is missing'
+dashboards=$(curl -fsS "$GRAFANA_URL/api/search?query=Kelmio%20Operations")
+printf '%s' "$dashboards" | grep -q '"uid":"kelmio-operations"' || fail 'Grafana operations dashboard is missing'
 
 printf '%s\n' 'Checking Alertmanager with a temporary synthetic alert...'
 now=$(date -u '+%Y-%m-%dT%H:%M:%SZ')

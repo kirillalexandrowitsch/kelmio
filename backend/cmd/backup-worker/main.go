@@ -14,10 +14,10 @@ import (
 	"syscall"
 	"time"
 
-	"team-task-tracker/backend/internal/backups"
-	"team-task-tracker/backend/internal/config"
-	appmetrics "team-task-tracker/backend/internal/metrics"
-	"team-task-tracker/backend/internal/restores"
+	"kelmio/backend/internal/backups"
+	"kelmio/backend/internal/config"
+	appmetrics "kelmio/backend/internal/metrics"
+	"kelmio/backend/internal/restores"
 )
 
 type backupRunner interface {

@@ -147,7 +147,7 @@ smoke-production:
 	./scripts/smoke-production.sh
 
 prod-config-check:
-	cd backend && GOCACHE="$${GOCACHE:-$${TMPDIR:-/tmp}/team-task-tracker-gocache}" go test ./internal/config -run Production
+	cd backend && GOCACHE="$${GOCACHE:-$${TMPDIR:-/tmp}/kelmio-gocache}" go test ./internal/config -run Production
 
 prod-compose-check:
 	docker compose --env-file "$${ENV_FILE:-deploy/production.env.example}" -f docker-compose.prod.yml config >/dev/null

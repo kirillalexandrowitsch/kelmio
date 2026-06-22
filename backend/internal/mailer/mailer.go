@@ -14,7 +14,7 @@ import (
 	"strconv"
 	"strings"
 
-	"team-task-tracker/backend/internal/config"
+	"kelmio/backend/internal/config"
 )
 
 var ErrDeliveryFailed = errors.New("smtp delivery failed")
@@ -207,7 +207,7 @@ func renderMessage(msg Message) []byte {
 	writeHeader(&body, "MIME-Version", "1.0")
 
 	if msg.TextBody != "" && msg.HTMLBody != "" {
-		boundary := "team-task-tracker-message-boundary"
+		boundary := "kelmio-message-boundary"
 		writeHeader(&body, "Content-Type", `multipart/alternative; boundary="`+boundary+`"`)
 		body.WriteString("\r\n")
 		writePart(&body, boundary, "text/plain; charset=utf-8", msg.TextBody)

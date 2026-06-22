@@ -1,5 +1,5 @@
 groups:
-  - name: team-task-tracker-runtime
+  - name: kelmio-runtime
     rules:
       - alert: BackendMetricsUnavailable
         expr: up{job="backend"} == 0
@@ -12,7 +12,7 @@ groups:
           description: Prometheus has not scraped the backend metrics endpoint for 30 seconds.
 
       - alert: DatabaseNotReady
-        expr: team_task_tracker_database_ready{job="backend"} == 0
+        expr: kelmio_database_ready{job="backend"} == 0
         for: 1m
         labels:
           severity: critical
@@ -32,7 +32,7 @@ groups:
           description: Prometheus has not scraped the email worker metrics endpoint for 30 seconds.
 
       - alert: EmailWorkerHeartbeatStale
-        expr: team_task_tracker_email_worker_heartbeat_timestamp_seconds{job="email-worker"} == 0 or (time() - team_task_tracker_email_worker_heartbeat_timestamp_seconds{job="email-worker"}) > 60
+        expr: kelmio_email_worker_heartbeat_timestamp_seconds{job="email-worker"} == 0 or (time() - kelmio_email_worker_heartbeat_timestamp_seconds{job="email-worker"}) > 60
         for: 1m
         labels:
           severity: warning
@@ -42,7 +42,7 @@ groups:
           description: The email worker has not completed a polling heartbeat in more than one minute.
 
       - alert: EmailDeliveryFailures
-        expr: team_task_tracker_email_outbox_records{job="backend",status="failed"} > 0
+        expr: kelmio_email_outbox_records{job="backend",status="failed"} > 0
         for: 30s
         labels:
           severity: warning
@@ -52,7 +52,7 @@ groups:
           description: At least one email exhausted all configured delivery attempts.
 
       - alert: EmailWorkerBatchErrors
-        expr: increase(team_task_tracker_email_worker_batch_errors_total{job="email-worker"}[5m]) > 0
+        expr: increase(kelmio_email_worker_batch_errors_total{job="email-worker"}[5m]) > 0
         labels:
           severity: warning
           service: email-worker
@@ -60,7 +60,7 @@ groups:
           summary: Email worker batch processing failed
           description: The email worker recorded a claim or processing-loop error during the last five minutes.
 
-  - name: team-task-tracker-operations
+  - name: kelmio-operations
     rules:
       - alert: BackupRunnerUnavailable
         expr: up{job="backup-worker"} == 0
@@ -73,7 +73,7 @@ groups:
           description: Prometheus has not scraped the backup worker metrics endpoint for 30 seconds.
 
       - alert: BackupFailed
-        expr: team_task_tracker_backup_last_result{job="backup-worker",result="failure"} == 1
+        expr: kelmio_backup_last_result{job="backup-worker",result="failure"} == 1
         for: 30s
         labels:
           severity: warning
@@ -83,7 +83,7 @@ groups:
           description: The backup worker could not complete its latest PostgreSQL backup attempt.
 
       - alert: BackupStale
-        expr: (team_task_tracker_backup_last_success_timestamp_seconds{job="backup-worker"} > 0) and ((time() - team_task_tracker_backup_last_success_timestamp_seconds{job="backup-worker"}) > 93600)
+        expr: (kelmio_backup_last_success_timestamp_seconds{job="backup-worker"} > 0) and ((time() - kelmio_backup_last_success_timestamp_seconds{job="backup-worker"}) > 93600)
         for: 5m
         labels:
           severity: warning
@@ -93,7 +93,7 @@ groups:
           description: No successful backup has been recorded in the last 26 hours.
 
       - alert: RestoreDrillStale
-        expr: (team_task_tracker_restore_drill_last_success_timestamp_seconds{job="backup-worker"} > 0) and ((time() - team_task_tracker_restore_drill_last_success_timestamp_seconds{job="backup-worker"}) > 93600)
+        expr: (kelmio_restore_drill_last_success_timestamp_seconds{job="backup-worker"} > 0) and ((time() - kelmio_restore_drill_last_success_timestamp_seconds{job="backup-worker"}) > 93600)
         for: 5m
         labels:
           severity: warning
@@ -103,7 +103,7 @@ groups:
           description: No successful restore drill has been recorded in the last 26 hours.
 
       - alert: RestoreDrillUnavailable
-        expr: absent(team_task_tracker_restore_drill_last_attempt_timestamp_seconds{job="backup-worker"}) or team_task_tracker_restore_drill_last_attempt_timestamp_seconds{job="backup-worker"} == 0
+        expr: absent(kelmio_restore_drill_last_attempt_timestamp_seconds{job="backup-worker"}) or kelmio_restore_drill_last_attempt_timestamp_seconds{job="backup-worker"} == 0
         for: 1m
         labels:
           severity: critical
@@ -113,7 +113,7 @@ groups:
           description: The backup worker is not exposing restore drill operational metrics.
 
       - alert: RestoreDrillFailed
-        expr: team_task_tracker_restore_drill_last_result{job="backup-worker",result="failure"} == 1
+        expr: kelmio_restore_drill_last_result{job="backup-worker",result="failure"} == 1
         for: 30s
         labels:
           severity: critical

@@ -21,8 +21,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/crypto/bcrypt"
 
-	"team-task-tracker/backend/internal/auth"
-	"team-task-tracker/backend/internal/emailoutbox"
+	"kelmio/backend/internal/auth"
+	"kelmio/backend/internal/emailoutbox"
 )
 
 const inviteTTL = 7 * 24 * time.Hour

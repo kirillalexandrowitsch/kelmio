@@ -12,8 +12,8 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"team-task-tracker/backend/internal/auth"
-	"team-task-tracker/backend/internal/projectaccess"
+	"kelmio/backend/internal/auth"
+	"kelmio/backend/internal/projectaccess"
 )
 
 var errStatusKeyExists = errors.New("workflow status key exists")

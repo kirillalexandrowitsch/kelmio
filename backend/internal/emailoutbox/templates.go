@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"team-task-tracker/backend/internal/mailer"
+	"kelmio/backend/internal/mailer"
 )
 
 var ErrTemplateInvalid = errors.New("email template is invalid")

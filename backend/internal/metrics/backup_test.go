@@ -16,12 +16,12 @@ func TestBackupMetricsRecordSuccessAndFailure(t *testing.T) {
 	metrics.Handler("").ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/metrics", nil))
 	body := recorder.Body.String()
 	for _, expected := range []string{
-		"team_task_tracker_backup_last_attempt_timestamp_seconds 2000",
-		"team_task_tracker_backup_last_success_timestamp_seconds 2000",
-		"team_task_tracker_backup_duration_seconds 3",
-		"team_task_tracker_backup_artifacts 3",
-		`team_task_tracker_backup_last_result{result="success"} 1`,
-		`team_task_tracker_backup_last_result{result="failure"} 0`,
+		"kelmio_backup_last_attempt_timestamp_seconds 2000",
+		"kelmio_backup_last_success_timestamp_seconds 2000",
+		"kelmio_backup_duration_seconds 3",
+		"kelmio_backup_artifacts 3",
+		`kelmio_backup_last_result{result="success"} 1`,
+		`kelmio_backup_last_result{result="failure"} 0`,
 	} {
 		if !strings.Contains(body, expected) {
 			t.Fatalf("metrics output missing %q:\n%s", expected, body)
@@ -34,12 +34,12 @@ func TestBackupMetricsRecordSuccessAndFailure(t *testing.T) {
 	metrics.Handler("").ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/metrics", nil))
 	body = recorder.Body.String()
 	for _, expected := range []string{
-		"team_task_tracker_backup_last_attempt_timestamp_seconds 3000",
-		"team_task_tracker_backup_last_success_timestamp_seconds 2000",
-		"team_task_tracker_backup_failures_total 1",
-		"team_task_tracker_backup_retention_failures_total 1",
-		`team_task_tracker_backup_last_result{result="success"} 0`,
-		`team_task_tracker_backup_last_result{result="failure"} 1`,
+		"kelmio_backup_last_attempt_timestamp_seconds 3000",
+		"kelmio_backup_last_success_timestamp_seconds 2000",
+		"kelmio_backup_failures_total 1",
+		"kelmio_backup_retention_failures_total 1",
+		`kelmio_backup_last_result{result="success"} 0`,
+		`kelmio_backup_last_result{result="failure"} 1`,
 	} {
 		if !strings.Contains(body, expected) {
 			t.Fatalf("metrics output missing %q:\n%s", expected, body)
@@ -56,12 +56,12 @@ func TestBackupMetricsRecordsRestoreDrill(t *testing.T) {
 	metrics.Handler("").ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/metrics", nil))
 	body := recorder.Body.String()
 	for _, expected := range []string{
-		"team_task_tracker_restore_drill_last_attempt_timestamp_seconds 5000",
-		"team_task_tracker_restore_drill_last_success_timestamp_seconds 4000",
-		"team_task_tracker_restore_drill_duration_seconds 2",
-		"team_task_tracker_restore_drill_backup_timestamp_seconds 4900",
-		"team_task_tracker_restore_drill_failures_total 1",
-		`team_task_tracker_restore_drill_last_result{result="failure"} 1`,
+		"kelmio_restore_drill_last_attempt_timestamp_seconds 5000",
+		"kelmio_restore_drill_last_success_timestamp_seconds 4000",
+		"kelmio_restore_drill_duration_seconds 2",
+		"kelmio_restore_drill_backup_timestamp_seconds 4900",
+		"kelmio_restore_drill_failures_total 1",
+		`kelmio_restore_drill_last_result{result="failure"} 1`,
 	} {
 		if !strings.Contains(body, expected) {
 			t.Fatalf("metrics output missing %q:\n%s", expected, body)

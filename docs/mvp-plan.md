@@ -160,7 +160,7 @@
 Рекомендуемая структура монорепозитория:
 
 ```text
-team-task-tracker/
+kelmio/
   backend/
     cmd/api/
     internal/

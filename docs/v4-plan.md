@@ -589,21 +589,21 @@ Viewer видит только read-only project summary.
 
 ```sh
 git diff --check
-GOCACHE=/private/tmp/team-task-tracker-gocache make verify
+GOCACHE=/private/tmp/kelmio-gocache make verify
 ```
 
 Перед финальным V4 закрытием:
 
 ```sh
-GOCACHE=/private/tmp/team-task-tracker-gocache make setup-db
-GOCACHE=/private/tmp/team-task-tracker-gocache make setup-db
+GOCACHE=/private/tmp/kelmio-gocache make setup-db
+GOCACHE=/private/tmp/kelmio-gocache make setup-db
 make smoke-production
 make smoke-api
 make frontend-e2e
-GOCACHE=/private/tmp/team-task-tracker-gocache make backend-integration-test
+GOCACHE=/private/tmp/kelmio-gocache make backend-integration-test
 make prod-compose-check
 make prod-stack-qa
-GOCACHE=/private/tmp/team-task-tracker-gocache make verify
+GOCACHE=/private/tmp/kelmio-gocache make verify
 git diff --check
 ```
 

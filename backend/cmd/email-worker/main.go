@@ -11,11 +11,11 @@ import (
 	"syscall"
 	"time"
 
-	"team-task-tracker/backend/internal/config"
-	"team-task-tracker/backend/internal/database"
-	"team-task-tracker/backend/internal/emailoutbox"
-	"team-task-tracker/backend/internal/mailer"
-	appmetrics "team-task-tracker/backend/internal/metrics"
+	"kelmio/backend/internal/config"
+	"kelmio/backend/internal/database"
+	"kelmio/backend/internal/emailoutbox"
+	"kelmio/backend/internal/mailer"
+	appmetrics "kelmio/backend/internal/metrics"
 )
 
 const batchSize = 10

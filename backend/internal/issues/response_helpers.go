@@ -8,7 +8,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgtype"
 
-	"team-task-tracker/backend/internal/notifications"
+	"kelmio/backend/internal/notifications"
 )
 
 func scanIssue(row rowScanner) (issueResponse, error) {

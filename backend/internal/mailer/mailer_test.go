@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"team-task-tracker/backend/internal/config"
+	"kelmio/backend/internal/config"
 )
 
 func TestNoopClientSendReturnsSuccess(t *testing.T) {

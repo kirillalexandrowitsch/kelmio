@@ -12,7 +12,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "team-task-tracker-prometheus"
+        "uid": "kelmio-prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -72,7 +72,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "team_task_tracker_database_ready{job=\"backend\"}",
+          "expr": "kelmio_database_ready{job=\"backend\"}",
           "instant": true,
           "legendFormat": "Database",
           "range": false,
@@ -85,7 +85,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "team-task-tracker-prometheus"
+        "uid": "kelmio-prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -158,7 +158,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "team-task-tracker-prometheus"
+        "uid": "kelmio-prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -211,7 +211,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "time() - team_task_tracker_email_worker_heartbeat_timestamp_seconds{job=\"email-worker\"}",
+          "expr": "time() - kelmio_email_worker_heartbeat_timestamp_seconds{job=\"email-worker\"}",
           "instant": true,
           "legendFormat": "Heartbeat age",
           "range": false,
@@ -224,7 +224,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "team-task-tracker-prometheus"
+        "uid": "kelmio-prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -272,7 +272,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "team_task_tracker_email_outbox_records{job=\"backend\",status=\"failed\"}",
+          "expr": "kelmio_email_outbox_records{job=\"backend\",status=\"failed\"}",
           "instant": true,
           "legendFormat": "Failed",
           "range": false,
@@ -285,7 +285,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "team-task-tracker-prometheus"
+        "uid": "kelmio-prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -336,7 +336,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum by (method) (rate(team_task_tracker_http_requests_total{job=\"backend\"}[5m]))",
+          "expr": "sum by (method) (rate(kelmio_http_requests_total{job=\"backend\"}[5m]))",
           "legendFormat": "{{method}}",
           "range": true,
           "refId": "A"
@@ -348,7 +348,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "team-task-tracker-prometheus"
+        "uid": "kelmio-prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -399,7 +399,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum(rate(team_task_tracker_http_requests_total{job=\"backend\",status=~\"5..\"}[5m]))",
+          "expr": "sum(rate(kelmio_http_requests_total{job=\"backend\",status=~\"5..\"}[5m]))",
           "legendFormat": "5xx",
           "range": true,
           "refId": "A"
@@ -411,7 +411,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "team-task-tracker-prometheus"
+        "uid": "kelmio-prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -462,7 +462,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum(rate(team_task_tracker_http_request_duration_seconds_sum{job=\"backend\"}[5m])) / clamp_min(sum(rate(team_task_tracker_http_request_duration_seconds_count{job=\"backend\"}[5m])), 0.001)",
+          "expr": "sum(rate(kelmio_http_request_duration_seconds_sum{job=\"backend\"}[5m])) / clamp_min(sum(rate(kelmio_http_request_duration_seconds_count{job=\"backend\"}[5m])), 0.001)",
           "legendFormat": "Average",
           "range": true,
           "refId": "A"
@@ -474,7 +474,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "team-task-tracker-prometheus"
+        "uid": "kelmio-prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -527,7 +527,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "team_task_tracker_email_outbox_records{job=\"backend\"}",
+          "expr": "kelmio_email_outbox_records{job=\"backend\"}",
           "legendFormat": "{{status}}",
           "range": true,
           "refId": "A"
@@ -539,7 +539,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "team-task-tracker-prometheus"
+        "uid": "kelmio-prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -590,7 +590,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum by (result) (rate(team_task_tracker_email_worker_delivery_attempts_total{job=\"email-worker\"}[5m]))",
+          "expr": "sum by (result) (rate(kelmio_email_worker_delivery_attempts_total{job=\"email-worker\"}[5m]))",
           "legendFormat": "{{result}}",
           "range": true,
           "refId": "A"
@@ -602,7 +602,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "team-task-tracker-prometheus"
+        "uid": "kelmio-prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -662,7 +662,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "(time() - team_task_tracker_backup_last_success_timestamp_seconds{job=\"backup-worker\"}) and (team_task_tracker_backup_last_success_timestamp_seconds{job=\"backup-worker\"} > 0)",
+          "expr": "(time() - kelmio_backup_last_success_timestamp_seconds{job=\"backup-worker\"}) and (kelmio_backup_last_success_timestamp_seconds{job=\"backup-worker\"} > 0)",
           "instant": true,
           "legendFormat": "Backup age",
           "range": false,
@@ -675,7 +675,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "team-task-tracker-prometheus"
+        "uid": "kelmio-prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -735,7 +735,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "(time() - team_task_tracker_restore_drill_last_success_timestamp_seconds{job=\"backup-worker\"}) and (team_task_tracker_restore_drill_last_success_timestamp_seconds{job=\"backup-worker\"} > 0)",
+          "expr": "(time() - kelmio_restore_drill_last_success_timestamp_seconds{job=\"backup-worker\"}) and (kelmio_restore_drill_last_success_timestamp_seconds{job=\"backup-worker\"} > 0)",
           "instant": true,
           "legendFormat": "Restore drill age",
           "range": false,
@@ -748,7 +748,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "team-task-tracker-prometheus"
+        "uid": "kelmio-prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -816,7 +816,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "team_task_tracker_backup_last_result{job=\"backup-worker\",result=\"success\"} - team_task_tracker_backup_last_result{job=\"backup-worker\",result=\"failure\"}",
+          "expr": "kelmio_backup_last_result{job=\"backup-worker\",result=\"success\"} - kelmio_backup_last_result{job=\"backup-worker\",result=\"failure\"}",
           "instant": true,
           "legendFormat": "Latest backup",
           "range": false,
@@ -829,7 +829,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "team-task-tracker-prometheus"
+        "uid": "kelmio-prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -878,7 +878,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "team_task_tracker_backup_artifacts{job=\"backup-worker\"}",
+          "expr": "kelmio_backup_artifacts{job=\"backup-worker\"}",
           "instant": true,
           "legendFormat": "Artifacts",
           "range": false,
@@ -891,7 +891,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "team-task-tracker-prometheus"
+        "uid": "kelmio-prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -959,7 +959,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "team_task_tracker_restore_drill_last_result{job=\"backup-worker\",result=\"success\"} - team_task_tracker_restore_drill_last_result{job=\"backup-worker\",result=\"failure\"}",
+          "expr": "kelmio_restore_drill_last_result{job=\"backup-worker\",result=\"success\"} - kelmio_restore_drill_last_result{job=\"backup-worker\",result=\"failure\"}",
           "instant": true,
           "legendFormat": "Latest restore drill",
           "range": false,
@@ -972,7 +972,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "team-task-tracker-prometheus"
+        "uid": "kelmio-prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -1021,7 +1021,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "team_task_tracker_restore_drill_duration_seconds{job=\"backup-worker\"}",
+          "expr": "kelmio_restore_drill_duration_seconds{job=\"backup-worker\"}",
           "instant": true,
           "legendFormat": "Duration",
           "range": false,
@@ -1035,7 +1035,7 @@
   "refresh": "15s",
   "schemaVersion": 41,
   "tags": [
-    "team-task-tracker",
+    "kelmio",
     "operations",
     "localhost"
   ],
@@ -1049,7 +1049,7 @@
   "timepicker": {},
   "timezone": "browser",
   "title": "Kelmio Operations",
-  "uid": "team-task-tracker-operations",
+  "uid": "kelmio-operations",
   "version": 1,
   "weekStart": ""
 }

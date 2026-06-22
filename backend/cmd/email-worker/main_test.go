@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	appmetrics "team-task-tracker/backend/internal/metrics"
+	appmetrics "kelmio/backend/internal/metrics"
 )
 
 func TestEmailWorkerMetricsServerExposesAndShutsDown(t *testing.T) {
@@ -48,7 +48,7 @@ func TestEmailWorkerMetricsServerExposesAndShutsDown(t *testing.T) {
 		}
 		time.Sleep(25 * time.Millisecond)
 	}
-	if !strings.Contains(body, "team_task_tracker_email_worker_heartbeat_timestamp_seconds 1234") {
+	if !strings.Contains(body, "kelmio_email_worker_heartbeat_timestamp_seconds 1234") {
 		t.Fatalf("metrics body missing heartbeat:\n%s", body)
 	}
 

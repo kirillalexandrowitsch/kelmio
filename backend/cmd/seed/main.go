@@ -11,8 +11,8 @@ import (
 	"github.com/jackc/pgx/v5"
 	"golang.org/x/crypto/bcrypt"
 
-	"team-task-tracker/backend/internal/config"
-	"team-task-tracker/backend/internal/database"
+	"kelmio/backend/internal/config"
+	"kelmio/backend/internal/database"
 )
 
 type seedConfig struct {

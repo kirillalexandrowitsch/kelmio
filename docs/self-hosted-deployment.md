@@ -93,7 +93,7 @@ Create and verify a backup before every update:
 
 ```sh
 COMPOSE_FILE=docker-compose.prod.yml ENV_FILE=deploy/production.env make backup
-BACKUP=backups/team-task-tracker-YYYYMMDD-HHMMSS.sql.gz make restore-check
+BACKUP=backups/kelmio-YYYYMMDD-HHMMSS.sql.gz make restore-check
 ```
 
 Then update and rebuild:

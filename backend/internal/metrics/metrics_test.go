@@ -88,7 +88,7 @@ func TestHTTPMiddlewareEmitsMetricsWithoutSensitiveLabels(t *testing.T) {
 	appMetrics.Handler("").ServeHTTP(metricsRecorder, httptest.NewRequest(http.MethodGet, "/metrics", nil))
 	body := metricsRecorder.Body.String()
 
-	if !strings.Contains(body, `team_task_tracker_http_requests_total{method="POST",route="/api/v1/issues/{id}/comments",status="201"} 1`) {
+	if !strings.Contains(body, `kelmio_http_requests_total{method="POST",route="/api/v1/issues/{id}/comments",status="201"} 1`) {
 		t.Fatalf("metrics output missing normalized request metric:\n%s", body)
 	}
 	for _, secret := range []string{"4fdc482f-61b6-47f0-a1a8-ff9f34ca5c35", "token=secret", "password=secret"} {
@@ -112,10 +112,10 @@ func TestAuthLoginOutcomeMetrics(t *testing.T) {
 	body := recorder.Body.String()
 
 	for _, expected := range []string{
-		`team_task_tracker_auth_login_attempts_total{outcome="success"} 1`,
-		`team_task_tracker_auth_login_attempts_total{outcome="invalid"} 1`,
-		`team_task_tracker_auth_login_attempts_total{outcome="rate_limited"} 1`,
-		`team_task_tracker_auth_login_attempts_total{outcome="error"} 1`,
+		`kelmio_auth_login_attempts_total{outcome="success"} 1`,
+		`kelmio_auth_login_attempts_total{outcome="invalid"} 1`,
+		`kelmio_auth_login_attempts_total{outcome="rate_limited"} 1`,
+		`kelmio_auth_login_attempts_total{outcome="error"} 1`,
 	} {
 		if !strings.Contains(body, expected) {
 			t.Fatalf("metrics output missing %q:\n%s", expected, body)
@@ -139,12 +139,12 @@ func TestEmailWorkerMetrics(t *testing.T) {
 	body := recorder.Body.String()
 
 	for _, expected := range []string{
-		"team_task_tracker_email_worker_heartbeat_timestamp_seconds 1234",
-		`team_task_tracker_email_worker_delivery_attempts_total{result="sent"} 1`,
-		`team_task_tracker_email_worker_delivery_attempts_total{result="pending"} 1`,
-		`team_task_tracker_email_worker_delivery_attempts_total{result="failed"} 1`,
-		`team_task_tracker_email_worker_delivery_attempts_total{result="error"} 1`,
-		"team_task_tracker_email_worker_batch_errors_total 1",
+		"kelmio_email_worker_heartbeat_timestamp_seconds 1234",
+		`kelmio_email_worker_delivery_attempts_total{result="sent"} 1`,
+		`kelmio_email_worker_delivery_attempts_total{result="pending"} 1`,
+		`kelmio_email_worker_delivery_attempts_total{result="failed"} 1`,
+		`kelmio_email_worker_delivery_attempts_total{result="error"} 1`,
+		"kelmio_email_worker_batch_errors_total 1",
 	} {
 		if !strings.Contains(body, expected) {
 			t.Fatalf("metrics output missing %q:\n%s", expected, body)

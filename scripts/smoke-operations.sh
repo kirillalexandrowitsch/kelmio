@@ -3,7 +3,7 @@
 set -eu
 
 ROOT_DIR=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
-QA_DIR=$(mktemp -d "${TMPDIR:-/tmp}/team-task-tracker-operations-smoke.XXXXXX")
+QA_DIR=$(mktemp -d "${TMPDIR:-/tmp}/kelmio-operations-smoke.XXXXXX")
 RESTORE_SERVICE=restore-drill-postgres
 RESTORE_WAS_RUNNING=false
 
@@ -47,7 +47,7 @@ docker compose --profile monitoring build backup-worker >/dev/null
 printf '%s\n' 'Creating and verifying a scheduled backup...'
 BACKUP_DIR="$QA_DIR" BACKUP_RETENTION_COUNT=2 docker compose --profile monitoring run --rm backup-worker --once
 
-scheduled=$(find "$QA_DIR" -maxdepth 1 -type f -name 'team-task-tracker-scheduled-*.sql.gz' -print)
+scheduled=$(find "$QA_DIR" -maxdepth 1 -type f -name 'kelmio-scheduled-*.sql.gz' -print)
 [ "$(printf '%s\n' "$scheduled" | sed '/^$/d' | wc -l | tr -d ' ')" = "1" ] || fail 'expected exactly one scheduled backup'
 valid_backup=$scheduled
 state=$(read_restore_state) || fail 'restore drill state was not created'
@@ -56,7 +56,7 @@ state=$(read_restore_state) || fail 'restore drill state was not created'
 first_success=$(state_value "$state" '.last_success_at')
 
 printf '%s\n' 'Rejecting a corrupted latest backup...'
-corrupted="$QA_DIR/team-task-tracker-scheduled-20990101-000000.sql.gz"
+corrupted="$QA_DIR/kelmio-scheduled-20990101-000000.sql.gz"
 printf '%s\n' 'corrupted backup' >"$corrupted"
 if BACKUP_DIR="$QA_DIR" docker compose --profile monitoring run --rm backup-worker --restore-only; then
 	fail 'corrupted backup unexpectedly passed restore drill'

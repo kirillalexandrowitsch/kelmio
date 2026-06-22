@@ -13,11 +13,11 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"team-task-tracker/backend/internal/auth"
-	"team-task-tracker/backend/internal/automations"
-	"team-task-tracker/backend/internal/notifications"
-	"team-task-tracker/backend/internal/pagination"
-	"team-task-tracker/backend/internal/projectaccess"
+	"kelmio/backend/internal/auth"
+	"kelmio/backend/internal/automations"
+	"kelmio/backend/internal/notifications"
+	"kelmio/backend/internal/pagination"
+	"kelmio/backend/internal/projectaccess"
 )
 
 var validIssueTypes = map[string]bool{

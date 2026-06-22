@@ -6,8 +6,8 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"team-task-tracker/backend/internal/auth"
-	"team-task-tracker/backend/internal/automations"
+	"kelmio/backend/internal/auth"
+	"kelmio/backend/internal/automations"
 )
 
 type rowScanner interface {

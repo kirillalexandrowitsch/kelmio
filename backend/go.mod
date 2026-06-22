@@ -1,4 +1,4 @@
-module team-task-tracker/backend
+module kelmio/backend
 
 go 1.26
 

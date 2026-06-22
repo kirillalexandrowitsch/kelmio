@@ -12,10 +12,10 @@ CURL_INSECURE="${CURL_INSECURE:-false}"
 SMOKE_READY_TIMEOUT_SECONDS="${SMOKE_READY_TIMEOUT_SECONDS:-60}"
 
 API_BASE_URL="${API_BASE_URL%/}"
-COOKIE_JAR="$(mktemp "${TMPDIR:-/tmp}/team-task-tracker-production-smoke-cookies.XXXXXX")"
-HEADERS_FILE="$(mktemp "${TMPDIR:-/tmp}/team-task-tracker-production-smoke-headers.XXXXXX")"
-BODY_FILE="$(mktemp "${TMPDIR:-/tmp}/team-task-tracker-production-smoke-body.XXXXXX")"
-LARGE_BODY_FILE="$(mktemp "${TMPDIR:-/tmp}/team-task-tracker-production-smoke-large-body.XXXXXX")"
+COOKIE_JAR="$(mktemp "${TMPDIR:-/tmp}/kelmio-production-smoke-cookies.XXXXXX")"
+HEADERS_FILE="$(mktemp "${TMPDIR:-/tmp}/kelmio-production-smoke-headers.XXXXXX")"
+BODY_FILE="$(mktemp "${TMPDIR:-/tmp}/kelmio-production-smoke-body.XXXXXX")"
+LARGE_BODY_FILE="$(mktemp "${TMPDIR:-/tmp}/kelmio-production-smoke-large-body.XXXXXX")"
 
 cleanup() {
 	if [ -s "$COOKIE_JAR" ]; then
@@ -222,7 +222,7 @@ status="$(curl -sS -D "$HEADERS_FILE" -o "$BODY_FILE" -w '%{http_code}' \
 	-d "{\"login\":\"$ADMIN_LOGIN\",\"password\":\"$ADMIN_PASSWORD\"}" \
 	"$API_BASE_URL/api/v1/auth/login")"
 assert_status "$status" "200"
-assert_header_contains "Set-Cookie" "team_task_tracker_session="
+assert_header_contains "Set-Cookie" "kelmio_session="
 assert_header_contains "Set-Cookie" "Path=/"
 assert_header_contains "Set-Cookie" "HttpOnly"
 assert_header_contains "Set-Cookie" "SameSite=Lax"

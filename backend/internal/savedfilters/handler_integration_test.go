@@ -13,9 +13,9 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"team-task-tracker/backend/internal/auth"
-	"team-task-tracker/backend/internal/database"
-	"team-task-tracker/backend/internal/migrations"
+	"kelmio/backend/internal/auth"
+	"kelmio/backend/internal/database"
+	"kelmio/backend/internal/migrations"
 )
 
 func TestSavedFilterLifecycleIntegration(t *testing.T) {
@@ -123,7 +123,7 @@ func newSavedFilterIntegrationDB(t *testing.T, ctx context.Context) *pgxpool.Poo
 
 	databaseURL := os.Getenv("DATABASE_URL")
 	if databaseURL == "" {
-		databaseURL = "postgres://team_task_tracker:team_task_tracker@localhost:15432/team_task_tracker?sslmode=disable"
+		databaseURL = "postgres://kelmio:kelmio@localhost:15432/kelmio?sslmode=disable"
 	}
 
 	adminDB, err := database.Connect(ctx, databaseURL)

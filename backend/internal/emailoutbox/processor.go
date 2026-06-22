@@ -3,7 +3,7 @@ package emailoutbox
 import (
 	"context"
 
-	"team-task-tracker/backend/internal/mailer"
+	"kelmio/backend/internal/mailer"
 )
 
 type StateStore interface {
