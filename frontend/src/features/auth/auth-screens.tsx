@@ -1,6 +1,9 @@
 import { type FormEvent } from "react";
+import { ArrowRight, KeyRound, LoaderCircle, UserRound } from "lucide-react";
 
 import { FormError } from "../../components/form-feedback";
+import { Button, Field, Input } from "../../ui";
+import { AuthLayout, KelmioMark } from "./auth-layout";
 
 type SignInScreenProps = {
   canSignIn: boolean;
@@ -16,10 +19,11 @@ type SignInScreenProps = {
 
 export function BootingScreen() {
   return (
-    <main className="auth-shell">
-      <section className="auth-panel auth-panel-compact">
-        <span className="brand-mark">K</span>
-        <p className="eyebrow">Checking session</p>
+    <main className="auth-shell auth-booting">
+      <section aria-live="polite" className="auth-panel auth-panel-compact">
+        <KelmioMark />
+        <LoaderCircle className="auth-spinner" size={20} />
+        <p>Checking session</p>
       </section>
     </main>
   );
@@ -37,59 +41,58 @@ export function SignInScreen({
   password,
 }: SignInScreenProps) {
   return (
-    <main className="auth-shell">
-      <section className="auth-panel">
-        <div className="brand auth-brand">
-          <span className="brand-mark">K</span>
-          <div>
-            <strong>Kelmio</strong>
-            <span>Local workspace</span>
-          </div>
-        </div>
-
-        <div>
-          <p className="eyebrow">Sign in</p>
-          <h1>Welcome back</h1>
-        </div>
-
-        <form className="auth-form" onSubmit={onSubmit}>
-          <label>
-            <span>Username or email</span>
-            <input
+    <AuthLayout
+      description="Enter your workspace credentials to continue."
+      eyebrow="Workspace access"
+      title="Welcome back"
+    >
+      <form className="auth-form" onSubmit={onSubmit}>
+          <Field label="Username or email">
+            <Input
               autoComplete="username"
               autoFocus
               name="login"
               onChange={(event) => onLoginChange(event.target.value)}
+              placeholder="admin or member@example.com"
               value={loginValue}
             />
-          </label>
+          </Field>
 
-          <label>
-            <span>Password</span>
-            <input
+          <Field label="Password">
+            <Input
               autoComplete="current-password"
               name="password"
               onChange={(event) => onPasswordChange(event.target.value)}
+              placeholder="Enter your password"
               type="password"
               value={password}
             />
-          </label>
+          </Field>
 
           <FormError message={error} />
 
-          <button disabled={!canSignIn} type="submit">
+          <Button
+            disabled={!canSignIn}
+            icon={isSubmitting ? <LoaderCircle className="auth-spinner" size={17} /> : <ArrowRight size={17} />}
+            type="submit"
+          >
             {isSubmitting ? "Signing in..." : "Sign in"}
-          </button>
+          </Button>
 
-          <button
+          <Button
             className="auth-link-button"
+            icon={<KeyRound size={15} />}
             onClick={onForgotPassword}
-            type="button"
+            size="sm"
+            variant="ghost"
           >
             Forgot password?
-          </button>
+          </Button>
         </form>
-      </section>
-    </main>
+      <div className="auth-security-note">
+        <UserRound size={15} />
+        <span>Your session remains inside this Kelmio installation.</span>
+      </div>
+    </AuthLayout>
   );
 }

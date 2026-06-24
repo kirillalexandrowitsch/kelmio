@@ -1,4 +1,5 @@
 import { type FormEvent, useEffect, useState } from "react";
+import { ArrowLeft, ArrowRight, CheckCircle2, KeyRound, Mail } from "lucide-react";
 
 import { FormError } from "../../components/form-feedback";
 import {
@@ -16,6 +17,8 @@ import {
   validatePasswordResetEmail,
 } from "../../lib/password-reset-view";
 import { hasText } from "../../lib/validation";
+import { Button, Card, Field, Input } from "../../ui";
+import { AuthLayout } from "./auth-layout";
 
 type ForgotPasswordScreenProps = {
   onGoToSignIn: () => void;
@@ -62,38 +65,28 @@ export function ForgotPasswordScreen({ onGoToSignIn }: ForgotPasswordScreenProps
   }
 
   return (
-    <main className="auth-shell">
-      <section className="auth-panel">
-        <div className="brand auth-brand">
-          <span className="brand-mark">K</span>
-          <div>
-            <strong>Kelmio</strong>
-            <span>Account recovery</span>
-          </div>
-        </div>
-
-        <div>
-          <p className="eyebrow">Password reset</p>
-          <h1>Reset your password</h1>
-        </div>
-
+    <AuthLayout
+      description="We will send a private reset link if the account is active."
+      eyebrow="Account recovery"
+      title="Reset your password"
+    >
         {isSuccess ? (
-          <div className="invite-success-card">
+          <Card className="auth-state auth-state-success">
+            <span className="auth-state-icon"><CheckCircle2 size={22} /></span>
             <p className="eyebrow">Check your email</p>
             <h2>Password reset instructions sent</h2>
             <p>
               If an active account exists for that email, password reset
               instructions will be sent.
             </p>
-            <button onClick={onGoToSignIn} type="button">
+            <Button icon={<ArrowLeft size={16} />} onClick={onGoToSignIn} variant="secondary">
               Back to sign in
-            </button>
-          </div>
+            </Button>
+          </Card>
         ) : (
           <form className="auth-form" onSubmit={handleSubmit}>
-            <label>
-              <span>Email</span>
-              <input
+            <Field label="Email">
+              <Input
                 autoComplete="email"
                 autoFocus
                 name="email"
@@ -102,23 +95,26 @@ export function ForgotPasswordScreen({ onGoToSignIn }: ForgotPasswordScreenProps
                 type="email"
                 value={email}
               />
-            </label>
+            </Field>
 
             <FormError message={formError} />
 
-            <button disabled={!hasText(email) || isSubmitting} type="submit">
+            <Button
+              disabled={!hasText(email) || isSubmitting}
+              icon={<Mail size={17} />}
+              type="submit"
+            >
               {isSubmitting ? "Sending..." : "Send reset link"}
-            </button>
+            </Button>
           </form>
         )}
 
         {!isSuccess ? (
-          <button className="ghost-button" onClick={onGoToSignIn} type="button">
+          <Button icon={<ArrowLeft size={15} />} onClick={onGoToSignIn} size="sm" variant="ghost">
             Back to sign in
-          </button>
+          </Button>
         ) : null}
-      </section>
-    </main>
+    </AuthLayout>
   );
 }
 
@@ -216,36 +212,28 @@ export function ResetPasswordScreen({
     !isSubmitting;
 
   return (
-    <main className="auth-shell">
-      <section className="auth-panel">
-        <div className="brand auth-brand">
-          <span className="brand-mark">K</span>
-          <div>
-            <strong>Kelmio</strong>
-            <span>Account recovery</span>
-          </div>
-        </div>
-
-        <div>
-          <p className="eyebrow">Password reset</p>
-          <h1>Choose a new password</h1>
-        </div>
-
+    <AuthLayout
+      description="Choose a new password for the account linked to this request."
+      eyebrow="Secure reset"
+      title="Choose a new password"
+    >
         {isLoadingPreview ? <p className="muted">Loading reset link...</p> : null}
         <FormError message={previewError} />
 
         {preview && !isSuccess ? (
           <>
-            <article className="invite-preview-card">
+            <Card as="article" className="auth-preview" padding="sm">
+              <span className="auth-preview-icon"><KeyRound size={18} /></span>
+              <div>
               <span>Reset request</span>
               <strong>{preview.email}</strong>
               <p>{passwordResetPreviewText(preview.email, preview.expires_at)}</p>
-            </article>
+              </div>
+            </Card>
 
             <form className="auth-form" onSubmit={handleSubmit}>
-              <label>
-                <span>New password</span>
-                <input
+              <Field label="New password">
+                <Input
                   autoComplete="new-password"
                   minLength={8}
                   onChange={(event) => setPassword(event.target.value)}
@@ -253,11 +241,10 @@ export function ResetPasswordScreen({
                   type="password"
                   value={password}
                 />
-              </label>
+              </Field>
 
-              <label>
-                <span>Confirm password</span>
-                <input
+              <Field label="Confirm password">
+                <Input
                   autoComplete="new-password"
                   minLength={8}
                   onChange={(event) => setConfirmPassword(event.target.value)}
@@ -265,34 +252,34 @@ export function ResetPasswordScreen({
                   type="password"
                   value={confirmPassword}
                 />
-              </label>
+              </Field>
 
               <FormError message={formError} />
 
-              <button disabled={!canSubmit} type="submit">
+              <Button disabled={!canSubmit} icon={<ArrowRight size={17} />} type="submit">
                 {isSubmitting ? "Resetting..." : "Reset password"}
-              </button>
+              </Button>
             </form>
           </>
         ) : null}
 
         {isSuccess ? (
-          <div className="invite-success-card">
+          <Card className="auth-state auth-state-success">
+            <span className="auth-state-icon"><CheckCircle2 size={22} /></span>
             <p className="eyebrow">Password updated</p>
             <h2>Your password has been reset</h2>
             <p>Sign in with your new password to continue.</p>
-            <button onClick={onGoToSignIn} type="button">
+            <Button icon={<ArrowRight size={16} />} onClick={onGoToSignIn}>
               Go to sign in
-            </button>
-          </div>
+            </Button>
+          </Card>
         ) : null}
 
         {!isSuccess ? (
-          <button className="ghost-button" onClick={onGoToSignIn} type="button">
+          <Button icon={<ArrowLeft size={15} />} onClick={onGoToSignIn} size="sm" variant="ghost">
             Back to sign in
-          </button>
+          </Button>
         ) : null}
-      </section>
-    </main>
+    </AuthLayout>
   );
 }

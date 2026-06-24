@@ -1,4 +1,5 @@
 import { type FormEvent, useEffect, useState } from "react";
+import { ArrowLeft, ArrowRight, CheckCircle2, Mail, UsersRound } from "lucide-react";
 
 import { FormError } from "../../components/form-feedback";
 import {
@@ -12,6 +13,8 @@ import {
   normalizedInviteAcceptInput,
   validateInviteAcceptForm,
 } from "../../lib/invite-view";
+import { Badge, Button, Card, Field, Input } from "../../ui";
+import { AuthLayout } from "./auth-layout";
 
 type InviteAcceptScreenProps = {
   onGoToSignIn: () => void;
@@ -122,60 +125,49 @@ export function InviteAcceptScreen({
     !isSubmitting;
 
   return (
-    <main className="auth-shell">
-      <section className="auth-panel invite-accept-panel">
-        <div className="brand auth-brand">
-          <span className="brand-mark">K</span>
-          <div>
-            <strong>Kelmio</strong>
-            <span>Workspace invite</span>
-          </div>
-        </div>
-
-        <div>
-          <p className="eyebrow">Invite onboarding</p>
-          <h1>Accept workspace invite</h1>
-        </div>
-
+    <AuthLayout
+      description="Join the workspace and create your private Kelmio account."
+      eyebrow="Invite onboarding"
+      title="Accept workspace invite"
+    >
         {isLoadingPreview ? <p className="muted">Loading invite...</p> : null}
         <FormError message={previewError} />
 
         {preview && !acceptedInvite ? (
           <>
-            <article className="invite-preview-card">
-              <span>Workspace</span>
-              <strong>{preview.workspace_name}</strong>
-              <p>
-                Invited email: {preview.email} · Role: {preview.role}
-              </p>
-            </article>
+            <Card as="article" className="auth-preview" padding="sm">
+              <span className="auth-preview-icon"><UsersRound size={18} /></span>
+              <div>
+                <span>Workspace</span>
+                <strong>{preview.workspace_name}</strong>
+                <p><Mail size={13} /> {preview.email}</p>
+              </div>
+              <Badge tone="success">{preview.role}</Badge>
+            </Card>
 
             <form className="auth-form" onSubmit={handleSubmit}>
-              <label>
-                <span>Username</span>
-                <input
+              <Field label="Username">
+                <Input
                   autoComplete="username"
                   maxLength={32}
                   onChange={(event) => setUsername(event.target.value.toLowerCase())}
                   placeholder="member_name"
                   value={username}
                 />
-              </label>
+              </Field>
 
-              <label>
-                <span>Display name</span>
-                <input
+              <Field label="Display name">
+                <Input
                   autoComplete="name"
                   maxLength={80}
                   onChange={(event) => setDisplayName(event.target.value)}
                   placeholder="Member Name"
                   value={displayName}
                 />
-              </label>
+              </Field>
 
-              <label>
-                <span>Password</span>
-                <input
+              <Field label="Password">
+                <Input
                   autoComplete="new-password"
                   minLength={8}
                   onChange={(event) => setPassword(event.target.value)}
@@ -183,11 +175,10 @@ export function InviteAcceptScreen({
                   type="password"
                   value={password}
                 />
-              </label>
+              </Field>
 
-              <label>
-                <span>Confirm password</span>
-                <input
+              <Field label="Confirm password">
+                <Input
                   autoComplete="new-password"
                   minLength={8}
                   onChange={(event) => setConfirmPassword(event.target.value)}
@@ -195,37 +186,37 @@ export function InviteAcceptScreen({
                   type="password"
                   value={confirmPassword}
                 />
-              </label>
+              </Field>
 
               <FormError message={formError} />
 
-              <button disabled={!canSubmit} type="submit">
+              <Button disabled={!canSubmit} icon={<ArrowRight size={17} />} type="submit">
                 {isSubmitting ? "Accepting..." : "Accept invite"}
-              </button>
+              </Button>
             </form>
           </>
         ) : null}
 
         {acceptedInvite ? (
-          <div className="invite-success-card">
+          <Card className="auth-state auth-state-success">
+            <span className="auth-state-icon"><CheckCircle2 size={22} /></span>
             <p className="eyebrow">Invite accepted</p>
             <h2>Account created for @{acceptedInvite.username}</h2>
             <p>
               Sign in with username <strong>{acceptedInvite.username}</strong> and
               the password you just created.
             </p>
-            <button onClick={onGoToSignIn} type="button">
+            <Button icon={<ArrowRight size={16} />} onClick={onGoToSignIn}>
               Go to sign in
-            </button>
-          </div>
+            </Button>
+          </Card>
         ) : null}
 
         {!acceptedInvite ? (
-          <button className="ghost-button" onClick={onGoToSignIn} type="button">
+          <Button icon={<ArrowLeft size={15} />} onClick={onGoToSignIn} size="sm" variant="ghost">
             Back to sign in
-          </button>
+          </Button>
         ) : null}
-      </section>
-    </main>
+      </AuthLayout>
   );
 }
