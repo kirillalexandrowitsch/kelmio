@@ -1,0 +1,643 @@
+.small-button,
+.ghost-button,
+.projects-layout button,
+.team-panel button,
+.labels-panel button {
+  min-height: var(--control-sm);
+  padding: 0 11px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  color: var(--text-strong);
+  background: var(--surface-2);
+  font-size: 11px;
+  font-weight: 750;
+  transition:
+    color var(--transition-fast),
+    border-color var(--transition-fast),
+    background var(--transition-fast),
+    transform var(--transition-fast);
+}
+
+.small-button:hover:not(:disabled),
+.ghost-button:hover:not(:disabled),
+.projects-layout button:hover:not(:disabled),
+.team-panel button:hover:not(:disabled),
+.labels-panel button:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+  transform: translateY(-1px);
+}
+
+.ghost-button {
+  color: var(--text-muted);
+  border-color: transparent;
+  background: transparent;
+}
+
+.danger-button,
+.small-button.danger-button {
+  color: var(--red-400);
+  border-color: rgba(255, 125, 118, 0.2);
+  background: var(--red-soft);
+}
+
+.projects-layout,
+.team-panel,
+.labels-panel {
+  min-width: 0;
+  color: var(--text-default);
+}
+
+.projects-layout {
+  display: grid;
+  grid-template-columns: minmax(420px, 0.92fr) minmax(440px, 1.08fr);
+  align-items: start;
+  gap: 12px;
+}
+
+.projects-panel,
+.project-form,
+.project-detail-panel,
+.team-panel,
+.team-invite-panel,
+.email-diagnostics-panel,
+.team-member-form,
+.labels-panel,
+.project-members-panel,
+.workflow-settings-panel,
+.automation-settings-panel {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  color: var(--text-default);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.018), transparent 46%),
+    var(--surface-1);
+  box-shadow: var(--shadow-xs);
+}
+
+.project-sidebar {
+  display: grid;
+  gap: 12px;
+}
+
+.project-list,
+.team-list,
+.team-invite-list,
+.project-member-list,
+.label-list,
+.email-failure-list {
+  display: grid;
+  gap: 7px;
+}
+
+.project-row,
+.team-member-row,
+.team-invite-card,
+.project-member-card,
+.label-management-row,
+.email-failure-card {
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  color: var(--text-default);
+  background: var(--canvas-raised);
+  transition:
+    border-color var(--transition-fast),
+    background var(--transition-fast);
+}
+
+.project-row:hover,
+.team-member-row:hover,
+.project-member-card:hover,
+.label-management-row:hover {
+  border-color: var(--border-default);
+  background: var(--surface-2);
+}
+
+.project-row {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 74px;
+  padding: 11px;
+}
+
+.project-key {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  border: 1px solid rgba(100, 217, 154, 0.16);
+  border-radius: 10px;
+  color: var(--mint-300);
+  background: var(--mint-soft);
+  font: 760 10px/1 var(--font-display);
+  letter-spacing: 0.05em;
+}
+
+.project-row h3,
+.team-member-row h3,
+.project-member-card h4 {
+  margin: 0;
+  color: var(--text-strong);
+  font: 650 12px/1.3 var(--font-display);
+}
+
+.project-row p,
+.team-member-row p,
+.project-member-card p {
+  margin: 3px 0 0;
+  color: var(--text-faint);
+  font-size: 10px;
+}
+
+.project-row-actions,
+.project-detail-actions,
+.invite-actions,
+.member-controls,
+.form-actions,
+.project-member-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.project-form label,
+.project-inline-form label,
+.team-invite-form label,
+.team-member-form label,
+.member-controls label,
+.member-password-reset label,
+.label-form label,
+.project-member-add-form label,
+.project-member-controls label {
+  display: grid;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 750;
+}
+
+.project-form input,
+.project-form textarea,
+.project-inline-form input,
+.project-inline-form textarea,
+.team-panel input,
+.team-panel select,
+.labels-panel input,
+.project-members-panel select {
+  width: 100%;
+  min-height: var(--control-md);
+  padding: 8px 10px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  outline: none;
+  color: var(--text-strong);
+  background: var(--canvas-raised);
+}
+
+.project-form textarea,
+.project-inline-form textarea {
+  resize: vertical;
+}
+
+.project-form input:focus,
+.project-form textarea:focus,
+.project-inline-form input:focus,
+.project-inline-form textarea:focus,
+.team-panel input:focus,
+.team-panel select:focus,
+.labels-panel input:focus,
+.project-members-panel select:focus {
+  border-color: var(--mint-400);
+  box-shadow: var(--focus-ring);
+}
+
+.project-form > button,
+.team-invite-form > button,
+.team-member-form > button,
+.label-form > button {
+  color: var(--text-on-accent);
+  border-color: transparent;
+  background: linear-gradient(135deg, var(--mint-300), var(--mint-500));
+}
+
+.project-inline-form {
+  display: grid;
+  grid-template-columns: minmax(130px, 0.7fr) minmax(160px, 1.3fr) auto;
+  align-items: end;
+  gap: 8px;
+}
+
+.project-detail-panel {
+  min-height: 240px;
+}
+
+.project-detail-description,
+.project-access-note,
+.project-member-note,
+.team-readonly-note,
+.permission-note {
+  margin: 0;
+  padding: 11px 12px;
+  border: 1px solid rgba(103, 169, 255, 0.14);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  background: var(--blue-soft);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.project-detail-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.project-detail-stats div {
+  display: grid;
+  gap: 5px;
+  padding: 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--canvas-raised);
+}
+
+.project-detail-stats span {
+  color: var(--text-faint);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.project-detail-stats strong {
+  color: var(--text-strong);
+  font: 650 18px/1 var(--font-display);
+}
+
+.project-detail-tabs {
+  display: flex;
+  width: fit-content;
+  max-width: 100%;
+  gap: 3px;
+  overflow-x: auto;
+  padding: 3px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--canvas-raised);
+}
+
+.project-detail-tabs button {
+  flex: 0 0 auto;
+  min-height: 31px;
+  border-color: transparent;
+  background: transparent;
+}
+
+.project-detail-tabs button[aria-selected="true"] {
+  color: var(--text-strong);
+  background: var(--surface-3);
+}
+
+.project-detail-issues {
+  display: grid;
+  gap: 6px;
+}
+
+.project-detail-issues button {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  text-align: left;
+}
+
+.project-empty,
+.comments-empty,
+.labels-empty {
+  display: grid;
+  min-height: 104px;
+  place-items: center;
+  padding: 20px;
+  border: 1px dashed var(--border-default);
+  border-radius: var(--radius-sm);
+  color: var(--text-faint);
+  background: rgba(255, 255, 255, 0.012);
+  font-size: 11px;
+  text-align: center;
+}
+
+.team-panel,
+.labels-panel {
+  align-content: start;
+}
+
+.team-member-row {
+  display: grid;
+  grid-template-columns: auto minmax(180px, 1fr) auto minmax(280px, auto);
+  align-items: center;
+  gap: 12px;
+  padding: 11px;
+}
+
+.member-avatar {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border: 1px solid rgba(100, 217, 154, 0.16);
+  border-radius: 10px;
+  color: var(--mint-300);
+  background: var(--mint-soft);
+  font: 700 11px/1 var(--font-display);
+}
+
+.member-role,
+.invite-status,
+.invite-delivery-status {
+  display: inline-flex;
+  width: fit-content;
+  min-height: 24px;
+  align-items: center;
+  padding: 3px 8px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-pill);
+  color: var(--text-muted);
+  background: var(--surface-2);
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: capitalize;
+}
+
+.member-controls {
+  display: grid;
+  grid-template-columns: minmax(90px, 130px) auto auto;
+}
+
+.member-active-toggle {
+  display: flex !important;
+  align-items: center;
+  gap: 6px !important;
+}
+
+.member-active-toggle input {
+  width: 15px;
+  min-height: 15px;
+  accent-color: var(--mint-400);
+}
+
+.member-password-reset {
+  display: grid;
+  grid-column: 2 / -1;
+  grid-template-columns: minmax(220px, 1fr) auto;
+  align-items: end;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.team-invite-panel,
+.email-diagnostics-panel,
+.team-member-form {
+  margin-top: 4px;
+  background: var(--canvas-raised);
+}
+
+.team-invite-form,
+.team-member-form,
+.label-form,
+.project-member-add-form {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(120px, 0.45fr) auto;
+  align-items: end;
+  gap: 8px;
+}
+
+.team-member-form {
+  grid-template-columns: repeat(2, minmax(140px, 1fr));
+}
+
+.team-invite-card {
+  display: grid;
+  grid-template-columns: minmax(170px, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+}
+
+.team-invite-card h3,
+.team-invite-card p {
+  margin: 0;
+}
+
+.team-invite-card h3 {
+  color: var(--text-strong);
+  font-size: 12px;
+}
+
+.team-invite-card p,
+.invite-link-note {
+  color: var(--text-faint);
+  font-size: 10px;
+}
+
+.invite-link-field {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.invite-link-field input {
+  min-width: 0;
+}
+
+.invite-status-pending,
+.invite-delivery-status-sent {
+  color: var(--mint-300);
+  border-color: rgba(100, 217, 154, 0.16);
+  background: var(--mint-soft);
+}
+
+.invite-status-revoked,
+.invite-status-expired,
+.invite-delivery-status-failed {
+  color: var(--red-400);
+  border-color: rgba(255, 125, 118, 0.16);
+  background: var(--red-soft);
+}
+
+.invite-delivery-status-pending,
+.invite-delivery-status-processing {
+  color: var(--amber-400);
+  border-color: rgba(241, 173, 97, 0.16);
+  background: var(--amber-soft);
+}
+
+.email-diagnostics-counts {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.email-diagnostics-counts div {
+  display: grid;
+  gap: 5px;
+  padding: 11px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-1);
+}
+
+.email-diagnostics-counts span,
+.email-diagnostics-age {
+  color: var(--text-faint);
+  font-size: 9px;
+}
+
+.email-diagnostics-counts strong {
+  color: var(--text-strong);
+  font: 650 18px/1 var(--font-display);
+}
+
+.email-failure-card {
+  padding: 11px;
+}
+
+.labels-panel {
+  max-width: 880px;
+}
+
+.label-management-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px;
+}
+
+.label-chip {
+  display: inline-flex;
+  min-height: 26px;
+  align-items: center;
+  padding: 3px 9px;
+  border: 1px solid;
+  border-radius: var(--radius-pill);
+  color: var(--text-strong);
+  font-size: 10px;
+  font-weight: 750;
+}
+
+.label-form input[type="color"] {
+  min-width: 54px;
+  padding: 4px;
+}
+
+.project-members-header,
+.project-member-card,
+.project-member-identity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.project-members-header,
+.project-member-card {
+  justify-content: space-between;
+}
+
+.project-member-card {
+  padding: 11px;
+}
+
+.project-member-badges {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.member-role-inactive {
+  color: var(--red-400);
+}
+
+@media (max-width: 1120px) {
+  .projects-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .team-member-row {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .member-controls,
+  .member-password-reset {
+    grid-column: 2 / -1;
+  }
+}
+
+@media (max-width: 760px) {
+  .project-row,
+  .team-member-row,
+  .team-invite-card,
+  .project-member-card {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .project-row-actions,
+  .member-controls,
+  .invite-actions,
+  .project-member-controls {
+    grid-column: 2;
+    justify-content: flex-start;
+  }
+
+  .project-inline-form,
+  .team-invite-form,
+  .team-member-form,
+  .label-form,
+  .project-member-add-form,
+  .member-password-reset {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .project-detail-stats,
+  .email-diagnostics-counts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 460px) {
+  .projects-panel,
+  .project-form,
+  .project-detail-panel,
+  .team-panel,
+  .labels-panel {
+    padding: 14px;
+  }
+
+  .project-row,
+  .team-member-row,
+  .team-invite-card,
+  .project-member-card {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .project-key,
+  .member-avatar {
+    width: 34px;
+    height: 34px;
+  }
+
+  .project-row-actions,
+  .member-controls,
+  .invite-actions,
+  .project-member-controls,
+  .member-password-reset {
+    grid-column: auto;
+  }
+}

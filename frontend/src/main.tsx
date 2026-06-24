@@ -10,6 +10,7 @@ import "./styles.css";
 import "./styles/auth.css";
 import "./styles/shell.css";
 import "./styles/workspace.css";
+import "./styles/management.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
