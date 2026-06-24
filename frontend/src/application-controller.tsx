@@ -1,5 +1,4 @@
 import { DragEvent, FormEvent, useEffect } from "react";
-import "./styles.css";
 import {
   ApiError,
   AppNotification,

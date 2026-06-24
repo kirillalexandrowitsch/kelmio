@@ -1,0 +1,66 @@
+:root {
+  color-scheme: dark;
+  --font-body: "Manrope Variable", "Manrope", sans-serif;
+  --font-display: "Space Grotesk Variable", "Space Grotesk", sans-serif;
+
+  --canvas: #090c0b;
+  --canvas-raised: #0d110f;
+  --surface-1: #111613;
+  --surface-2: #171d19;
+  --surface-3: #1d2520;
+  --surface-hover: #222c26;
+  --surface-active: #29372f;
+  --overlay: rgba(4, 7, 5, 0.76);
+
+  --border-subtle: rgba(219, 245, 228, 0.08);
+  --border-default: rgba(219, 245, 228, 0.14);
+  --border-strong: rgba(219, 245, 228, 0.24);
+
+  --text-strong: #f3f8f4;
+  --text-default: #d3ded6;
+  --text-muted: #8f9d94;
+  --text-faint: #657169;
+  --text-on-accent: #07110b;
+
+  --mint-300: #8be7b3;
+  --mint-400: #64d99a;
+  --mint-500: #3fc982;
+  --mint-soft: rgba(100, 217, 154, 0.12);
+  --mint-glow: rgba(100, 217, 154, 0.24);
+  --amber-400: #f1ad61;
+  --amber-soft: rgba(241, 173, 97, 0.12);
+  --blue-400: #67a9ff;
+  --blue-soft: rgba(103, 169, 255, 0.12);
+  --red-400: #ff7d76;
+  --red-soft: rgba(255, 125, 118, 0.12);
+
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.24);
+  --shadow-sm: 0 10px 28px rgba(0, 0, 0, 0.18);
+  --shadow-lg: 0 30px 90px rgba(0, 0, 0, 0.42);
+  --focus-ring: 0 0 0 3px rgba(100, 217, 154, 0.22);
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 22px;
+  --radius-pill: 999px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  --control-sm: 32px;
+  --control-md: 38px;
+  --control-lg: 44px;
+  --sidebar-width: 260px;
+  --sidebar-collapsed-width: 76px;
+  --topbar-height: 72px;
+  --transition-fast: 140ms ease;
+  --transition-base: 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
