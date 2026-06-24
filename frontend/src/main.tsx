@@ -11,6 +11,7 @@ import "./styles/auth.css";
 import "./styles/shell.css";
 import "./styles/workspace.css";
 import "./styles/management.css";
+import "./styles/issues.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
