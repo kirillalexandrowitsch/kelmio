@@ -2,8 +2,9 @@ import { type FormEvent } from "react";
 import { ArrowRight, KeyRound, LoaderCircle, UserRound } from "lucide-react";
 
 import { FormError } from "../../components/form-feedback";
+import { KelmioMark } from "../../components/kelmio-mark";
 import { Button, Field, Input } from "../../ui";
-import { AuthLayout, KelmioMark } from "./auth-layout";
+import { AuthLayout } from "./auth-layout";
 
 type SignInScreenProps = {
   canSignIn: boolean;

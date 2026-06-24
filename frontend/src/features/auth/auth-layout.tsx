@@ -1,5 +1,6 @@
 import { ArrowUpRight, Boxes, ShieldCheck, Sparkles } from "lucide-react";
 import { type ReactNode } from "react";
+import { KelmioMark } from "../../components/kelmio-mark";
 
 type AuthLayoutProps = {
   children: ReactNode;
@@ -7,16 +8,6 @@ type AuthLayoutProps = {
   eyebrow: string;
   title: string;
 };
-
-export function KelmioMark() {
-  return (
-    <span aria-hidden="true" className="kelmio-mark">
-      <span />
-      <span />
-      <span />
-    </span>
-  );
-}
 
 export function AuthLayout({
   children,

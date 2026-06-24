@@ -8,6 +8,7 @@ import "./styles/reset.css";
 import "./styles/primitives.css";
 import "./styles.css";
 import "./styles/auth.css";
+import "./styles/shell.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
