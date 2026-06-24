@@ -59,6 +59,7 @@
 }
 
 .sidebar .brand .kelmio-mark {
+  display: grid;
   margin: 0;
 }
 

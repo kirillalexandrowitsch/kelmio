@@ -8,6 +8,19 @@ import {
 import { type AppSection } from "../../lib/routing";
 import { memberDisplayName } from "../../lib/team-view";
 import { isIssueDone } from "../../lib/issue-model";
+import {
+  AlertTriangle,
+  ArrowUpRight,
+  CalendarClock,
+  CheckCircle2,
+  FolderKanban,
+  Gauge,
+  KanbanSquare,
+  ListChecks,
+  Tags,
+  UsersRound,
+} from "lucide-react";
+import { Button } from "../../ui";
 
 type DashboardSectionProps = {
   activeSprint: Sprint | null;
@@ -77,22 +90,27 @@ export function DashboardSection({
         hidden={!isActive}
       >
         <article>
+          <span className="summary-icon"><FolderKanban size={17} /></span>
           <span>Projects</span>
           <strong>{projectsCount}</strong>
         </article>
         <article>
+          <span className="summary-icon"><ListChecks size={17} /></span>
           <span>Open issues</span>
           <strong>{openIssuesCount}</strong>
         </article>
         <article className={overdueIssuesCount > 0 ? "summary-alert" : undefined}>
+          <span className="summary-icon"><AlertTriangle size={17} /></span>
           <span>Overdue</span>
           <strong>{overdueIssuesCount}</strong>
         </article>
         <article className={dueSoonIssuesCount > 0 ? "summary-warning" : undefined}>
+          <span className="summary-icon"><CalendarClock size={17} /></span>
           <span>Due soon</span>
           <strong>{dueSoonIssuesCount}</strong>
         </article>
         <article>
+          <span className="summary-icon"><UsersRound size={17} /></span>
           <span>Team members</span>
           <strong>{teamMembersCount}</strong>
         </article>
@@ -104,6 +122,7 @@ export function DashboardSection({
         hidden={!isActive}
       >
         <article>
+          <span className="dashboard-card-icon"><Gauge size={17} /></span>
           <span>Active sprint</span>
           <strong>{activeSprint ? activeSprint.name : "No active sprint"}</strong>
           <p>
@@ -111,9 +130,13 @@ export function DashboardSection({
               ? `${sprintProgress}% complete · ${activeSprintDoneCount}/${activeSprintIssueCount} issues`
               : "Start a sprint to track progress here."}
           </p>
+          <span className="dashboard-progress" aria-label={`${sprintProgress}% complete`}>
+            <i style={{ width: `${sprintProgress}%` }} />
+          </span>
         </article>
 
         <article>
+          <span className="dashboard-card-icon"><CheckCircle2 size={17} /></span>
           <span>Sprint points</span>
           <strong>
             {activeSprint ? `${activeSprintPointsDone}/${activeSprintPointsTotal}` : "0/0"}
@@ -126,6 +149,7 @@ export function DashboardSection({
         </article>
 
         <article>
+          <span className="dashboard-card-icon"><UsersRound size={17} /></span>
           <span>Workload</span>
           <strong>{isLoadingActiveSprint ? "Loading" : "Open points"}</strong>
           {activeSprintError ? <p>{activeSprintError}</p> : null}
@@ -155,93 +179,105 @@ export function DashboardSection({
         hidden={!isActive}
       >
         <article className="dashboard-action-card">
+          <span className="dashboard-action-icon"><FolderKanban size={18} /></span>
           <div>
             <p className="eyebrow">Planning</p>
             <h2>Projects</h2>
             <p>{DASHBOARD_ACTION_COPY.projects[role]}</p>
           </div>
-          <button
-            className="small-button"
+          <Button
+            icon={<ArrowUpRight size={15} />}
             onClick={() => onNavigate("projects")}
-            type="button"
+            size="sm"
+            variant="secondary"
           >
             Open projects
-          </button>
+          </Button>
         </article>
 
         <article className="dashboard-action-card">
+          <span className="dashboard-action-icon"><ListChecks size={18} /></span>
           <div>
             <p className="eyebrow">Execution</p>
             <h2>Issues</h2>
             <p>Create tasks, inspect details, update status, comments, and labels.</p>
           </div>
-          <button
-            className="small-button"
+          <Button
+            icon={<ArrowUpRight size={15} />}
             onClick={() => onNavigate("issues")}
-            type="button"
+            size="sm"
+            variant="secondary"
           >
             Open issues
-          </button>
+          </Button>
         </article>
 
         <article className="dashboard-action-card">
+          <span className="dashboard-action-icon"><KanbanSquare size={18} /></span>
           <div>
             <p className="eyebrow">Flow</p>
             <h2>Board</h2>
             <p>Move work between statuses with a kanban view backed by the same issue data.</p>
           </div>
-          <button
-            className="small-button"
+          <Button
+            icon={<ArrowUpRight size={15} />}
             onClick={() => onNavigate("board")}
-            type="button"
+            size="sm"
+            variant="secondary"
           >
             Open board
-          </button>
+          </Button>
         </article>
 
         <article className="dashboard-action-card">
+          <span className="dashboard-action-icon"><CalendarClock size={18} /></span>
           <div>
             <p className="eyebrow">Iterations</p>
             <h2>Sprints</h2>
             <p>Create lightweight sprint cycles, set goals, and run start/complete flow.</p>
           </div>
-          <button
-            className="small-button"
+          <Button
+            icon={<ArrowUpRight size={15} />}
             onClick={() => onNavigate("sprints")}
-            type="button"
+            size="sm"
+            variant="secondary"
           >
             Open sprints
-          </button>
+          </Button>
         </article>
 
         <article className="dashboard-action-card">
+          <span className="dashboard-action-icon"><UsersRound size={18} /></span>
           <div>
             <p className="eyebrow">People</p>
             <h2>Team</h2>
             <p>{DASHBOARD_ACTION_COPY.team[role]}</p>
           </div>
-          <button
-            className="small-button"
+          <Button
+            icon={<ArrowUpRight size={15} />}
             onClick={() => onNavigate("team")}
-            type="button"
+            size="sm"
+            variant="secondary"
           >
             Open team
-          </button>
+          </Button>
         </article>
 
         <article className="dashboard-action-card">
+          <span className="dashboard-action-icon"><Tags size={18} /></span>
           <div>
             <p className="eyebrow">Taxonomy</p>
             <h2>Labels</h2>
             <p>Keep issue categories clean so filtering and board scans stay useful.</p>
           </div>
-          <button
-            className="small-button"
+          <Button
+            icon={<ArrowUpRight size={15} />}
             onClick={() => onNavigate("labels")}
-            type="button"
+            size="sm"
+            variant="secondary"
           >
             Open labels
-          </button>
+          </Button>
         </article>
       </section>
     </>

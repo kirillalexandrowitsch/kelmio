@@ -3,6 +3,17 @@ import { type FormEvent } from "react";
 import { FormError } from "../../components/form-feedback";
 import { type CurrentUser, type RuntimeVersion } from "../../lib/api-types";
 import { runtimeVersionDisplay } from "../../lib/runtime-version";
+import {
+  AtSign,
+  BadgeCheck,
+  Fingerprint,
+  KeyRound,
+  Mail,
+  Save,
+  ServerCog,
+  UserRound,
+} from "lucide-react";
+import { Badge, Button, Field, Input } from "../../ui";
 
 type AccountSectionProps = {
   accountDisplayName: string;
@@ -68,20 +79,24 @@ export function AccountSection({
 
       <div className="account-card">
         <div>
+          <UserRound size={17} />
           <span>Display name</span>
           <strong>{user.display_name}</strong>
         </div>
         <div>
+          <AtSign size={17} />
           <span>Username</span>
           <strong>@{user.username}</strong>
         </div>
         <div>
+          <Mail size={17} />
           <span>Email</span>
           <strong>{user.email}</strong>
         </div>
         <div>
+          <BadgeCheck size={17} />
           <span>Role</span>
-          <strong>{user.workspace.role}</strong>
+          <Badge tone="success">{user.workspace.role}</Badge>
         </div>
       </div>
 
@@ -101,18 +116,22 @@ export function AccountSection({
         {runtimeVersion ? (
           <div className="account-card account-metadata-card">
             <div>
+              <ServerCog size={17} />
               <span>Version</span>
               <strong>{versionDisplay.version}</strong>
             </div>
             <div>
+              <Fingerprint size={17} />
               <span>Commit</span>
               <strong>{versionDisplay.commit}</strong>
             </div>
             <div>
+              <ServerCog size={17} />
               <span>Environment</span>
               <strong>{versionDisplay.environment}</strong>
             </div>
             <div>
+              <ServerCog size={17} />
               <span>Build time</span>
               <strong>{versionDisplay.buildTime}</strong>
             </div>
@@ -133,18 +152,17 @@ export function AccountSection({
           </div>
         </header>
 
-        <label>
-          <span>Display name</span>
-          <input
+        <Field label="Display name">
+          <Input
             maxLength={80}
             onChange={(event) => onDisplayNameChange(event.target.value)}
             value={accountDisplayName}
           />
-        </label>
+        </Field>
 
-        <button disabled={!canUpdateProfile} type="submit">
+        <Button disabled={!canUpdateProfile} icon={<Save size={16} />} type="submit">
           {isUpdatingProfile ? "Saving..." : "Save profile"}
-        </button>
+        </Button>
       </form>
 
       <form className="account-form" onSubmit={onChangePassword}>
@@ -155,39 +173,36 @@ export function AccountSection({
           </div>
         </header>
 
-        <label>
-          <span>Current password</span>
-          <input
+        <Field label="Current password">
+          <Input
             autoComplete="current-password"
             onChange={(event) => onCurrentPasswordChange(event.target.value)}
             type="password"
             value={currentPassword}
           />
-        </label>
-        <label>
-          <span>New password</span>
-          <input
+        </Field>
+        <Field label="New password">
+          <Input
             autoComplete="new-password"
             minLength={8}
             onChange={(event) => onNewPasswordChange(event.target.value)}
             type="password"
             value={newPassword}
           />
-        </label>
-        <label>
-          <span>Confirm new password</span>
-          <input
+        </Field>
+        <Field label="Confirm new password">
+          <Input
             autoComplete="new-password"
             minLength={8}
             onChange={(event) => onConfirmNewPasswordChange(event.target.value)}
             type="password"
             value={confirmNewPassword}
           />
-        </label>
+        </Field>
 
-        <button disabled={!canChangePassword} type="submit">
+        <Button disabled={!canChangePassword} icon={<KeyRound size={16} />} type="submit">
           {isChangingPassword ? "Changing..." : "Change password"}
-        </button>
+        </Button>
       </form>
     </section>
   );
