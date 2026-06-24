@@ -1,4 +1,5 @@
-import { DragEvent, FormEvent, useEffect, useState } from "react";
+import { DragEvent, FormEvent, useEffect } from "react";
+import "./styles.css";
 import {
   ApiError,
   AppNotification,
@@ -257,8 +258,6 @@ function upsertSavedFilter(
 }
 
 export function ApplicationController() {
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [isMobileNavigationOpen, setIsMobileNavigationOpen] = useState(false);
   const {
     user,
     setUser,
@@ -4827,22 +4826,11 @@ export function ApplicationController() {
   }
 
   return (
-    <main className="app-shell" data-sidebar-collapsed={isSidebarCollapsed}>
-      <AppSidebar
-        activeSection={activeSection}
-        collapsed={isSidebarCollapsed}
-        displayName={user.display_name}
-        isMobileOpen={isMobileNavigationOpen}
-        onCollapseToggle={() => setIsSidebarCollapsed((current) => !current)}
-        onMobileClose={() => setIsMobileNavigationOpen(false)}
-        onNavigate={navigateToSection}
-        role={user.workspace.role}
-        username={user.username}
-      />
+    <main className="app-shell">
+      <AppSidebar activeSection={activeSection} onNavigate={navigateToSection} />
 
       <section className="workspace">
         <WorkspaceTopbar
-          displayName={user.display_name}
           heading={activeSectionHeading}
           isLoggingOut={isLoggingOut}
           isNotificationsOpen={isNotificationsOpen}
@@ -4855,7 +4843,6 @@ export function ApplicationController() {
             void handleMarkNotificationRead(notification);
           }}
           onLogout={handleLogout}
-          onMobileMenuOpen={() => setIsMobileNavigationOpen(true)}
           onOpenNotifications={() => {
             setIsNotificationsOpen(false);
             navigateToSection("notifications");
@@ -4871,7 +4858,6 @@ export function ApplicationController() {
           role={user.workspace.role}
           subtitle={activeSectionSubtitle}
           unreadNotificationsCount={unreadNotificationsCount}
-          username={user.username}
         />
 
         <DashboardSection

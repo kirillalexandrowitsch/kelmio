@@ -7,8 +7,6 @@ import {
   notificationTitle,
   unreadBadgeLabel,
 } from "../../lib/notification-view";
-import { Bell, BellRing, Check, ExternalLink } from "lucide-react";
-import { Badge, Button, EmptyState } from "../../ui";
 
 type NotificationsSectionProps = {
   error: string;
@@ -43,15 +41,14 @@ export function NotificationsSection({
           <h2>Notifications</h2>
           <p>{unreadBadgeLabel(unreadCount)}</p>
         </div>
-        <Button
-          icon={<Check size={15} />}
+        <button
+          className="small-button"
           disabled={unreadCount === 0}
           onClick={onMarkAllRead}
-          size="sm"
-          variant="secondary"
+          type="button"
         >
           Mark all read
-        </Button>
+        </button>
       </header>
 
       {isLoading ? <p className="muted">Loading notifications</p> : null}
@@ -69,11 +66,7 @@ export function NotificationsSection({
           ))}
         </div>
       ) : (
-        <EmptyState
-          description="Assignments, mentions and automation updates will appear here."
-          icon={<Bell size={20} />}
-          title="No notifications yet"
-        />
+        <div className="project-empty">No notifications yet</div>
       )}
     </section>
   );
@@ -95,13 +88,10 @@ function NotificationCard({
 
   return (
     <article className={`notification-card ${isUnread ? "notification-unread" : ""}`}>
-      <span className="notification-card-icon">
-        {isUnread ? <BellRing size={17} /> : <Bell size={17} />}
-      </span>
       <div>
         <div className="notification-card-heading">
           <h3>{notificationTitle(notification)}</h3>
-          {isUnread ? <Badge tone="success">Unread</Badge> : null}
+          {isUnread ? <span className="status-pill">Unread</span> : null}
         </div>
         <p>{notificationDescription(notification)}</p>
         {preview ? <p className="notification-preview">{preview}</p> : null}
@@ -109,24 +99,22 @@ function NotificationCard({
       </div>
       <div className="notification-actions">
         {notification.issue_id ? (
-          <Button
-            icon={<ExternalLink size={14} />}
+          <button
+            className="small-button"
             onClick={() => onOpenIssue(notification)}
-            size="sm"
-            variant="secondary"
+            type="button"
           >
             Open issue
-          </Button>
+          </button>
         ) : null}
-        <Button
-          icon={<Check size={14} />}
+        <button
+          className="small-button"
           disabled={!isUnread}
           onClick={() => onMarkRead(notification)}
-          size="sm"
-          variant="ghost"
+          type="button"
         >
           {isUnread ? "Mark read" : "Read"}
-        </Button>
+        </button>
       </div>
     </article>
   );

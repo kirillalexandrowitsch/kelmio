@@ -12,9 +12,6 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@fontsource-variable/manrope": "^5.2.8",
-    "@fontsource-variable/space-grotesk": "^5.2.10",
-    "lucide-react": "^1.21.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
