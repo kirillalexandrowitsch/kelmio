@@ -1,4 +1,4 @@
-import { DragEvent, FormEvent, useEffect } from "react";
+import { DragEvent, FormEvent, useEffect, useState } from "react";
 import "./styles.css";
 import "@fontsource-variable/space-grotesk";
 import "@fontsource-variable/manrope";
@@ -149,6 +149,7 @@ import {
   validateInviteEmail,
 } from "./lib/invite-view";
 import { AppSidebar, WorkspaceTopbar } from "./components/app-shell";
+import { CommandPalette } from "./features/command-palette/command-palette";
 import { AccountSection } from "./features/account/account-section";
 import { InviteAcceptScreen } from "./features/auth/invite-accept-screen";
 import { BootingScreen, SignInScreen } from "./features/auth/auth-screens";
@@ -261,6 +262,7 @@ function upsertSavedFilter(
 }
 
 export function ApplicationController() {
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const {
     user,
     setUser,
@@ -1549,6 +1551,24 @@ export function ApplicationController() {
 
     return () => {
       window.clearInterval(intervalID);
+    };
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) {
+      return;
+    }
+
+    function handleCommandPaletteShortcut(event: KeyboardEvent) {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setIsCommandPaletteOpen((isOpen) => !isOpen);
+      }
+    }
+
+    window.addEventListener("keydown", handleCommandPaletteShortcut);
+    return () => {
+      window.removeEventListener("keydown", handleCommandPaletteShortcut);
     };
   }, [user]);
 
@@ -4840,6 +4860,7 @@ export function ApplicationController() {
             void refreshNotifications();
           }
         }}
+        onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
         onSignOut={handleLogout}
         role={user.workspace.role}
         unreadNotificationsCount={unreadNotificationsCount}
@@ -5479,6 +5500,21 @@ export function ApplicationController() {
         />
         </div>
       </div>
+
+      <CommandPalette
+        onClose={() => setIsCommandPaletteOpen(false)}
+        onNavigate={(section) => {
+          navigateToSection(section);
+          if (section === "notifications") {
+            void refreshNotifications();
+          }
+        }}
+        onOpenIssue={(issueId) => {
+          void handleSelectIssue(issueId);
+        }}
+        open={isCommandPaletteOpen}
+        recentIssues={issues.slice(0, 6)}
+      />
     </div>
   );
 }

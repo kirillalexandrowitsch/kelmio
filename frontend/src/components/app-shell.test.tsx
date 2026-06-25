@@ -7,6 +7,7 @@ function renderSidebar(overrides: Record<string, unknown> = {}) {
   const props = {
     activeSection: "issues" as const,
     onNavigate: vi.fn(),
+    onOpenCommandPalette: vi.fn(),
     displayName: "Kirill Alexandrov",
     role: "admin",
     unreadNotificationsCount: 0,

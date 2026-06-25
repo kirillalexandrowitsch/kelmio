@@ -6,6 +6,7 @@ import {
   ListTodo,
   LogOut,
   Rocket,
+  Search,
   Tag,
   UserRound,
   Users,
@@ -45,6 +46,7 @@ function userInitials(name: string) {
 type AppSidebarProps = {
   activeSection: AppSection;
   onNavigate: (section: AppSection) => void;
+  onOpenCommandPalette: () => void;
   displayName: string;
   role: string;
   unreadNotificationsCount: number;
@@ -55,6 +57,7 @@ type AppSidebarProps = {
 export function AppSidebar({
   activeSection,
   onNavigate,
+  onOpenCommandPalette,
   displayName,
   role,
   unreadNotificationsCount,
@@ -67,6 +70,16 @@ export function AppSidebar({
         <span className="kl-sidebar__mark">K</span>
         <span>Kelmio</span>
       </div>
+
+      <button
+        className="kl-sidebar__search"
+        onClick={onOpenCommandPalette}
+        type="button"
+      >
+        <Icon icon={Search} size={16} />
+        <span>Search</span>
+        <kbd className="kl-sidebar__kbd">⌘K</kbd>
+      </button>
 
       <nav className="kl-sidebar__nav" aria-label="Main navigation">
         {navGroups.map((group) => (
