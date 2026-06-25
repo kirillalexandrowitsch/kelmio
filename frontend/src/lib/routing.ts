@@ -21,6 +21,27 @@ export const appSections = [
   { id: "account", title: "Account" },
 ] satisfies Array<{ id: AppSection; title: string }>;
 
+export type NavGroup = {
+  id: string;
+  label: string;
+  sections: AppSection[];
+};
+
+// Sidebar navigation groups. "account" is intentionally excluded; it is reached
+// through the user card in the sidebar footer rather than a nav entry.
+export const navGroups: NavGroup[] = [
+  {
+    id: "workspace",
+    label: "Workspace",
+    sections: ["dashboard", "projects", "issues", "board", "sprints"],
+  },
+  {
+    id: "organization",
+    label: "Organization",
+    sections: ["notifications", "team", "labels"],
+  },
+];
+
 const appSectionPaths: Record<AppSection, string> = {
   dashboard: "/",
   projects: "/projects",

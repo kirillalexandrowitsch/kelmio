@@ -4829,39 +4829,29 @@ export function ApplicationController() {
   }
 
   return (
-    <main className="app-shell">
-      <AppSidebar activeSection={activeSection} onNavigate={navigateToSection} />
+    <div className="kl-app">
+      <AppSidebar
+        activeSection={activeSection}
+        displayName={user.display_name}
+        isLoggingOut={isLoggingOut}
+        onNavigate={(section) => {
+          navigateToSection(section);
+          if (section === "notifications") {
+            void refreshNotifications();
+          }
+        }}
+        onSignOut={handleLogout}
+        role={user.workspace.role}
+        unreadNotificationsCount={unreadNotificationsCount}
+      />
 
-      <section className="workspace">
+      <div className="kl-app__main">
         <WorkspaceTopbar
           heading={activeSectionHeading}
-          isLoggingOut={isLoggingOut}
-          isNotificationsOpen={isNotificationsOpen}
-          notifications={notifications}
-          notificationsError={notificationsError}
-          onMarkAllNotificationsRead={() => {
-            void handleMarkAllNotificationsRead();
-          }}
-          onMarkNotificationRead={(notification) => {
-            void handleMarkNotificationRead(notification);
-          }}
-          onLogout={handleLogout}
-          onOpenNotifications={() => {
-            setIsNotificationsOpen(false);
-            navigateToSection("notifications");
-            void refreshNotifications();
-          }}
-          onOpenNotificationIssue={(notification) => {
-            void handleOpenNotificationIssue(notification);
-          }}
-          onToggleNotifications={() => {
-            setIsNotificationsOpen((currentValue) => !currentValue);
-            void refreshNotifications();
-          }}
-          role={user.workspace.role}
           subtitle={activeSectionSubtitle}
-          unreadNotificationsCount={unreadNotificationsCount}
         />
+
+        <div className="kl-app__content">
 
         <DashboardSection
           activeSprint={activeDashboardSprint}
@@ -5487,7 +5477,8 @@ export function ApplicationController() {
           workflow={selectedBoardWorkflow}
           workflowError={workflowErrorsByProjectId[boardProjectId] || ""}
         />
-      </section>
-    </main>
+        </div>
+      </div>
+    </div>
   );
 }
