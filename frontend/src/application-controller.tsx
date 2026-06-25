@@ -1,5 +1,8 @@
 import { DragEvent, FormEvent, useEffect } from "react";
 import "./styles.css";
+import "@fontsource-variable/space-grotesk";
+import "@fontsource-variable/manrope";
+import "./styles/index.css";
 import {
   ApiError,
   AppNotification,

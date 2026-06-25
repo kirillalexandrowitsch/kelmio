@@ -1,0 +1,332 @@
+/* Icon */
+.kl-icon {
+  display: inline-flex;
+  flex: none;
+  color: currentColor;
+}
+
+/* Button */
+.kl-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  height: var(--control-md);
+  padding: 0 var(--space-4);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 13px;
+  white-space: nowrap;
+  transition:
+    background var(--transition-fast),
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast),
+    transform var(--transition-fast);
+}
+
+.kl-btn:disabled {
+  opacity: 0.6;
+}
+
+.kl-btn--sm {
+  height: var(--control-sm);
+  padding: 0 var(--space-3);
+  font-size: 12px;
+}
+
+.kl-btn--lg {
+  height: var(--control-lg);
+  padding: 0 var(--space-5);
+  font-size: 14px;
+}
+
+.kl-btn--block {
+  width: 100%;
+}
+
+.kl-btn--primary {
+  background: var(--accent-gradient);
+  color: var(--text-on-accent);
+  box-shadow: var(--shadow-xs);
+}
+
+.kl-btn--primary:not(:disabled):hover {
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-1px);
+}
+
+.kl-btn--secondary {
+  background: var(--surface-1);
+  border-color: var(--border-default);
+  color: var(--text-strong);
+}
+
+.kl-btn--secondary:not(:disabled):hover {
+  background: var(--surface-2);
+  border-color: var(--border-strong);
+}
+
+.kl-btn--ghost {
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.kl-btn--ghost:not(:disabled):hover {
+  background: var(--surface-3);
+  color: var(--text-strong);
+}
+
+.kl-btn--danger {
+  background: var(--critical-soft);
+  color: var(--critical-500);
+}
+
+.kl-btn--danger:not(:disabled):hover {
+  background: var(--critical-500);
+  color: var(--text-on-accent);
+}
+
+/* Field */
+.kl-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.kl-field__label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.kl-field__hint {
+  font-size: 12px;
+  color: var(--text-faint);
+}
+
+.kl-field__error {
+  font-size: 12px;
+  color: var(--critical-500);
+}
+
+.kl-input,
+.kl-textarea,
+.kl-select {
+  width: 100%;
+  min-height: var(--control-md);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+  color: var(--text-strong);
+  transition:
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.kl-textarea {
+  min-height: 92px;
+  padding: var(--space-3);
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.kl-input:focus-visible,
+.kl-textarea:focus-visible,
+.kl-select:focus-visible {
+  border-color: var(--accent-500);
+  box-shadow: var(--focus-ring);
+}
+
+.kl-input::placeholder,
+.kl-textarea::placeholder {
+  color: var(--text-faint);
+}
+
+.kl-field--invalid .kl-input,
+.kl-field--invalid .kl-textarea,
+.kl-field--invalid .kl-select {
+  border-color: var(--critical-500);
+}
+
+/* Surface */
+.kl-surface {
+  background: var(--surface-1);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+}
+
+.kl-surface--raised {
+  box-shadow: var(--shadow-sm);
+}
+
+.kl-surface--muted {
+  background: var(--surface-2);
+}
+
+.kl-surface--pad {
+  padding: var(--space-5);
+}
+
+/* Tabs */
+.kl-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.kl-tab {
+  height: var(--control-sm);
+  padding: 0 var(--space-3);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 13px;
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast);
+}
+
+.kl-tab:hover {
+  color: var(--text-strong);
+}
+
+.kl-tab[aria-selected="true"] {
+  background: var(--surface-1);
+  color: var(--text-strong);
+  box-shadow: var(--shadow-xs);
+}
+
+/* Badge / Pill */
+.kl-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: 22px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--surface-3);
+  color: var(--text-default);
+}
+
+.kl-badge--critical {
+  background: var(--critical-soft);
+  color: var(--critical-500);
+}
+
+.kl-badge--overdue {
+  background: var(--overdue-soft);
+  color: var(--overdue-500);
+}
+
+.kl-badge--done {
+  background: var(--done-soft);
+  color: var(--done-500);
+}
+
+.kl-badge--info {
+  background: var(--info-soft);
+  color: var(--info-500);
+}
+
+.kl-badge--accent {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.kl-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: 26px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-default);
+  background: var(--surface-1);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-default);
+}
+
+/* Empty state */
+.kl-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-10) var(--space-6);
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.kl-empty__title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+/* Overlay / Modal / Slide-over */
+.kl-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  background: var(--overlay);
+  backdrop-filter: blur(2px);
+  animation: kl-overlay-in var(--transition-base);
+}
+
+.kl-overlay--center {
+  align-items: flex-start;
+  justify-content: center;
+  padding: 12vh var(--space-4) var(--space-4);
+}
+
+.kl-overlay--end {
+  justify-content: flex-end;
+}
+
+.kl-modal {
+  width: min(560px, 100%);
+  background: var(--surface-1);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lg);
+  animation: kl-modal-in var(--transition-base);
+}
+
+.kl-slideover {
+  width: min(720px, 100%);
+  height: 100%;
+  background: var(--surface-1);
+  border-left: 1px solid var(--border-default);
+  box-shadow: var(--shadow-lg);
+  overflow-y: auto;
+  animation: kl-slideover-in var(--transition-base);
+}
+
+@keyframes kl-overlay-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes kl-modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
+  }
+}
+
+@keyframes kl-slideover-in {
+  from {
+    transform: translateX(24px);
+    opacity: 0;
+  }
+}

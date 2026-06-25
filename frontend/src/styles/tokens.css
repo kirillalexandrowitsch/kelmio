@@ -1,0 +1,85 @@
+:root {
+  color-scheme: light;
+
+  /* Typography */
+  --font-body: "Manrope Variable", "Manrope", system-ui, -apple-system, sans-serif;
+  --font-display: "Space Grotesk Variable", "Space Grotesk", system-ui, sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", "JetBrains Mono", Menlo, monospace;
+
+  /* Light surfaces (see design reference) */
+  --canvas: #f4f6f9;
+  --surface-1: #ffffff;
+  --surface-2: #f7f8fb;
+  --surface-3: #eceef3;
+  --surface-hover: #f4f6f9;
+  --surface-active: #eaedf3;
+  --overlay: rgba(23, 30, 46, 0.42);
+
+  /* Borders */
+  --border-subtle: #eef0f5;
+  --border-default: #e6e9f0;
+  --border-strong: #d6dae4;
+
+  /* Text */
+  --text-strong: #1a2233;
+  --text-default: #39414f;
+  --text-muted: #6b7280;
+  --text-faint: #9aa1ad;
+  --text-on-accent: #ffffff;
+
+  /* Signature accent: iris -> cyan */
+  --iris-500: #6e5cf0;
+  --iris-600: #5a48d6;
+  --cyan-500: #22c3e6;
+  --accent-500: #6e5cf0;
+  --accent-strong: #5a48d6;
+  --accent-soft: rgba(110, 92, 240, 0.12);
+  --accent-ring: rgba(110, 92, 240, 0.28);
+  --accent-gradient: linear-gradient(135deg, #6e5cf0 0%, #22c3e6 100%);
+
+  /* Semantic colors (data only) */
+  --critical-500: #e5484d;
+  --critical-soft: rgba(229, 72, 77, 0.12);
+  --overdue-500: #e8910b;
+  --overdue-soft: rgba(232, 145, 11, 0.14);
+  --done-500: #30a46c;
+  --done-soft: rgba(48, 164, 108, 0.14);
+  --info-500: #3b82f6;
+  --info-soft: rgba(59, 130, 246, 0.12);
+
+  /* Elevation */
+  --shadow-xs: 0 1px 2px rgba(23, 30, 46, 0.06);
+  --shadow-sm: 0 6px 18px rgba(23, 30, 46, 0.08);
+  --shadow-md: 0 14px 36px rgba(23, 30, 46, 0.1);
+  --shadow-lg: 0 28px 70px rgba(23, 30, 46, 0.18);
+  --focus-ring: 0 0 0 3px var(--accent-ring);
+
+  /* Radii */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 22px;
+  --radius-pill: 999px;
+
+  /* Spacing scale */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* Controls and layout */
+  --control-sm: 32px;
+  --control-md: 38px;
+  --control-lg: 44px;
+  --sidebar-width: 264px;
+  --topbar-height: 68px;
+
+  /* Motion */
+  --transition-fast: 140ms ease;
+  --transition-base: 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
