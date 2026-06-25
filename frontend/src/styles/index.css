@@ -1,7 +1,9 @@
 @import "./tokens.css";
 @import "./reset.css";
 @import "./primitives.css";
+@import "./layout.css";
 @import "./shell.css";
 @import "./command-palette.css";
 @import "./dashboard.css";
+@import "./projects.css";
 @import "./auth.css";
