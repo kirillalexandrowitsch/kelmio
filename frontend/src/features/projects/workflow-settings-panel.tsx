@@ -24,6 +24,7 @@ import {
   validateWorkflowStatusInput,
   workflowStatusCategories,
 } from "../../lib/workflow-settings-model";
+import { Button, Field, Input, Select } from "../../ui";
 
 type StatusDraft = {
   name: string;
@@ -219,11 +220,11 @@ export function WorkflowSettingsPanel({
   }
 
   if (isLoading && !workflow) {
-    return <div className="comments-empty">Loading project workflow</div>;
+    return <div className="kl-empty-block">Loading project workflow</div>;
   }
   if (!workflow) {
     return (
-      <section className="workflow-settings-panel" aria-label="Workflow settings">
+      <section className="kl-wf" aria-label="Workflow settings">
         <FormError message={error || "Project workflow is unavailable."} />
       </section>
     );
@@ -235,83 +236,90 @@ export function WorkflowSettingsPanel({
   );
 
   return (
-    <section className="workflow-settings-panel" aria-label="Workflow settings">
-      <header className="workflow-settings-header">
+    <section className="kl-wf" aria-label="Workflow settings">
+      <header className="kl-section-head">
         <div>
           <h3>Workflow settings</h3>
-          <p>Statuses define board columns. Transitions control allowed moves.</p>
+          <p className="kl-muted">
+            Statuses define board columns. Transitions control allowed moves.
+          </p>
         </div>
-        {isLoading ? <span className="muted">Refreshing</span> : null}
+        {isLoading ? <span className="kl-muted">Refreshing</span> : null}
       </header>
 
       <FormError message={formError || error} />
 
-      <form className="workflow-status-create-form" onSubmit={handleCreateStatus}>
+      <form className="kl-wf__create" onSubmit={handleCreateStatus}>
         <h4>Create status</h4>
-        <label>
-          <span>Key</span>
-          <input
-            aria-label="New status key"
-            maxLength={32}
-            onChange={(event) =>
-              setCreateStatus((current) => ({ ...current, key: event.target.value }))
-            }
-            placeholder="ready_for_review"
-            value={createStatus.key}
-          />
-        </label>
-        <label>
-          <span>Name</span>
-          <input
-            aria-label="New status name"
-            maxLength={60}
-            onChange={(event) =>
-              setCreateStatus((current) => ({ ...current, name: event.target.value }))
-            }
-            placeholder="Ready for review"
-            value={createStatus.name}
-          />
-        </label>
-        <label>
-          <span>Color</span>
-          <input
-            aria-label="New status color"
-            onChange={(event) =>
-              setCreateStatus((current) => ({ ...current, color: event.target.value }))
-            }
-            type="color"
-            value={createStatus.color}
-          />
-        </label>
-        <label>
-          <span>Category</span>
-          <select
-            aria-label="New status category"
-            onChange={(event) =>
-              setCreateStatus((current) => ({
-                ...current,
-                category: event.target.value as WorkflowStatusCategory,
-              }))
-            }
-            value={createStatus.category}
-          >
-            <WorkflowCategoryOptions />
-          </select>
-        </label>
-        <button disabled={creatingStatus} type="submit">
+        <div className="kl-wf__create-fields">
+          <Field label="Key" htmlFor="wf-new-key">
+            <Input
+              id="wf-new-key"
+              aria-label="New status key"
+              maxLength={32}
+              onChange={(event) =>
+                setCreateStatus((current) => ({ ...current, key: event.target.value }))
+              }
+              placeholder="ready_for_review"
+              value={createStatus.key}
+            />
+          </Field>
+          <Field label="Name" htmlFor="wf-new-name">
+            <Input
+              id="wf-new-name"
+              aria-label="New status name"
+              maxLength={60}
+              onChange={(event) =>
+                setCreateStatus((current) => ({ ...current, name: event.target.value }))
+              }
+              placeholder="Ready for review"
+              value={createStatus.name}
+            />
+          </Field>
+          <Field label="Color" htmlFor="wf-new-color">
+            <Input
+              id="wf-new-color"
+              aria-label="New status color"
+              className="kl-color-input"
+              onChange={(event) =>
+                setCreateStatus((current) => ({ ...current, color: event.target.value }))
+              }
+              type="color"
+              value={createStatus.color}
+            />
+          </Field>
+          <Field label="Category" htmlFor="wf-new-category">
+            <Select
+              id="wf-new-category"
+              aria-label="New status category"
+              onChange={(event) =>
+                setCreateStatus((current) => ({
+                  ...current,
+                  category: event.target.value as WorkflowStatusCategory,
+                }))
+              }
+              value={createStatus.category}
+            >
+              <WorkflowCategoryOptions />
+            </Select>
+          </Field>
+        </div>
+        <Button variant="primary" disabled={creatingStatus} type="submit">
           {creatingStatus ? "Creating" : "Create status"}
-        </button>
+        </Button>
       </form>
 
-      <section className="workflow-status-section" aria-label="Active workflow statuses">
-        <header>
+      <section className="kl-wf__statuses" aria-label="Active workflow statuses">
+        <header className="kl-section-head">
           <div>
             <h4>Active statuses</h4>
-            <p>Drag rows or use move buttons to change board column order.</p>
+            <p className="kl-muted">
+              Drag rows or use move buttons to change board column order.
+            </p>
           </div>
-          {isReordering ? <span className="muted">Saving order</span> : null}
+          {isReordering ? <span className="kl-muted">Saving order</span> : null}
         </header>
-        <div className="workflow-status-list">
+        <div className="kl-wf-status-list">
           {statuses.map((status, index) => {
             const draft = statusDrafts[status.id] ?? status;
             const isUpdating = updatingStatusIds.includes(status.id);
@@ -320,7 +328,7 @@ export function WorkflowSettingsPanel({
               status.category === "done" && doneStatusCount === 1;
             return (
               <article
-                className="workflow-status-card"
+                className="kl-wf-status"
                 draggable={!isReordering}
                 key={status.id}
                 onDragOver={(event) => event.preventDefault()}
@@ -331,86 +339,93 @@ export function WorkflowSettingsPanel({
                 onDrop={(event) => void handleDropStatus(event, status.id)}
                 style={{ borderLeftColor: status.color }}
               >
-                <div className="workflow-status-key">
-                  <span className="workflow-status-dot" style={{ background: status.color }} />
+                <div className="kl-wf-status__key">
+                  <span
+                    className="kl-wf-status__dot"
+                    style={{ background: status.color }}
+                  />
                   <strong>{status.key}</strong>
                   <small>Immutable key</small>
                 </div>
-                <label>
-                  <span>Name</span>
-                  <input
-                    aria-label={`Name for ${status.name}`}
-                    maxLength={60}
-                    onChange={(event) =>
-                      setStatusDrafts((current) => ({
-                        ...current,
-                        [status.id]: { ...draft, name: event.target.value },
-                      }))
-                    }
-                    value={draft.name}
-                  />
-                </label>
-                <label>
-                  <span>Color</span>
-                  <input
-                    aria-label={`Color for ${status.name}`}
-                    onChange={(event) =>
-                      setStatusDrafts((current) => ({
-                        ...current,
-                        [status.id]: { ...draft, color: event.target.value },
-                      }))
-                    }
-                    type="color"
-                    value={draft.color}
-                  />
-                </label>
-                <label>
-                  <span>Category</span>
-                  <select
-                    aria-label={`Category for ${status.name}`}
-                    onChange={(event) =>
-                      setStatusDrafts((current) => ({
-                        ...current,
-                        [status.id]: {
-                          ...draft,
-                          category: event.target.value as WorkflowStatusCategory,
-                        },
-                      }))
-                    }
-                    value={draft.category}
-                  >
-                    <WorkflowCategoryOptions />
-                  </select>
-                </label>
-                <div className="workflow-status-actions">
-                  <button
+                <div className="kl-wf-status__fields">
+                  <Field label="Name" htmlFor={`wf-name-${status.id}`}>
+                    <Input
+                      id={`wf-name-${status.id}`}
+                      aria-label={`Name for ${status.name}`}
+                      maxLength={60}
+                      onChange={(event) =>
+                        setStatusDrafts((current) => ({
+                          ...current,
+                          [status.id]: { ...draft, name: event.target.value },
+                        }))
+                      }
+                      value={draft.name}
+                    />
+                  </Field>
+                  <Field label="Color" htmlFor={`wf-color-${status.id}`}>
+                    <Input
+                      id={`wf-color-${status.id}`}
+                      aria-label={`Color for ${status.name}`}
+                      className="kl-color-input"
+                      onChange={(event) =>
+                        setStatusDrafts((current) => ({
+                          ...current,
+                          [status.id]: { ...draft, color: event.target.value },
+                        }))
+                      }
+                      type="color"
+                      value={draft.color}
+                    />
+                  </Field>
+                  <Field label="Category" htmlFor={`wf-category-${status.id}`}>
+                    <Select
+                      id={`wf-category-${status.id}`}
+                      aria-label={`Category for ${status.name}`}
+                      onChange={(event) =>
+                        setStatusDrafts((current) => ({
+                          ...current,
+                          [status.id]: {
+                            ...draft,
+                            category: event.target.value as WorkflowStatusCategory,
+                          },
+                        }))
+                      }
+                      value={draft.category}
+                    >
+                      <WorkflowCategoryOptions />
+                    </Select>
+                  </Field>
+                </div>
+                <div className="kl-wf-status__actions">
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     aria-label={`Move ${status.name} up`}
-                    className="ghost-button"
                     disabled={index === 0 || isReordering}
                     onClick={() => void handleMoveStatus(status.id, -1)}
-                    type="button"
                   >
                     ↑
-                  </button>
-                  <button
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     aria-label={`Move ${status.name} down`}
-                    className="ghost-button"
                     disabled={index === statuses.length - 1 || isReordering}
                     onClick={() => void handleMoveStatus(status.id, 1)}
-                    type="button"
                   >
                     ↓
-                  </button>
-                  <button
-                    className="small-button"
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
                     disabled={isUpdating}
                     onClick={() => void handleUpdateStatus(status)}
-                    type="button"
                   >
                     {isUpdating ? "Saving" : "Save"}
-                  </button>
-                  <button
-                    className="small-button danger-button"
+                  </Button>
+                  <Button
+                    variant="danger"
+                    size="sm"
                     disabled={isArchiving || protectsLastDone}
                     onClick={() => {
                       setArchiveStatusId(status.id);
@@ -421,13 +436,12 @@ export function WorkflowSettingsPanel({
                         ? "The workflow requires at least one active done status."
                         : undefined
                     }
-                    type="button"
                   >
                     Archive
-                  </button>
+                  </Button>
                 </div>
                 {protectsLastDone ? (
-                  <p className="workflow-status-note">
+                  <p className="kl-wf-status__note">
                     This is the last active done status and cannot be archived.
                   </p>
                 ) : null}
@@ -437,16 +451,20 @@ export function WorkflowSettingsPanel({
         </div>
       </section>
 
-      <section className="workflow-transition-section" aria-label="Transition matrix">
-        <header>
+      <section className="kl-wf__transitions" aria-label="Transition matrix">
+        <header className="kl-section-head">
           <div>
             <h4>Allowed transitions</h4>
-            <p>Rows are current statuses. Columns are allowed target statuses.</p>
+            <p className="kl-muted">
+              Rows are current statuses. Columns are allowed target statuses.
+            </p>
           </div>
-          {isSavingTransitions ? <span className="muted">Saving transitions</span> : null}
+          {isSavingTransitions ? (
+            <span className="kl-muted">Saving transitions</span>
+          ) : null}
         </header>
-        <div className="workflow-transition-scroll">
-          <table className="workflow-transition-matrix">
+        <div className="kl-wf-matrix__scroll">
+          <table className="kl-wf-matrix">
             <thead>
               <tr>
                 <th>From \ To</th>
@@ -481,31 +499,34 @@ export function WorkflowSettingsPanel({
             </tbody>
           </table>
         </div>
-        <div className="workflow-transition-actions">
-          <button
+        <div className="kl-wf__transition-actions">
+          <Button
+            variant="primary"
             disabled={isSavingTransitions}
             onClick={() => void handleSaveTransitions()}
-            type="button"
           >
             Save transitions
-          </button>
-          <button
-            className="ghost-button"
+          </Button>
+          <Button
+            variant="ghost"
             disabled={isSavingTransitions}
             onClick={resetTransitions}
-            type="button"
           >
             Reset
-          </button>
+          </Button>
         </div>
       </section>
 
       {archivedStatuses.length > 0 ? (
-        <section className="workflow-archived-section" aria-label="Archived workflow statuses">
+        <section className="kl-wf__archived" aria-label="Archived workflow statuses">
           <h4>Archived statuses</h4>
-          <div>
+          <div className="kl-wf__archived-list">
             {archivedStatuses.map((status) => (
-              <span key={status.id} style={workflowStatusStyle(status)}>
+              <span
+                className="kl-wf__archived-chip"
+                key={status.id}
+                style={workflowStatusStyle(status)}
+              >
                 {status.name} · {status.key}
               </span>
             ))}
@@ -517,17 +538,17 @@ export function WorkflowSettingsPanel({
         <section
           aria-label={`Archive ${archiveStatus.name}`}
           aria-modal="true"
-          className="workflow-archive-dialog"
+          className="kl-wf-archive"
           role="dialog"
         >
           <h4>Archive {archiveStatus.name}?</h4>
-          <p>
+          <p className="kl-muted">
             All issues in this status will move to the replacement. Saved filters may
             show a missing status until they are updated.
           </p>
-          <label>
-            <span>Replacement status</span>
-            <select
+          <Field label="Replacement status" htmlFor="wf-replacement">
+            <Select
+              id="wf-replacement"
               aria-label="Replacement status"
               onChange={(event) => setReplacementStatusId(event.target.value)}
               value={replacementStatusId}
@@ -538,29 +559,29 @@ export function WorkflowSettingsPanel({
                   {status.name}
                 </option>
               ))}
-            </select>
-          </label>
-          <div>
-            <button
-              className="danger-button"
-              disabled={!replacementStatusId || archivingStatusIds.includes(archiveStatus.id)}
+            </Select>
+          </Field>
+          <div className="kl-wf-archive__actions">
+            <Button
+              variant="danger"
+              disabled={
+                !replacementStatusId || archivingStatusIds.includes(archiveStatus.id)
+              }
               onClick={() => void handleArchiveStatus()}
-              type="button"
             >
               {archivingStatusIds.includes(archiveStatus.id)
                 ? "Archiving"
                 : "Confirm archive"}
-            </button>
-            <button
-              className="ghost-button"
+            </Button>
+            <Button
+              variant="ghost"
               onClick={() => {
                 setArchiveStatusId("");
                 setReplacementStatusId("");
               }}
-              type="button"
             >
               Cancel
-            </button>
+            </Button>
           </div>
         </section>
       ) : null}
