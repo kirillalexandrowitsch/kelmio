@@ -3,4 +3,5 @@
 @import "./primitives.css";
 @import "./shell.css";
 @import "./command-palette.css";
+@import "./dashboard.css";
 @import "./auth.css";

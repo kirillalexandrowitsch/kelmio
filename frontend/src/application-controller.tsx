@@ -4691,6 +4691,14 @@ export function ApplicationController() {
     (issue) => issueDueInfo(issue, today)?.tone === "due-soon",
   ).length;
   const openIssuesCount = openIssues.length;
+  const myWorkIssues = openIssues
+    .filter((issue) => issue.assignee_id === user?.id)
+    .sort((left, right) => {
+      const leftDue = left.due_date ? new Date(left.due_date).getTime() : Infinity;
+      const rightDue = right.due_date ? new Date(right.due_date).getTime() : Infinity;
+      return leftDue - rightDue;
+    })
+    .slice(0, 6);
   const canSignIn =
     hasText(loginValue) && hasText(password) && !isSubmitting;
   const canUpdateProfile =
@@ -4881,11 +4889,14 @@ export function ApplicationController() {
           dueSoonIssuesCount={dueSoonIssuesCount}
           isActive={activeSection === "dashboard"}
           isLoadingActiveSprint={isLoadingDashboardSprint}
+          myWorkIssues={myWorkIssues}
           onNavigate={navigateToSection}
+          onOpenIssue={(issueId) => {
+            void handleSelectIssue(issueId);
+          }}
           openIssuesCount={openIssuesCount}
           overdueIssuesCount={overdueIssuesCount}
           projectsCount={projects.length}
-          role={user.workspace.role}
           teamMembers={teamMembers}
           teamMembersCount={teamMembers.length}
         />
