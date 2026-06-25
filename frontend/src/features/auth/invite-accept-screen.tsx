@@ -1,6 +1,8 @@
 import { type FormEvent, useEffect, useState } from "react";
 
 import { FormError } from "../../components/form-feedback";
+import { Button, Field, Input } from "../../ui";
+import { AuthLayout } from "./auth-layout";
 import {
   ApiError,
   acceptTeamInvite,
@@ -122,110 +124,110 @@ export function InviteAcceptScreen({
     !isSubmitting;
 
   return (
-    <main className="auth-shell">
-      <section className="auth-panel invite-accept-panel">
-        <div className="brand auth-brand">
-          <span className="brand-mark">K</span>
-          <div>
-            <strong>Kelmio</strong>
-            <span>Workspace invite</span>
-          </div>
-        </div>
+    <AuthLayout>
+      <header className="kl-auth__heading">
+        <p className="kl-auth__eyebrow">Invite onboarding</p>
+        <h1>Accept workspace invite</h1>
+      </header>
 
-        <div>
-          <p className="eyebrow">Invite onboarding</p>
-          <h1>Accept workspace invite</h1>
-        </div>
+      {isLoadingPreview ? (
+        <p className="kl-auth__muted">Loading invite...</p>
+      ) : null}
+      <FormError message={previewError} />
 
-        {isLoadingPreview ? <p className="muted">Loading invite...</p> : null}
-        <FormError message={previewError} />
-
-        {preview && !acceptedInvite ? (
-          <>
-            <article className="invite-preview-card">
-              <span>Workspace</span>
-              <strong>{preview.workspace_name}</strong>
-              <p>
-                Invited email: {preview.email} · Role: {preview.role}
-              </p>
-            </article>
-
-            <form className="auth-form" onSubmit={handleSubmit}>
-              <label>
-                <span>Username</span>
-                <input
-                  autoComplete="username"
-                  maxLength={32}
-                  onChange={(event) => setUsername(event.target.value.toLowerCase())}
-                  placeholder="member_name"
-                  value={username}
-                />
-              </label>
-
-              <label>
-                <span>Display name</span>
-                <input
-                  autoComplete="name"
-                  maxLength={80}
-                  onChange={(event) => setDisplayName(event.target.value)}
-                  placeholder="Member Name"
-                  value={displayName}
-                />
-              </label>
-
-              <label>
-                <span>Password</span>
-                <input
-                  autoComplete="new-password"
-                  minLength={8}
-                  onChange={(event) => setPassword(event.target.value)}
-                  placeholder="At least 8 characters"
-                  type="password"
-                  value={password}
-                />
-              </label>
-
-              <label>
-                <span>Confirm password</span>
-                <input
-                  autoComplete="new-password"
-                  minLength={8}
-                  onChange={(event) => setConfirmPassword(event.target.value)}
-                  placeholder="Repeat password"
-                  type="password"
-                  value={confirmPassword}
-                />
-              </label>
-
-              <FormError message={formError} />
-
-              <button disabled={!canSubmit} type="submit">
-                {isSubmitting ? "Accepting..." : "Accept invite"}
-              </button>
-            </form>
-          </>
-        ) : null}
-
-        {acceptedInvite ? (
-          <div className="invite-success-card">
-            <p className="eyebrow">Invite accepted</p>
-            <h2>Account created for @{acceptedInvite.username}</h2>
+      {preview && !acceptedInvite ? (
+        <>
+          <article className="kl-auth__preview">
+            <span className="kl-auth__preview-label">Workspace</span>
+            <strong>{preview.workspace_name}</strong>
             <p>
-              Sign in with username <strong>{acceptedInvite.username}</strong> and
-              the password you just created.
+              Invited email: {preview.email} · Role: {preview.role}
             </p>
-            <button onClick={onGoToSignIn} type="button">
-              Go to sign in
-            </button>
-          </div>
-        ) : null}
+          </article>
 
-        {!acceptedInvite ? (
-          <button className="ghost-button" onClick={onGoToSignIn} type="button">
-            Back to sign in
-          </button>
-        ) : null}
-      </section>
-    </main>
+          <form className="kl-auth__form" onSubmit={handleSubmit}>
+            <Field label="Username" htmlFor="invite-username">
+              <Input
+                id="invite-username"
+                autoComplete="username"
+                maxLength={32}
+                onChange={(event) =>
+                  setUsername(event.target.value.toLowerCase())
+                }
+                placeholder="member_name"
+                value={username}
+              />
+            </Field>
+
+            <Field label="Display name" htmlFor="invite-display-name">
+              <Input
+                id="invite-display-name"
+                autoComplete="name"
+                maxLength={80}
+                onChange={(event) => setDisplayName(event.target.value)}
+                placeholder="Member Name"
+                value={displayName}
+              />
+            </Field>
+
+            <Field label="Password" htmlFor="invite-password">
+              <Input
+                id="invite-password"
+                autoComplete="new-password"
+                minLength={8}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="At least 8 characters"
+                type="password"
+                value={password}
+              />
+            </Field>
+
+            <Field label="Confirm password" htmlFor="invite-confirm-password">
+              <Input
+                id="invite-confirm-password"
+                autoComplete="new-password"
+                minLength={8}
+                onChange={(event) => setConfirmPassword(event.target.value)}
+                placeholder="Repeat password"
+                type="password"
+                value={confirmPassword}
+              />
+            </Field>
+
+            <FormError message={formError} />
+
+            <Button
+              variant="primary"
+              size="lg"
+              block
+              disabled={!canSubmit}
+              type="submit"
+            >
+              {isSubmitting ? "Accepting..." : "Accept invite"}
+            </Button>
+          </form>
+        </>
+      ) : null}
+
+      {acceptedInvite ? (
+        <div className="kl-auth__success">
+          <p className="kl-auth__eyebrow">Invite accepted</p>
+          <h2>Account created for @{acceptedInvite.username}</h2>
+          <p>
+            Sign in with username <strong>{acceptedInvite.username}</strong> and
+            the password you just created.
+          </p>
+          <Button variant="secondary" onClick={onGoToSignIn}>
+            Go to sign in
+          </Button>
+        </div>
+      ) : null}
+
+      {!acceptedInvite ? (
+        <button className="kl-auth__link" onClick={onGoToSignIn} type="button">
+          Back to sign in
+        </button>
+      ) : null}
+    </AuthLayout>
   );
 }

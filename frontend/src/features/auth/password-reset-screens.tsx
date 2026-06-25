@@ -1,6 +1,8 @@
 import { type FormEvent, useEffect, useState } from "react";
 
 import { FormError } from "../../components/form-feedback";
+import { Button, Field, Input } from "../../ui";
+import { AuthLayout } from "./auth-layout";
 import {
   completePasswordReset,
   getPasswordResetPreview,
@@ -62,63 +64,57 @@ export function ForgotPasswordScreen({ onGoToSignIn }: ForgotPasswordScreenProps
   }
 
   return (
-    <main className="auth-shell">
-      <section className="auth-panel">
-        <div className="brand auth-brand">
-          <span className="brand-mark">K</span>
-          <div>
-            <strong>Kelmio</strong>
-            <span>Account recovery</span>
-          </div>
+    <AuthLayout>
+      <header className="kl-auth__heading">
+        <p className="kl-auth__eyebrow">Password reset</p>
+        <h1>Reset your password</h1>
+      </header>
+
+      {isSuccess ? (
+        <div className="kl-auth__success">
+          <p className="kl-auth__eyebrow">Check your email</p>
+          <h2>Password reset instructions sent</h2>
+          <p>
+            If an active account exists for that email, password reset
+            instructions will be sent.
+          </p>
+          <Button variant="secondary" onClick={onGoToSignIn}>
+            Back to sign in
+          </Button>
         </div>
+      ) : (
+        <form className="kl-auth__form" onSubmit={handleSubmit}>
+          <Field label="Email" htmlFor="forgot-email">
+            <Input
+              id="forgot-email"
+              autoComplete="email"
+              autoFocus
+              name="email"
+              onChange={(event) => setEmail(event.target.value)}
+              placeholder="member@example.com"
+              type="email"
+              value={email}
+            />
+          </Field>
 
-        <div>
-          <p className="eyebrow">Password reset</p>
-          <h1>Reset your password</h1>
-        </div>
+          <FormError message={formError} />
 
-        {isSuccess ? (
-          <div className="invite-success-card">
-            <p className="eyebrow">Check your email</p>
-            <h2>Password reset instructions sent</h2>
-            <p>
-              If an active account exists for that email, password reset
-              instructions will be sent.
-            </p>
-            <button onClick={onGoToSignIn} type="button">
-              Back to sign in
-            </button>
-          </div>
-        ) : (
-          <form className="auth-form" onSubmit={handleSubmit}>
-            <label>
-              <span>Email</span>
-              <input
-                autoComplete="email"
-                autoFocus
-                name="email"
-                onChange={(event) => setEmail(event.target.value)}
-                placeholder="member@example.com"
-                type="email"
-                value={email}
-              />
-            </label>
+          <Button
+            variant="primary"
+            size="lg"
+            block
+            disabled={!hasText(email) || isSubmitting}
+            type="submit"
+          >
+            {isSubmitting ? "Sending..." : "Send reset link"}
+          </Button>
 
-            <FormError message={formError} />
-
-            <button disabled={!hasText(email) || isSubmitting} type="submit">
-              {isSubmitting ? "Sending..." : "Send reset link"}
-            </button>
-          </form>
-        )}
-
-        {!isSuccess ? (
-          <button className="ghost-button" onClick={onGoToSignIn} type="button">
+          <button className="kl-auth__link" onClick={onGoToSignIn} type="button">
             Back to sign in
           </button>
-        ) : null}
-      </section>
-    </main>
+        </form>
+      )}
+    </AuthLayout>
   );
 }
 
@@ -216,83 +212,81 @@ export function ResetPasswordScreen({
     !isSubmitting;
 
   return (
-    <main className="auth-shell">
-      <section className="auth-panel">
-        <div className="brand auth-brand">
-          <span className="brand-mark">K</span>
-          <div>
-            <strong>Kelmio</strong>
-            <span>Account recovery</span>
-          </div>
+    <AuthLayout>
+      <header className="kl-auth__heading">
+        <p className="kl-auth__eyebrow">Password reset</p>
+        <h1>Choose a new password</h1>
+      </header>
+
+      {isLoadingPreview ? (
+        <p className="kl-auth__muted">Loading reset link...</p>
+      ) : null}
+      <FormError message={previewError} />
+
+      {preview && !isSuccess ? (
+        <>
+          <article className="kl-auth__preview">
+            <span className="kl-auth__preview-label">Reset request</span>
+            <strong>{preview.email}</strong>
+            <p>{passwordResetPreviewText(preview.email, preview.expires_at)}</p>
+          </article>
+
+          <form className="kl-auth__form" onSubmit={handleSubmit}>
+            <Field label="New password" htmlFor="reset-new-password">
+              <Input
+                id="reset-new-password"
+                autoComplete="new-password"
+                minLength={8}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="At least 8 characters"
+                type="password"
+                value={password}
+              />
+            </Field>
+
+            <Field label="Confirm password" htmlFor="reset-confirm-password">
+              <Input
+                id="reset-confirm-password"
+                autoComplete="new-password"
+                minLength={8}
+                onChange={(event) => setConfirmPassword(event.target.value)}
+                placeholder="Repeat password"
+                type="password"
+                value={confirmPassword}
+              />
+            </Field>
+
+            <FormError message={formError} />
+
+            <Button
+              variant="primary"
+              size="lg"
+              block
+              disabled={!canSubmit}
+              type="submit"
+            >
+              {isSubmitting ? "Resetting..." : "Reset password"}
+            </Button>
+          </form>
+        </>
+      ) : null}
+
+      {isSuccess ? (
+        <div className="kl-auth__success">
+          <p className="kl-auth__eyebrow">Password updated</p>
+          <h2>Your password has been reset</h2>
+          <p>Sign in with your new password to continue.</p>
+          <Button variant="secondary" onClick={onGoToSignIn}>
+            Go to sign in
+          </Button>
         </div>
+      ) : null}
 
-        <div>
-          <p className="eyebrow">Password reset</p>
-          <h1>Choose a new password</h1>
-        </div>
-
-        {isLoadingPreview ? <p className="muted">Loading reset link...</p> : null}
-        <FormError message={previewError} />
-
-        {preview && !isSuccess ? (
-          <>
-            <article className="invite-preview-card">
-              <span>Reset request</span>
-              <strong>{preview.email}</strong>
-              <p>{passwordResetPreviewText(preview.email, preview.expires_at)}</p>
-            </article>
-
-            <form className="auth-form" onSubmit={handleSubmit}>
-              <label>
-                <span>New password</span>
-                <input
-                  autoComplete="new-password"
-                  minLength={8}
-                  onChange={(event) => setPassword(event.target.value)}
-                  placeholder="At least 8 characters"
-                  type="password"
-                  value={password}
-                />
-              </label>
-
-              <label>
-                <span>Confirm password</span>
-                <input
-                  autoComplete="new-password"
-                  minLength={8}
-                  onChange={(event) => setConfirmPassword(event.target.value)}
-                  placeholder="Repeat password"
-                  type="password"
-                  value={confirmPassword}
-                />
-              </label>
-
-              <FormError message={formError} />
-
-              <button disabled={!canSubmit} type="submit">
-                {isSubmitting ? "Resetting..." : "Reset password"}
-              </button>
-            </form>
-          </>
-        ) : null}
-
-        {isSuccess ? (
-          <div className="invite-success-card">
-            <p className="eyebrow">Password updated</p>
-            <h2>Your password has been reset</h2>
-            <p>Sign in with your new password to continue.</p>
-            <button onClick={onGoToSignIn} type="button">
-              Go to sign in
-            </button>
-          </div>
-        ) : null}
-
-        {!isSuccess ? (
-          <button className="ghost-button" onClick={onGoToSignIn} type="button">
-            Back to sign in
-          </button>
-        ) : null}
-      </section>
-    </main>
+      {!isSuccess ? (
+        <button className="kl-auth__link" onClick={onGoToSignIn} type="button">
+          Back to sign in
+        </button>
+      ) : null}
+    </AuthLayout>
   );
 }

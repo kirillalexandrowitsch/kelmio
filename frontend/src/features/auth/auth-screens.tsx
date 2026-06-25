@@ -1,6 +1,9 @@
 import { type FormEvent } from "react";
+import { ArrowRight } from "lucide-react";
 
 import { FormError } from "../../components/form-feedback";
+import { Button, Field, Input } from "../../ui";
+import { AuthLayout } from "./auth-layout";
 
 type SignInScreenProps = {
   canSignIn: boolean;
@@ -16,12 +19,13 @@ type SignInScreenProps = {
 
 export function BootingScreen() {
   return (
-    <main className="auth-shell">
-      <section className="auth-panel auth-panel-compact">
-        <span className="brand-mark">K</span>
-        <p className="eyebrow">Checking session</p>
-      </section>
-    </main>
+    <AuthLayout>
+      <header className="kl-auth__heading">
+        <p className="kl-auth__eyebrow">Checking session</p>
+        <h1>Welcome to Kelmio</h1>
+      </header>
+      <p className="kl-auth__muted">Restoring your workspace…</p>
+    </AuthLayout>
   );
 }
 
@@ -37,59 +41,58 @@ export function SignInScreen({
   password,
 }: SignInScreenProps) {
   return (
-    <main className="auth-shell">
-      <section className="auth-panel">
-        <div className="brand auth-brand">
-          <span className="brand-mark">K</span>
-          <div>
-            <strong>Kelmio</strong>
-            <span>Local workspace</span>
-          </div>
-        </div>
+    <AuthLayout>
+      <header className="kl-auth__heading">
+        <p className="kl-auth__eyebrow">Sign in to your workspace</p>
+        <h1>Welcome back</h1>
+      </header>
 
-        <div>
-          <p className="eyebrow">Sign in</p>
-          <h1>Welcome back</h1>
-        </div>
+      <form className="kl-auth__form" onSubmit={onSubmit}>
+        <Field label="Username or email" htmlFor="signin-login">
+          <Input
+            id="signin-login"
+            autoComplete="username"
+            autoFocus
+            name="login"
+            onChange={(event) => onLoginChange(event.target.value)}
+            value={loginValue}
+          />
+        </Field>
 
-        <form className="auth-form" onSubmit={onSubmit}>
-          <label>
-            <span>Username or email</span>
-            <input
-              autoComplete="username"
-              autoFocus
-              name="login"
-              onChange={(event) => onLoginChange(event.target.value)}
-              value={loginValue}
-            />
-          </label>
+        <Field label="Password" htmlFor="signin-password">
+          <Input
+            id="signin-password"
+            autoComplete="current-password"
+            name="password"
+            onChange={(event) => onPasswordChange(event.target.value)}
+            type="password"
+            value={password}
+          />
+        </Field>
 
-          <label>
-            <span>Password</span>
-            <input
-              autoComplete="current-password"
-              name="password"
-              onChange={(event) => onPasswordChange(event.target.value)}
-              type="password"
-              value={password}
-            />
-          </label>
-
-          <FormError message={error} />
-
-          <button disabled={!canSignIn} type="submit">
-            {isSubmitting ? "Signing in..." : "Sign in"}
-          </button>
-
+        <div className="kl-auth__row-end">
           <button
-            className="auth-link-button"
+            className="kl-auth__link"
             onClick={onForgotPassword}
             type="button"
           >
             Forgot password?
           </button>
-        </form>
-      </section>
-    </main>
+        </div>
+
+        <FormError message={error} />
+
+        <Button
+          variant="primary"
+          size="lg"
+          block
+          disabled={!canSignIn}
+          iconEnd={ArrowRight}
+          type="submit"
+        >
+          {isSubmitting ? "Signing in..." : "Sign in"}
+        </Button>
+      </form>
+    </AuthLayout>
   );
 }
