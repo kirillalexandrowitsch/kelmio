@@ -7,6 +7,7 @@ import {
   type TeamMember,
 } from "../../lib/api-types";
 import { memberInitials } from "../../lib/team-view";
+import { Badge, Button, Field, Select } from "../../ui";
 
 type ProjectMembersPanelProps = {
   error: string;
@@ -51,21 +52,23 @@ export function ProjectMembersPanel({
   ).length;
 
   return (
-    <section className="project-members-panel" aria-label="Project members">
-      <header className="project-members-header">
+    <section className="kl-members" aria-label="Project members">
+      <header className="kl-section-head">
         <div>
           <h3>Project members</h3>
-          <p>Leads manage access. Contributors write. Viewers are read-only.</p>
+          <p className="kl-muted">
+            Leads manage access. Contributors write. Viewers are read-only.
+          </p>
         </div>
-        {isLoading ? <span className="muted">Loading</span> : null}
+        {isLoading ? <span className="kl-muted">Loading</span> : null}
       </header>
 
       <FormError message={error} />
 
-      <form className="project-member-add-form" onSubmit={onAddMember}>
-        <label>
-          <span>Workspace member</span>
-          <select
+      <form className="kl-members__add" onSubmit={onAddMember}>
+        <Field label="Workspace member" htmlFor="member-user">
+          <Select
+            id="member-user"
             disabled={isLoading || availableMembers.length === 0}
             onChange={(event) => onUserChange(event.target.value)}
             value={selectedUserId}
@@ -76,32 +79,36 @@ export function ProjectMembersPanel({
                 {member.display_name} (@{member.username})
               </option>
             ))}
-          </select>
-        </label>
-        <label>
-          <span>Project role</span>
-          <select
+          </Select>
+        </Field>
+        <Field label="Project role" htmlFor="member-role">
+          <Select
+            id="member-role"
             aria-label="New project member role"
             disabled={isLoading || availableMembers.length === 0}
             onChange={(event) => onRoleChange(event.target.value as ProjectRole)}
             value={role}
           >
             <ProjectRoleOptions />
-          </select>
-        </label>
-        <button disabled={isLoading || !selectedUserId} type="submit">
+          </Select>
+        </Field>
+        <Button
+          variant="primary"
+          disabled={isLoading || !selectedUserId}
+          type="submit"
+        >
           Add member
-        </button>
+        </Button>
       </form>
 
       {availableMembers.length === 0 ? (
-        <p className="muted project-members-availability">
+        <p className="kl-muted">
           All active workspace members already belong to this project.
         </p>
       ) : null}
 
       {members.length > 0 ? (
-        <div className="project-member-list">
+        <div className="kl-members__list">
           {members.map((member) => {
             const isUpdating = updatingMemberIds.includes(member.user_id);
             const isRemoving = removingMemberIds.includes(member.user_id);
@@ -114,29 +121,27 @@ export function ProjectMembersPanel({
               !member.is_active || isUpdating || isRemoving || isProtectedLastLead;
 
             return (
-              <article className="project-member-card" key={member.user_id}>
-                <span className="member-avatar">
+              <article className="kl-member" key={member.user_id}>
+                <span className="kl-member__avatar">
                   {memberInitials(member.display_name)}
                 </span>
-                <div className="project-member-identity">
+                <div className="kl-member__identity">
                   <h4>{member.display_name}</h4>
                   <p>
                     @{member.username} · {member.email}
                   </p>
-                  <div className="project-member-badges">
-                    <span className="member-role">{member.role}</span>
+                  <div className="kl-member__badges">
+                    <Badge tone="accent">{member.role}</Badge>
                     {member.workspace_role === "admin" ? (
-                      <span className="member-role">Workspace admin</span>
+                      <Badge tone="info">Workspace admin</Badge>
                     ) : null}
-                    {!member.is_active ? (
-                      <span className="member-role member-role-inactive">Inactive</span>
-                    ) : null}
+                    {!member.is_active ? <Badge>Inactive</Badge> : null}
                   </div>
                 </div>
-                <div className="project-member-controls">
-                  <label>
-                    <span>Role</span>
-                    <select
+                <div className="kl-member__controls">
+                  <Field label="Role" htmlFor={`member-role-${member.user_id}`}>
+                    <Select
+                      id={`member-role-${member.user_id}`}
                       aria-label={`Project role for ${member.display_name}`}
                       disabled={controlsDisabled}
                       onChange={(event) =>
@@ -148,30 +153,30 @@ export function ProjectMembersPanel({
                       value={member.role}
                     >
                       <ProjectRoleOptions />
-                    </select>
-                  </label>
-                  <button
-                    className="small-button danger-button"
+                    </Select>
+                  </Field>
+                  <Button
+                    variant="danger"
+                    size="sm"
                     disabled={isUpdating || isRemoving || isProtectedLastLead}
                     onClick={() => onRemoveMember(member)}
-                    type="button"
                   >
                     {isRemoving ? "Removing" : "Remove"}
-                  </button>
+                  </Button>
                 </div>
                 {member.workspace_role === "admin" ? (
-                  <p className="project-member-note">
+                  <p className="kl-member__note">
                     Workspace admins keep full project access even without this
                     membership row.
                   </p>
                 ) : null}
                 {isProtectedLastLead ? (
-                  <p className="project-member-note">
+                  <p className="kl-member__note">
                     Add another active lead before changing or removing this lead.
                   </p>
                 ) : null}
                 {!member.is_active ? (
-                  <p className="project-member-note">
+                  <p className="kl-member__note">
                     Inactive memberships remain visible for audit and can be removed.
                   </p>
                 ) : null}
@@ -180,7 +185,7 @@ export function ProjectMembersPanel({
           })}
         </div>
       ) : isLoading ? null : (
-        <div className="comments-empty">No project members</div>
+        <div className="kl-empty-block">No project members</div>
       )}
     </section>
   );

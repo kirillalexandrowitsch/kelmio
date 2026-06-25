@@ -177,3 +177,88 @@
   font-weight: 600;
   color: var(--text-strong);
 }
+
+/* Project members */
+.kl-members {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.kl-members__add {
+  display: grid;
+  grid-template-columns: 1fr 200px auto;
+  align-items: end;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+
+.kl-members__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.kl-member {
+  display: grid;
+  grid-template-columns: 40px 1fr auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+}
+
+.kl-member__avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-gradient);
+  color: var(--text-on-accent);
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.kl-member__identity h4 {
+  font-family: var(--font-display);
+  font-size: 15px;
+}
+
+.kl-member__identity p {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.kl-member__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+}
+
+.kl-member__badges .kl-badge {
+  text-transform: capitalize;
+}
+
+.kl-member__controls {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-3);
+}
+
+.kl-member__controls .kl-field {
+  min-width: 140px;
+}
+
+.kl-member__note {
+  grid-column: 1 / -1;
+  font-size: 12px;
+  color: var(--text-muted);
+}
