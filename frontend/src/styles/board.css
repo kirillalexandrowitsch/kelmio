@@ -1,0 +1,287 @@
+/* Kanban board — restyled in place; scoped to keep drag logic and the
+   .board / .issue-card / column-heading e2e and test contracts untouched. */
+
+.board-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.board-section-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.board-section-header .eyebrow {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.board-section-header h2 {
+  font-size: 20px;
+}
+
+.board-section-header label > span {
+  display: block;
+  margin-bottom: var(--space-1);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.board-section-header select {
+  min-height: var(--control-md);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+  color: var(--text-strong);
+}
+
+.board-empty-state {
+  padding: var(--space-10) var(--space-6);
+  text-align: center;
+  color: var(--text-muted);
+  border: 1px dashed var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+
+.board-error-state {
+  border-color: var(--critical-soft);
+  color: var(--critical-500);
+}
+
+.board-read-only-note {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* Columns */
+.board {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(264px, 1fr);
+  gap: var(--space-4);
+  overflow-x: auto;
+  padding-bottom: var(--space-2);
+}
+
+.board-column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--border-default);
+  border-top: 3px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+  min-height: 120px;
+}
+
+.board-column > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.board-column > header h2 {
+  font-size: 15px;
+}
+
+.board-column > header small {
+  display: block;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-faint);
+}
+
+.board-column > header > span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 22px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.board-column-drop-allowed {
+  outline: 2px dashed var(--accent-500);
+  outline-offset: 2px;
+}
+
+.board-column-drop-disabled {
+  opacity: 0.7;
+}
+
+.board-card-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* Cards */
+.board-section .issue-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+  box-shadow: var(--shadow-xs);
+  cursor: grab;
+}
+
+.board-section .issue-card:hover {
+  box-shadow: var(--shadow-sm);
+}
+
+.issue-card-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.issue-card-meta span:first-child {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent-strong);
+}
+
+.issue-card-meta span:last-child {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: capitalize;
+}
+
+.board-section .issue-card h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.board-section .issue-card > p {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.board-section .detail-chip {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--surface-3);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-default);
+}
+
+.board-section .due-badge {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--surface-3);
+  color: var(--text-muted);
+}
+
+.board-section .due-badge-overdue {
+  background: var(--critical-soft);
+  color: var(--critical-500);
+}
+
+.board-section .due-badge-due-soon {
+  background: var(--overdue-soft);
+  color: var(--overdue-500);
+}
+
+.board-section .issue-label-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.board-section .label-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.issue-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.issue-card-actions label > span {
+  display: none;
+}
+
+.issue-card-actions select {
+  min-height: var(--control-sm);
+  padding: 0 var(--space-2);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: var(--surface-1);
+  font-size: 12px;
+}
+
+.board-section .small-button {
+  display: inline-flex;
+  align-items: center;
+  height: var(--control-sm);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+  color: var(--text-strong);
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.board-section .small-button:hover:not(:disabled) {
+  background: var(--surface-2);
+}
+
+.board-section .danger-button {
+  background: var(--critical-soft);
+  border-color: transparent;
+  color: var(--critical-500);
+}
+
+.board-card-list .empty-state {
+  padding: var(--space-4);
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-faint);
+}
