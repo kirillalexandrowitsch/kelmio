@@ -206,3 +206,67 @@
   overflow-y: auto;
   padding: var(--space-8);
 }
+
+/* Responsive: collapse the sidebar into a top strip on small screens. Nav
+   button labels stay visible so the accessibility/e2e contract is preserved;
+   only the decorative group labels are hidden. */
+@media (max-width: 860px) {
+  .kl-app {
+    grid-template-columns: 1fr;
+  }
+
+  .kl-sidebar {
+    position: static;
+    height: auto;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3);
+    border-right: none;
+    border-bottom: 1px solid var(--border-default);
+  }
+
+  .kl-sidebar__search {
+    width: auto;
+    flex: 1 1 160px;
+  }
+
+  .kl-sidebar__nav {
+    flex: 1 1 100%;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .kl-sidebar__group {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-1);
+  }
+
+  .kl-sidebar__group-label {
+    display: none;
+  }
+
+  .kl-sidebar__item {
+    width: auto;
+  }
+
+  .kl-sidebar__footer {
+    flex-direction: row;
+    align-items: center;
+    margin-left: auto;
+    padding-top: 0;
+    border-top: none;
+  }
+
+  .kl-app__main {
+    height: auto;
+    overflow: visible;
+  }
+
+  .kl-app__content {
+    padding: var(--space-5);
+  }
+}
