@@ -1,0 +1,341 @@
+/* Team, Labels, Notifications and Account — restyled in place. Each block is
+   scoped under its section root so all markup, props, regions, labels and
+   action names (the e2e/test contracts) stay untouched. */
+
+/* Shared scoped form controls + buttons for these sections */
+.team-panel,
+.labels-panel,
+.notifications-section,
+.account-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.team-panel select,
+.team-panel textarea,
+.team-panel input:not([type="checkbox"]):not([type="color"]),
+.labels-panel select,
+.labels-panel input:not([type="checkbox"]):not([type="color"]),
+.account-panel select,
+.account-panel textarea,
+.account-panel input:not([type="checkbox"]):not([type="color"]) {
+  min-height: var(--control-md);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+  color: var(--text-strong);
+}
+
+.team-panel textarea,
+.account-panel textarea {
+  padding: var(--space-3);
+  resize: vertical;
+}
+
+.team-panel select:focus-visible,
+.team-panel input:focus-visible,
+.labels-panel select:focus-visible,
+.labels-panel input:focus-visible,
+.account-panel select:focus-visible,
+.account-panel input:focus-visible,
+.account-panel textarea:focus-visible {
+  border-color: var(--accent-500);
+  box-shadow: var(--focus-ring);
+  outline: none;
+}
+
+.team-panel label > span,
+.labels-panel label > span,
+.account-panel label > span {
+  display: block;
+  margin-bottom: var(--space-1);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.team-panel button,
+.labels-panel button,
+.notifications-section button,
+.account-panel button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  height: var(--control-sm);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+  color: var(--text-strong);
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.team-panel button[type="submit"],
+.labels-panel button[type="submit"],
+.account-panel button[type="submit"] {
+  background: var(--accent-gradient);
+  border-color: transparent;
+  color: var(--text-on-accent);
+}
+
+.team-panel .ghost-button,
+.labels-panel .ghost-button,
+.notifications-section .ghost-button,
+.account-panel .ghost-button {
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-muted);
+}
+
+.team-panel .danger-button,
+.labels-panel .danger-button,
+.account-panel .danger-button {
+  background: var(--critical-soft);
+  border-color: transparent;
+  color: var(--critical-500);
+}
+
+.team-panel button:disabled,
+.labels-panel button:disabled,
+.notifications-section button:disabled,
+.account-panel button:disabled {
+  opacity: 0.6;
+}
+
+.team-panel .section-header h2,
+.labels-panel .section-header h2,
+.notifications-section .section-header h2,
+.account-panel .section-header h2 {
+  font-size: 18px;
+}
+
+.team-panel .eyebrow,
+.labels-panel .eyebrow,
+.notifications-section .eyebrow,
+.account-panel .eyebrow {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.team-panel .muted,
+.labels-panel .muted,
+.notifications-section .muted,
+.account-panel .muted {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+/* Team */
+.team-list,
+.team-invite-list,
+.email-failure-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.team-member-row,
+.team-invite-card,
+.email-failure-card,
+.team-member-form,
+.team-invite-form,
+.team-invite-panel,
+.email-diagnostics-panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--surface-1);
+}
+
+.team-member-form,
+.team-invite-form,
+.team-invite-panel,
+.email-diagnostics-panel {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.member-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-gradient);
+  color: var(--text-on-accent);
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.member-role,
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--surface-3);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-default);
+}
+
+.member-controls,
+.member-password-reset,
+.invite-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.invite-link-field {
+  display: flex;
+  gap: var(--space-2);
+  flex: 1;
+  min-width: 200px;
+}
+
+.invite-link-note,
+.team-readonly-note {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.email-diagnostics-counts,
+.email-diagnostics-age {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* Labels */
+.label-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+
+.label-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.label-management-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+}
+
+.labels-panel .label-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-pill);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.labels-empty,
+.labels-panel .project-empty {
+  padding: var(--space-6);
+  text-align: center;
+  color: var(--text-muted);
+}
+
+/* Notifications */
+.notification-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.notifications-section .notification-card,
+.notification-card-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.notifications-section article {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-4);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+}
+
+.notification-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.notification-preview {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* Account */
+.account-form,
+.account-card,
+.account-metadata-panel,
+.account-metadata-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--surface-1);
+}
+
+.account-panel .field-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.form-success {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--done-soft);
+  color: var(--done-500);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.permission-note {
+  font-size: 13px;
+  color: var(--text-muted);
+}
