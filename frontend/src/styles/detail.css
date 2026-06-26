@@ -1,0 +1,393 @@
+/* Issue detail / peek panel — restyled in place to avoid touching the dense
+   detail markup and its e2e contracts. All rules are scoped to the panel. */
+
+.issue-detail-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.issue-detail-panel .section-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.issue-detail-panel .section-header h2 {
+  font-size: 18px;
+}
+
+.issue-detail-panel .eyebrow {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.issue-detail-panel .detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.issue-detail-empty {
+  padding: var(--space-10) var(--space-6);
+  text-align: center;
+  color: var(--text-muted);
+  border: 1px dashed var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+
+.issue-detail-body {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-4);
+}
+
+@media (min-width: 980px) {
+  .issue-detail-body {
+    grid-template-columns: 1fr 300px;
+    align-items: start;
+  }
+}
+
+.issue-detail-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+/* Form controls inside the panel */
+.issue-detail-panel select,
+.issue-detail-panel textarea,
+.issue-detail-panel input[type="text"],
+.issue-detail-panel input[type="date"],
+.issue-detail-panel input[type="number"],
+.issue-detail-panel input:not([type]) {
+  width: 100%;
+  min-height: var(--control-md);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+  color: var(--text-strong);
+}
+
+.issue-detail-panel textarea {
+  padding: var(--space-3);
+  min-height: 84px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.issue-detail-panel select:focus-visible,
+.issue-detail-panel textarea:focus-visible,
+.issue-detail-panel input:focus-visible {
+  border-color: var(--accent-500);
+  box-shadow: var(--focus-ring);
+  outline: none;
+}
+
+.issue-detail-panel label > span {
+  display: block;
+  margin-bottom: var(--space-1);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.issue-detail-panel .field-grid,
+.issue-detail-panel .form-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.issue-detail-panel .form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* Buttons inside the panel */
+.issue-detail-panel button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  height: var(--control-sm);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+  color: var(--text-strong);
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.issue-detail-panel button[type="submit"] {
+  background: var(--accent-gradient);
+  border-color: transparent;
+  color: var(--text-on-accent);
+}
+
+.issue-detail-panel .ghost-button {
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-muted);
+}
+
+.issue-detail-panel .ghost-button:hover:not(:disabled) {
+  background: var(--surface-3);
+  color: var(--text-strong);
+}
+
+.issue-detail-panel .danger-button {
+  background: var(--critical-soft);
+  border-color: transparent;
+  color: var(--critical-500);
+}
+
+.issue-detail-panel button:disabled {
+  opacity: 0.6;
+}
+
+/* Cards: main blocks */
+.issue-detail-headline h3 {
+  font-family: var(--font-display);
+  font-size: 20px;
+}
+
+.issue-detail-description {
+  color: var(--text-default);
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.issue-edit-form,
+.subtask-form,
+.issue-link-form,
+.comment-form,
+.comment-edit-form,
+.hierarchy-section,
+.linked-issues-section,
+.comments-section,
+.activity-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--surface-1);
+}
+
+.issue-detail-main > .detail-chip,
+.detail-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: 24px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--surface-3);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Sidebar metadata */
+.issue-detail-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--surface-1);
+  position: sticky;
+  top: var(--space-4);
+}
+
+.issue-detail-status {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.metadata-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.metadata-grid span {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-faint);
+}
+
+.metadata-grid strong {
+  font-size: 13px;
+  color: var(--text-strong);
+}
+
+/* Labels / chips */
+.issue-detail-panel .label-checkbox-list,
+.issue-detail-panel .issue-label-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.issue-detail-panel .label-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  cursor: pointer;
+}
+
+.issue-detail-panel .label-chip,
+.link-type-pill {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.issue-detail-panel .due-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--surface-3);
+  color: var(--text-muted);
+}
+
+.issue-detail-panel .due-badge-overdue {
+  background: var(--critical-soft);
+  color: var(--critical-500);
+}
+
+.issue-detail-panel .due-badge-due-soon {
+  background: var(--overdue-soft);
+  color: var(--overdue-500);
+}
+
+/* Comments */
+.comments-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.comment-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.comment-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+
+.comment-author {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.comment-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.comments-empty,
+.linked-issues-empty {
+  padding: var(--space-4);
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+/* Activity */
+.activity-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.activity-card {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  font-size: 13px;
+  color: var(--text-default);
+}
+
+.activity-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin-top: 6px;
+  border-radius: 50%;
+  background: var(--accent-500);
+}
+
+/* Hierarchy + links */
+.hierarchy-child-list,
+.linked-issue-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.hierarchy-parent-card,
+.linked-issue-card,
+.hierarchy-issue-button {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  text-align: left;
+}
+
+.hierarchy-child-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.issue-detail-panel .issue-key {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent-strong);
+}
