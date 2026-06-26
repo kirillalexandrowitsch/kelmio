@@ -133,16 +133,3 @@ export function AppSidebar({
   );
 }
 
-type WorkspaceTopbarProps = {
-  heading: string;
-  subtitle: string;
-};
-
-export function WorkspaceTopbar({ heading, subtitle }: WorkspaceTopbarProps) {
-  return (
-    <header className="kl-topbar">
-      <p className="kl-topbar__eyebrow">{subtitle}</p>
-      <h1 className="kl-topbar__heading">{heading}</h1>
-    </header>
-  );
-}

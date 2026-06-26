@@ -16,6 +16,7 @@ type DashboardSectionProps = {
   teamMembersCount: number;
   teamMembers: TeamMember[];
   myWorkIssues: Issue[];
+  displayName: string;
   isActive: boolean;
   onNavigate: (section: AppSection) => void;
   onOpenIssue: (issueId: string) => void;
@@ -154,6 +155,7 @@ export function DashboardSection({
   teamMembersCount,
   teamMembers,
   myWorkIssues,
+  displayName,
   isActive,
   onNavigate,
   onOpenIssue,
@@ -202,10 +204,13 @@ export function DashboardSection({
 
   return (
     <section className="kl-dashboard" aria-label="Dashboard" hidden={!isActive}>
-      <div className="kl-dashboard__intro">
-        <p className="kl-dashboard__cycle">{cycleStatus}</p>
+      <header className="kl-dashboard__intro">
+        <div>
+          <h1 className="kl-dashboard__greeting">Good to see you, {displayName}</h1>
+          <p className="kl-dashboard__cycle">{cycleStatus}</p>
+        </div>
         <span className="kl-dashboard__date">{dateChip}</span>
-      </div>
+      </header>
 
       <div className="kl-stats">
         {stats.map((stat) => (

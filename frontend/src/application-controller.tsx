@@ -148,7 +148,7 @@ import {
   normalizedInviteEmail,
   validateInviteEmail,
 } from "./lib/invite-view";
-import { AppSidebar, WorkspaceTopbar } from "./components/app-shell";
+import { AppSidebar } from "./components/app-shell";
 import { CommandPalette } from "./features/command-palette/command-palette";
 import { AccountSection } from "./features/account/account-section";
 import { InviteAcceptScreen } from "./features/auth/invite-accept-screen";
@@ -4804,15 +4804,6 @@ export function ApplicationController() {
     selectedIssue?.parent_issue_id
       ? issues.find((issue) => issue.id === selectedIssue.parent_issue_id) ?? null
       : null;
-  const activeSectionTitle =
-    appSections.find((section) => section.id === activeSection)?.title ?? "Dashboard";
-  const activeSectionSubtitle =
-    activeSection === "dashboard" ? "Local workspace" : "Workspace section";
-  const activeSectionHeading =
-    activeSection === "dashboard"
-      ? `Good to see you, ${user?.display_name ?? "there"}`
-      : activeSectionTitle;
-
   if (isBooting) {
     return <BootingScreen />;
   }
@@ -4875,17 +4866,13 @@ export function ApplicationController() {
       />
 
       <div className="kl-app__main">
-        <WorkspaceTopbar
-          heading={activeSectionHeading}
-          subtitle={activeSectionSubtitle}
-        />
-
         <div className="kl-app__content">
 
         <DashboardSection
           activeSprint={activeDashboardSprint}
           activeSprintError={dashboardSprintError}
           activeSprintIssues={dashboardSprintIssues}
+          displayName={user.display_name}
           dueSoonIssuesCount={dueSoonIssuesCount}
           isActive={activeSection === "dashboard"}
           isLoadingActiveSprint={isLoadingDashboardSprint}

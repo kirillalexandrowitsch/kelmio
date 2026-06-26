@@ -25,6 +25,7 @@ function renderDashboard(overrides: Record<string, unknown> = {}) {
     projectsCount: 6,
     teamMembersCount: 9,
     teamMembers: [{ id: "u1", display_name: "Kirill A" }],
+    displayName: "Admin",
     myWorkIssues: [
       {
         id: "i1",
@@ -45,6 +46,13 @@ function renderDashboard(overrides: Record<string, unknown> = {}) {
 }
 
 describe("DashboardSection", () => {
+  it("renders the sign-in greeting heading that e2e depends on", () => {
+    renderDashboard();
+    expect(
+      screen.getByRole("heading", { name: /Good to see you/ }).textContent,
+    ).toContain("Admin");
+  });
+
   it("renders stat cards, burndown header, workload and my work", () => {
     renderDashboard();
 

@@ -11,7 +11,12 @@
   gap: var(--space-4);
 }
 
+.kl-dashboard__greeting {
+  font-size: 24px;
+}
+
 .kl-dashboard__cycle {
+  margin-top: var(--space-1);
   color: var(--text-muted);
   font-size: 14px;
 }

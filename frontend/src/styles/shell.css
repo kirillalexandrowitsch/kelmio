@@ -200,23 +200,6 @@
   overflow: hidden;
 }
 
-.kl-topbar {
-  flex: none;
-  padding: var(--space-5) var(--space-8);
-  border-bottom: 1px solid var(--border-default);
-  background: var(--surface-1);
-}
-
-.kl-topbar__eyebrow {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-faint);
-}
-
-.kl-topbar__heading {
-  font-size: 22px;
-}
-
 .kl-app__content {
   flex: 1;
   min-height: 0;
