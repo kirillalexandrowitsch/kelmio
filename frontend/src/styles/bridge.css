@@ -1,0 +1,71 @@
+/* Completes the migration off the legacy stylesheet: classes still referenced
+   in markup that no feature layer had covered yet. With these in place the
+   legacy styles.css is fully replaced. */
+
+.issues-layout {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.issue-label-picker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.issue-label-picker > span {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.label-chip-small {
+  height: 20px;
+  padding: 0 var(--space-2);
+  font-size: 11px;
+}
+
+.linked-issue-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.member-active-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+}
+
+.member-active-toggle input {
+  accent-color: var(--accent-500);
+}
+
+/* Unread notification highlight — needs to beat the base card rule. */
+.notifications-section .notification-unread {
+  border-color: var(--accent-500);
+  background: var(--accent-soft);
+}
+
+/* Sprint list rows + selected highlight (scoped to beat .sprint-list > article). */
+.sprint-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.sprints-layout .sprint-row-selected {
+  border-color: var(--accent-500);
+  background: var(--accent-soft);
+}
+
+.sprint-inline-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}

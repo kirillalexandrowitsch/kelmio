@@ -320,6 +320,23 @@
   background: var(--surface-1);
 }
 
+.account-card > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.account-card > div > span {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.account-card > div > strong {
+  font-size: 13px;
+  color: var(--text-strong);
+}
+
 .account-panel .field-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

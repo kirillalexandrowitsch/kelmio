@@ -257,6 +257,25 @@
   background: var(--surface-2);
 }
 
+.active-sprint-board > article > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.active-sprint-board > article > header > div {
+  display: flex;
+  flex-direction: column;
+}
+
+.active-sprint-board > article > header small {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-faint);
+}
+
 .active-sprint-card-list {
   display: flex;
   flex-direction: column;
@@ -327,6 +346,24 @@
   border: 1px solid var(--border-default);
   border-radius: var(--radius-lg);
   background: var(--surface-2);
+}
+
+.planning-column > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.planning-column > header span {
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.planning-column > header strong {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-muted);
 }
 
 .planning-issue-list {
