@@ -28,6 +28,7 @@ import {
 } from "../../lib/sprint-model";
 import { memberDisplayName, memberOptionLabel } from "../../lib/team-view";
 import { hasText } from "../../lib/validation";
+import { Button, Field, Input, Select } from "../../ui";
 
 type IssueListPanelProps = {
   archivingIssueIds: string[];
@@ -133,28 +134,28 @@ export function IssueListPanel({
     workflowStatusFilterId || (legacyStatusFilter ? `legacy:${legacyStatusFilter}` : "");
 
   return (
-    <div className="issues-panel">
-      <header className="section-header">
+    <div className="kl-issues-list">
+      <header className="kl-section-head">
         <div>
-          <p className="eyebrow">Open work</p>
+          <p className="kl-eyebrow">Open work</p>
           <h2>Recent issues</h2>
         </div>
-        {isLoadingIssues ? <span className="muted">Loading</span> : null}
+        {isLoadingIssues ? <span className="kl-muted">Loading</span> : null}
       </header>
 
-      <section className="issue-filters" aria-label="Issue filters">
-        <label>
-          <span>Search</span>
-          <input
+      <section className="kl-issue-filters" aria-label="Issue filters">
+        <Field label="Search" htmlFor="filter-search">
+          <Input
+            id="filter-search"
             onChange={(event) => onQueryChange(event.target.value)}
             placeholder="Key, title, description"
             value={query}
           />
-        </label>
+        </Field>
 
-        <label>
-          <span>Sort</span>
-          <select
+        <Field label="Sort" htmlFor="filter-sort">
+          <Select
+            id="filter-sort"
             onChange={(event) => onSortChange(event.target.value as IssueSort)}
             value={sort}
           >
@@ -163,12 +164,12 @@ export function IssueListPanel({
                 {label}
               </option>
             ))}
-          </select>
-        </label>
+          </Select>
+        </Field>
 
-        <label>
-          <span>Project</span>
-          <select
+        <Field label="Project" htmlFor="filter-project">
+          <Select
+            id="filter-project"
             onChange={(event) => onProjectFilterChange(event.target.value)}
             value={projectFilterId}
           >
@@ -183,12 +184,12 @@ export function IssueListPanel({
                 {project.key}
               </option>
             ))}
-          </select>
-        </label>
+          </Select>
+        </Field>
 
-        <label>
-          <span>Sprint</span>
-          <select
+        <Field label="Sprint" htmlFor="filter-sprint">
+          <Select
+            id="filter-sprint"
             onChange={(event) => onSprintFilterChange(event.target.value)}
             value={sprintFilterId}
           >
@@ -217,12 +218,12 @@ export function IssueListPanel({
                 </optgroup>
               );
             })}
-          </select>
-        </label>
+          </Select>
+        </Field>
 
-        <label>
-          <span>Status</span>
-          <select
+        <Field label="Status" htmlFor="filter-status">
+          <Select
+            id="filter-status"
             aria-label="Status"
             disabled={!projectFilterId && !statusFilterValue}
             onChange={(event) => onWorkflowStatusFilterChange(event.target.value)}
@@ -246,12 +247,12 @@ export function IssueListPanel({
                 {status.name}
               </option>
             ))}
-          </select>
-        </label>
+          </Select>
+        </Field>
 
-        <label>
-          <span>Priority</span>
-          <select
+        <Field label="Priority" htmlFor="filter-priority">
+          <Select
+            id="filter-priority"
             onChange={(event) =>
               onPriorityFilterChange(event.target.value as IssuePriority | "")
             }
@@ -263,12 +264,12 @@ export function IssueListPanel({
                 {label}
               </option>
             ))}
-          </select>
-        </label>
+          </Select>
+        </Field>
 
-        <label>
-          <span>Assignee</span>
-          <select
+        <Field label="Assignee" htmlFor="filter-assignee">
+          <Select
+            id="filter-assignee"
             onChange={(event) => onAssigneeFilterChange(event.target.value)}
             value={assigneeFilterId}
           >
@@ -284,12 +285,12 @@ export function IssueListPanel({
                 {memberOptionLabel(member)}
               </option>
             ))}
-          </select>
-        </label>
+          </Select>
+        </Field>
 
-        <label>
-          <span>Label</span>
-          <select
+        <Field label="Label" htmlFor="filter-label">
+          <Select
+            id="filter-label"
             onChange={(event) => onLabelFilterChange(event.target.value)}
             value={labelFilterId}
           >
@@ -304,12 +305,12 @@ export function IssueListPanel({
                 {label.name}
               </option>
             ))}
-          </select>
-        </label>
+          </Select>
+        </Field>
 
-        <label>
-          <span>Due</span>
-          <select
+        <Field label="Due" htmlFor="filter-due">
+          <Select
+            id="filter-due"
             onChange={(event) =>
               onDueFilterChange(event.target.value as IssueDueFilter | "")
             }
@@ -321,97 +322,93 @@ export function IssueListPanel({
                 {label}
               </option>
             ))}
-          </select>
-        </label>
+          </Select>
+        </Field>
 
-        <button
-          className="small-button"
+        <Button
+          variant="ghost"
+          size="sm"
           disabled={!hasFilters}
           onClick={onClearFilters}
-          type="button"
         >
           Clear
-        </button>
+        </Button>
       </section>
 
-      <p className="filter-summary">{summary}</p>
+      <p className="kl-muted kl-issues-list__summary">{summary}</p>
 
       <FormError message={issuesError} />
 
       {issues.length > 0 ? (
-        <div className="issue-list">
+        <div className="kl-issues-list__rows">
           {issues.map((issue) => {
             const dueInfo = issueDueInfo(issue, today);
             const sprintName = issue.sprint_id
               ? sprintDisplayName(sprints, issue.sprint_id)
               : null;
+            const canArchive = projects.find(
+              (project) => project.id === issue.project_id,
+            )?.can_write;
 
             return (
-              <article className="issue-row" key={issue.id}>
-                <span className="issue-key">{issue.issue_key}</span>
-                <div>
+              <article className="issue-row kl-issue-row" key={issue.id}>
+                <span className="kl-issue-row__key">{issue.issue_key}</span>
+                <div className="kl-issue-row__body">
                   <h3>{issue.title}</h3>
-                  <p>
+                  <p className="kl-issue-row__meta">
                     {issueTypeLabels[issue.issue_type]} ·{" "}
                     {priorityLabels[issue.priority]} ·{" "}
                     {storyPointsLabel(issue.story_points)} ·{" "}
                     {memberDisplayName(teamMembers, issue.assignee_id)}
                     {sprintName ? ` · Sprint: ${sprintName}` : ""}
                   </p>
-                  <WorkflowStatusBadge
-                    fallbackLabel={issue.status.replaceAll("_", " ")}
-                    status={issue.workflow_status}
-                  />
-                  {dueInfo ? (
-                    <span className={`due-badge due-badge-${dueInfo.tone}`}>
-                      {dueInfo.label}
-                    </span>
-                  ) : null}
-                  {issue.labels.length > 0 ? (
-                    <div className="issue-label-row">
-                      {issue.labels.map((label) => (
-                        <span
-                          className="label-chip label-chip-small"
-                          key={label.id}
-                          style={{
-                            backgroundColor: `${label.color}1a`,
-                            borderColor: label.color,
-                          }}
-                        >
-                          {label.name}
-                        </span>
-                      ))}
-                    </div>
-                  ) : null}
+                  <div className="kl-issue-row__tags">
+                    <WorkflowStatusBadge
+                      fallbackLabel={issue.status.replaceAll("_", " ")}
+                      status={issue.workflow_status}
+                    />
+                    {dueInfo ? (
+                      <span className={`kl-due kl-due--${dueInfo.tone}`}>
+                        {dueInfo.label}
+                      </span>
+                    ) : null}
+                    {issue.labels.map((label) => (
+                      <span
+                        className="kl-label-chip"
+                        key={label.id}
+                        style={{
+                          backgroundColor: `${label.color}1a`,
+                          borderColor: label.color,
+                        }}
+                      >
+                        {label.name}
+                      </span>
+                    ))}
+                  </div>
                 </div>
-                <div className="issue-row-actions">
-                  <button
-                    className="small-button"
+                <div className="kl-issue-row__actions">
+                  <Button
+                    variant="secondary"
+                    size="sm"
                     onClick={() => onOpenIssue(issue.id)}
-                    type="button"
                   >
                     Open
-                  </button>
-                  <button
-                    className="small-button danger-button"
-                    disabled={
-                      !projects.find((project) => project.id === issue.project_id)
-                        ?.can_write || archivingIssueIds.includes(issue.id)
-                    }
+                  </Button>
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    disabled={!canArchive || archivingIssueIds.includes(issue.id)}
                     onClick={() => onArchiveIssue(issue)}
-                    type="button"
                   >
-                    {archivingIssueIds.includes(issue.id)
-                      ? "Archiving"
-                      : "Archive"}
-                  </button>
+                    {archivingIssueIds.includes(issue.id) ? "Archiving" : "Archive"}
+                  </Button>
                 </div>
               </article>
             );
           })}
         </div>
       ) : (
-        <div className="project-empty">No issues yet</div>
+        <div className="kl-empty-block">No issues yet</div>
       )}
     </div>
   );

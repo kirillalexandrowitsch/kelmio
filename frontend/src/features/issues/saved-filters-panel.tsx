@@ -2,6 +2,7 @@ import { FormEvent } from "react";
 import { FormError } from "../../components/form-feedback";
 import { type SavedFilter } from "../../lib/api-types";
 import { savedIssueFilterSummary } from "../../lib/issue-model";
+import { Button, Field, Input } from "../../ui";
 
 type SavedFiltersPanelProps = {
   deletingSavedFilterIds: string[];
@@ -49,77 +50,65 @@ export function SavedFiltersPanel({
   workflowStatusNamesById,
 }: SavedFiltersPanelProps) {
   return (
-    <section className="saved-filters-panel" aria-label="Saved issue filters">
-      <div className="saved-filters-header">
+    <section className="kl-card kl-saved-filters" aria-label="Saved issue filters">
+      <div className="kl-section-head">
         <div>
-          <p className="eyebrow">Saved views</p>
+          <p className="kl-eyebrow">Saved views</p>
           <h3>Issue filters</h3>
         </div>
-        {isLoadingSavedFilters ? <span className="muted">Loading</span> : null}
+        {isLoadingSavedFilters ? <span className="kl-muted">Loading</span> : null}
       </div>
 
-      <form className="saved-filter-form" onSubmit={onCreateSavedFilter}>
-        <label>
-          <span>View name</span>
-          <input
+      <form className="kl-saved-filters__form" onSubmit={onCreateSavedFilter}>
+        <Field label="View name" htmlFor="saved-filter-name">
+          <Input
+            id="saved-filter-name"
             onChange={(event) => onSavedFilterNameChange(event.target.value)}
             placeholder="My todo bugs"
             value={savedFilterName}
           />
-        </label>
-        <button
-          className="small-button"
-          disabled={isCreatingSavedFilter}
-          type="submit"
-        >
+        </Field>
+        <Button variant="secondary" disabled={isCreatingSavedFilter} type="submit">
           {isCreatingSavedFilter ? "Saving" : "Save current view"}
-        </button>
+        </Button>
       </form>
 
       <FormError message={savedFilterFormError} />
       <FormError message={savedFiltersError} />
 
       {savedFilters.length > 0 ? (
-        <div className="saved-filter-list">
+        <div className="kl-saved-filters__list">
           {savedFilters.map((savedFilter) => {
             const isUpdating = updatingSavedFilterIds.includes(savedFilter.id);
             const isDeleting = deletingSavedFilterIds.includes(savedFilter.id);
             const isRenaming = renameSavedFilterId === savedFilter.id;
 
             return (
-              <article className="saved-filter-card" key={savedFilter.id}>
+              <article className="kl-saved-filter" key={savedFilter.id}>
                 {isRenaming ? (
                   <form
-                    className="saved-filter-rename"
+                    className="kl-saved-filter__rename"
                     onSubmit={(event) => {
                       event.preventDefault();
                       onRenameSavedFilter(savedFilter);
                     }}
                   >
-                    <input
+                    <Input
                       onChange={(event) =>
                         onRenameSavedFilterNameChange(event.target.value)
                       }
                       value={renameSavedFilterName}
                     />
-                    <button
-                      className="small-button"
-                      disabled={isUpdating}
-                      type="submit"
-                    >
+                    <Button size="sm" variant="primary" disabled={isUpdating} type="submit">
                       Save name
-                    </button>
-                    <button
-                      className="small-button"
-                      onClick={onCancelRenameSavedFilter}
-                      type="button"
-                    >
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={onCancelRenameSavedFilter}>
                       Cancel
-                    </button>
+                    </Button>
                   </form>
                 ) : (
                   <>
-                    <div>
+                    <div className="kl-saved-filter__info">
                       <h4>{savedFilter.name}</h4>
                       <p>
                         {savedIssueFilterSummary(
@@ -128,37 +117,37 @@ export function SavedFiltersPanel({
                         ).join(" · ")}
                       </p>
                     </div>
-                    <div className="saved-filter-actions">
-                      <button
-                        className="small-button"
+                    <div className="kl-saved-filter__actions">
+                      <Button
+                        size="sm"
+                        variant="secondary"
                         onClick={() => onApplySavedFilter(savedFilter)}
-                        type="button"
                       >
                         Apply
-                      </button>
-                      <button
-                        className="small-button"
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
                         disabled={isUpdating}
                         onClick={() => onUpdateSavedFilter(savedFilter)}
-                        type="button"
                       >
                         {isUpdating ? "Updating" : "Update"}
-                      </button>
-                      <button
-                        className="small-button"
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
                         onClick={() => onStartRenameSavedFilter(savedFilter)}
-                        type="button"
                       >
                         Rename
-                      </button>
-                      <button
-                        className="small-button danger-button"
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="danger"
                         disabled={isDeleting}
                         onClick={() => onDeleteSavedFilter(savedFilter)}
-                        type="button"
                       >
                         {isDeleting ? "Deleting" : "Delete"}
-                      </button>
+                      </Button>
                     </div>
                   </>
                 )}
@@ -167,7 +156,7 @@ export function SavedFiltersPanel({
           })}
         </div>
       ) : (
-        <p className="saved-filter-empty">No saved filters yet.</p>
+        <p className="kl-muted">No saved filters yet.</p>
       )}
     </section>
   );

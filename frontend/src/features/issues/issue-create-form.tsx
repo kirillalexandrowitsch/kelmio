@@ -16,6 +16,7 @@ import {
   rootIssueTypeOptions,
 } from "../../lib/issue-model";
 import { activeTeamMembers, memberOptionLabel } from "../../lib/team-view";
+import { Button, Field, Input, Select, TextArea } from "../../ui";
 
 type IssueCreateFormProps = {
   assigneeId: string;
@@ -78,18 +79,20 @@ export function IssueCreateForm({
   title,
   type,
 }: IssueCreateFormProps) {
+  const selectedStatus = statuses.find((status) => status.id === statusId);
+
   return (
-    <form className="issue-form" onSubmit={onCreateIssue}>
-      <header className="section-header">
+    <form className="issue-form kl-card" onSubmit={onCreateIssue}>
+      <header className="kl-section-head">
         <div>
-          <p className="eyebrow">Issues</p>
+          <p className="kl-eyebrow">Issues</p>
           <h2>Create issue</h2>
         </div>
       </header>
 
-      <label>
-        <span>Project</span>
-        <select
+      <Field label="Project" htmlFor="issue-project">
+        <Select
+          id="issue-project"
           onChange={(event) => onProjectChange(event.target.value)}
           value={projectId}
         >
@@ -99,32 +102,32 @@ export function IssueCreateForm({
               {project.key} · {project.name}
             </option>
           ))}
-        </select>
-      </label>
+        </Select>
+      </Field>
 
-      <label>
-        <span>Title</span>
-        <input
+      <Field label="Title" htmlFor="issue-title">
+        <Input
+          id="issue-title"
           maxLength={180}
           onChange={(event) => onTitleChange(event.target.value)}
           placeholder="Create project board"
           value={title}
         />
-      </label>
+      </Field>
 
-      <label>
-        <span>Description</span>
-        <textarea
+      <Field label="Description" htmlFor="issue-description">
+        <TextArea
+          id="issue-description"
           onChange={(event) => onDescriptionChange(event.target.value)}
           placeholder="Short context for the team"
           rows={3}
           value={description}
         />
-      </label>
+      </Field>
 
-      <label>
-        <span>Assignee</span>
-        <select
+      <Field label="Assignee" htmlFor="issue-assignee">
+        <Select
+          id="issue-assignee"
           onChange={(event) => onAssigneeChange(event.target.value)}
           value={assigneeId}
         >
@@ -134,24 +137,22 @@ export function IssueCreateForm({
               {memberOptionLabel(member)}
             </option>
           ))}
-        </select>
-      </label>
+        </Select>
+      </Field>
 
-      <div className="issue-label-picker">
-        <span>Labels</span>
+      <div className="kl-field">
+        <span className="kl-field__label">Labels</span>
         {labels.length > 0 ? (
-          <div className="label-checkbox-list">
+          <div className="kl-label-picker">
             {labels.map((label) => (
-              <label className="label-checkbox" key={label.id}>
+              <label className="kl-label-check" key={label.id}>
                 <input
                   checked={labelIds.includes(label.id)}
-                  onChange={(event) =>
-                    onLabelChange(label.id, event.target.checked)
-                  }
+                  onChange={(event) => onLabelChange(label.id, event.target.checked)}
                   type="checkbox"
                 />
                 <span
-                  className="label-chip label-chip-small"
+                  className="kl-label-chip"
                   style={{
                     backgroundColor: `${label.color}1a`,
                     borderColor: label.color,
@@ -163,14 +164,14 @@ export function IssueCreateForm({
             ))}
           </div>
         ) : (
-          <strong>No labels created</strong>
+          <strong className="kl-muted">No labels created</strong>
         )}
       </div>
 
-      <div className="field-grid">
-        <label>
-          <span>Type</span>
-          <select
+      <div className="kl-form-grid">
+        <Field label="Type" htmlFor="issue-type">
+          <Select
+            id="issue-type"
             onChange={(event) => onTypeChange(event.target.value as IssueType)}
             value={type}
           >
@@ -179,15 +180,13 @@ export function IssueCreateForm({
                 {issueTypeLabels[value]}
               </option>
             ))}
-          </select>
-        </label>
+          </Select>
+        </Field>
 
-        <label>
-          <span>Priority</span>
-          <select
-            onChange={(event) =>
-              onPriorityChange(event.target.value as IssuePriority)
-            }
+        <Field label="Priority" htmlFor="issue-priority">
+          <Select
+            id="issue-priority"
+            onChange={(event) => onPriorityChange(event.target.value as IssuePriority)}
             value={priority}
           >
             {Object.entries(priorityLabels).map(([value, label]) => (
@@ -195,14 +194,14 @@ export function IssueCreateForm({
                 {label}
               </option>
             ))}
-          </select>
-        </label>
+          </Select>
+        </Field>
       </div>
 
-      <div className="field-grid">
-        <label>
-          <span>Status</span>
-          <select
+      <div className="kl-form-grid">
+        <Field label="Status" htmlFor="issue-status">
+          <Select
+            id="issue-status"
             aria-label="Status"
             disabled={!projectId || statuses.length === 0}
             onChange={(event) => onStatusChange(event.target.value)}
@@ -217,40 +216,36 @@ export function IssueCreateForm({
                 {status.name} · {status.category.replaceAll("_", " ")}
               </option>
             ))}
-          </select>
-          {statuses.find((status) => status.id === statusId) ? (
-            <WorkflowStatusBadge
-              status={statuses.find((status) => status.id === statusId)!}
-            />
-          ) : null}
-        </label>
+          </Select>
+          {selectedStatus ? <WorkflowStatusBadge status={selectedStatus} /> : null}
+        </Field>
 
-        <label>
-          <span>Due date</span>
-          <input
+        <Field label="Due date" htmlFor="issue-due">
+          <Input
+            id="issue-due"
             onChange={(event) => onDueDateChange(event.target.value)}
             type="date"
             value={dueDate}
           />
-        </label>
+        </Field>
       </div>
 
-      <label>
-        <span>Story points</span>
-        <input
+      <Field label="Story points" htmlFor="issue-points">
+        <Input
+          id="issue-points"
           min="0"
           max="100"
           onChange={(event) => onStoryPointsChange(event.target.value)}
           type="number"
           value={storyPoints}
         />
-      </label>
+      </Field>
 
       <FormError message={formError} />
 
-      <button disabled={!canCreateIssue} type="submit">
+      <Button variant="primary" disabled={!canCreateIssue} type="submit">
         {isCreatingIssue ? "Creating..." : "Create issue"}
-      </button>
+      </Button>
     </form>
   );
 }
