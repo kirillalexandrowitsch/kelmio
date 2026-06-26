@@ -1,0 +1,227 @@
+/* Automations — restyled in place; all rules scoped under
+   .automation-settings-panel so the large rule/editor markup and every
+   region/label/button/class e2e and test contract stay untouched. */
+
+.automation-settings-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.automation-settings-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.automation-settings-header h3 {
+  font-size: 16px;
+}
+
+.automation-settings-panel .muted {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+/* Form controls */
+.automation-settings-panel select,
+.automation-settings-panel textarea,
+.automation-settings-panel input[type="text"],
+.automation-settings-panel input[type="number"],
+.automation-settings-panel input:not([type]) {
+  min-height: var(--control-sm);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+  color: var(--text-strong);
+}
+
+.automation-settings-panel textarea {
+  padding: var(--space-2) var(--space-3);
+  min-height: 64px;
+  resize: vertical;
+}
+
+.automation-settings-panel select:focus-visible,
+.automation-settings-panel textarea:focus-visible,
+.automation-settings-panel input:focus-visible {
+  border-color: var(--accent-500);
+  box-shadow: var(--focus-ring);
+  outline: none;
+}
+
+.automation-settings-panel label > span {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.automation-settings-panel input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent-500);
+}
+
+/* Buttons */
+.automation-settings-panel button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  height: var(--control-sm);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+  color: var(--text-strong);
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.automation-settings-panel button[type="submit"] {
+  background: var(--accent-gradient);
+  border-color: transparent;
+  color: var(--text-on-accent);
+}
+
+.automation-settings-panel .ghost-button {
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-muted);
+}
+
+.automation-settings-panel .ghost-button:hover:not(:disabled) {
+  background: var(--surface-3);
+  color: var(--text-strong);
+}
+
+.automation-settings-panel .danger-button {
+  background: var(--critical-soft);
+  border-color: transparent;
+  color: var(--critical-500);
+}
+
+.automation-settings-panel button:disabled {
+  opacity: 0.6;
+}
+
+/* Rule list */
+.automation-rule-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.automation-rule-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.automation-rule-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--surface-1);
+}
+
+.automation-rule-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 13px;
+}
+
+.automation-rule-summary strong {
+  font-family: var(--font-display);
+  font-size: 15px;
+  color: var(--text-strong);
+}
+
+.automation-disabled-reason {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--overdue-soft);
+  color: var(--overdue-500);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.automation-rule-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.automation-enabled-field {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* Editor */
+.automation-rule-editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+}
+
+.automation-rule-basics {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-3);
+}
+
+@media (min-width: 720px) {
+  .automation-rule-basics {
+    grid-template-columns: 1fr 1fr auto;
+    align-items: end;
+  }
+}
+
+.automation-item-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+}
+
+.automation-item-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.automation-item-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+
+.automation-settings-panel .comments-empty {
+  padding: var(--space-4);
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+}
