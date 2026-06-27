@@ -227,7 +227,7 @@ export function ProjectsSection({
             const isArchivingProject = archivingProjectIds.includes(project.id);
 
             return (
-              <article className="kl-project-card" key={project.id}>
+              <article className="project-row kl-project-card" key={project.id}>
                 <div className="kl-project-card__top">
                   <span className="kl-project-card__key">{project.key}</span>
                   {project.project_role ? (
@@ -331,7 +331,7 @@ export function ProjectsSection({
       )}
 
       {isAdmin ? (
-        <form className="kl-card kl-project-create" onSubmit={onCreateProject}>
+        <form className="project-form kl-card kl-project-create" onSubmit={onCreateProject}>
           <header className="kl-section-head">
             <div>
               <p className="kl-eyebrow">Admin</p>

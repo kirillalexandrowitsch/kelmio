@@ -50,7 +50,7 @@ describe("AppSidebar", () => {
     expect(
       within(nav).getByRole("button", { name: "Notifications", exact: true }),
     ).toBeTruthy();
-    expect(screen.getByText("3")).toBeTruthy();
+    expect(screen.getAllByText("3").length).toBeGreaterThan(0);
   });
 
   it("navigates to account via the user card and signs out", async () => {

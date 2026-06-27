@@ -4852,6 +4852,15 @@ export function ApplicationController() {
         activeSection={activeSection}
         displayName={user.display_name}
         isLoggingOut={isLoggingOut}
+        isNotificationsOpen={isNotificationsOpen}
+        notifications={notifications}
+        notificationsError={notificationsError}
+        onMarkAllNotificationsRead={() => {
+          void handleMarkAllNotificationsRead();
+        }}
+        onMarkNotificationRead={(notification) => {
+          void handleMarkNotificationRead(notification);
+        }}
         onNavigate={(section) => {
           navigateToSection(section);
           if (section === "notifications") {
@@ -4859,7 +4868,19 @@ export function ApplicationController() {
           }
         }}
         onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
+        onOpenNotificationIssue={(notification) => {
+          void handleOpenNotificationIssue(notification);
+        }}
+        onOpenNotifications={() => {
+          setIsNotificationsOpen(false);
+          navigateToSection("notifications");
+          void refreshNotifications();
+        }}
         onSignOut={handleLogout}
+        onToggleNotifications={() => {
+          setIsNotificationsOpen((currentValue) => !currentValue);
+          void refreshNotifications();
+        }}
         role={user.workspace.role}
         unreadNotificationsCount={unreadNotificationsCount}
       />

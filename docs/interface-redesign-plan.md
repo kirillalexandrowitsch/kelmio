@@ -131,3 +131,24 @@ V6 planning (`docs/v6-plan.md`, `PLAT-006`/`PLAT-007`) starts only after the
 final interface redesign QA commit is green. Capability statuses in the
 [capability baseline](product-capability-baseline.md) are unchanged by this
 redesign.
+
+## 10. Completion Status
+
+The redesign is complete. Every screen runs on the light Kelmio design system,
+the legacy `styles.css` has been removed, and the production CSS bundle dropped
+from ~115 KB to ~67 KB.
+
+Final QA gate:
+
+- Frontend unit/component tests green (`npm test`, 32 files / 139 tests).
+- Production build green (`tsc --noEmit && vite build`).
+- Full Playwright suite green against a local stack (all V1-V5 specs). The gate
+  also caught and fixed CSS-class selector contracts that several specs locate
+  by (`.issue-filters`, `.project-form`, `.project-row`, `.project-member-card`,
+  `.saved-filter-card`, `.workflow-status-card`) and restored the notification
+  quick dropdown (`.notification-toggle` / `.notification-badge` / the
+  "Notification dropdown" region) inside the new sidebar.
+- Backend, database schema, migrations and API behavior unchanged; `go test`
+  remains green in CI.
+
+V6 planning may now begin.

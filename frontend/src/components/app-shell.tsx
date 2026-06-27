@@ -14,6 +14,12 @@ import {
 } from "lucide-react";
 
 import { appSections, navGroups, type AppSection } from "../lib/routing";
+import { type AppNotification } from "../lib/api-types";
+import {
+  notificationDescription,
+  notificationTitle,
+  unreadBadgeLabel,
+} from "../lib/notification-view";
 import { Icon } from "../ui";
 
 const sectionIcons: Record<AppSection, LucideIcon> = {
@@ -52,6 +58,14 @@ type AppSidebarProps = {
   unreadNotificationsCount: number;
   isLoggingOut: boolean;
   onSignOut: () => void;
+  notifications: AppNotification[];
+  notificationsError: string;
+  isNotificationsOpen: boolean;
+  onToggleNotifications: () => void;
+  onMarkAllNotificationsRead: () => void;
+  onMarkNotificationRead: (notification: AppNotification) => void;
+  onOpenNotificationIssue: (notification: AppNotification) => void;
+  onOpenNotifications: () => void;
 };
 
 export function AppSidebar({
@@ -63,12 +77,96 @@ export function AppSidebar({
   unreadNotificationsCount,
   isLoggingOut,
   onSignOut,
+  notifications,
+  notificationsError,
+  isNotificationsOpen,
+  onToggleNotifications,
+  onMarkAllNotificationsRead,
+  onMarkNotificationRead,
+  onOpenNotificationIssue,
+  onOpenNotifications,
 }: AppSidebarProps) {
+  const previewNotifications = (notifications ?? []).slice(0, 5);
+
   return (
     <aside className="kl-sidebar">
       <div className="kl-sidebar__brand">
         <span className="kl-sidebar__mark">K</span>
         <span>Kelmio</span>
+        <div className="kl-sidebar__notify notification-menu">
+          <button
+            aria-label="Notifications"
+            className="kl-sidebar__bell notification-toggle"
+            onClick={onToggleNotifications}
+            type="button"
+          >
+            <Icon icon={Bell} size={18} />
+            {unreadNotificationsCount > 0 ? (
+              <span className="notification-badge">{unreadNotificationsCount}</span>
+            ) : null}
+          </button>
+          {isNotificationsOpen ? (
+            <section
+              className="notification-dropdown"
+              aria-label="Notification dropdown"
+            >
+              <header>
+                <strong>{unreadBadgeLabel(unreadNotificationsCount)}</strong>
+                <button
+                  className="small-button"
+                  disabled={unreadNotificationsCount === 0}
+                  onClick={onMarkAllNotificationsRead}
+                  type="button"
+                >
+                  Mark all read
+                </button>
+              </header>
+              {notificationsError ? (
+                <p className="notification-preview">{notificationsError}</p>
+              ) : null}
+              {previewNotifications.length > 0 ? (
+                <div className="notification-dropdown-list">
+                  {previewNotifications.map((notification) => (
+                    <article
+                      className={
+                        notification.read_at === null
+                          ? "notification-dropdown-item notification-unread"
+                          : "notification-dropdown-item"
+                      }
+                      key={notification.id}
+                    >
+                      <button
+                        onClick={() => onOpenNotificationIssue(notification)}
+                        type="button"
+                      >
+                        <strong>{notificationTitle(notification)}</strong>
+                        <span>{notificationDescription(notification)}</span>
+                      </button>
+                      {notification.read_at === null ? (
+                        <button
+                          className="small-button"
+                          onClick={() => onMarkNotificationRead(notification)}
+                          type="button"
+                        >
+                          Read
+                        </button>
+                      ) : null}
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <p className="notification-preview">No notifications yet.</p>
+              )}
+              <button
+                className="small-button notification-view-all"
+                onClick={onOpenNotifications}
+                type="button"
+              >
+                View all
+              </button>
+            </section>
+          ) : null}
+        </div>
       </div>
 
       <button
@@ -132,4 +230,3 @@ export function AppSidebar({
     </aside>
   );
 }
-

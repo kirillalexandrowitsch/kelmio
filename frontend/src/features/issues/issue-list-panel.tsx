@@ -143,7 +143,7 @@ export function IssueListPanel({
         {isLoadingIssues ? <span className="kl-muted">Loading</span> : null}
       </header>
 
-      <section className="kl-issue-filters" aria-label="Issue filters">
+      <section className="issue-filters kl-issue-filters" aria-label="Issue filters">
         <Field label="Search" htmlFor="filter-search">
           <Input
             id="filter-search"

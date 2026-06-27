@@ -328,7 +328,7 @@ export function WorkflowSettingsPanel({
               status.category === "done" && doneStatusCount === 1;
             return (
               <article
-                className="kl-wf-status"
+                className="workflow-status-card kl-wf-status"
                 draggable={!isReordering}
                 key={status.id}
                 onDragOver={(event) => event.preventDefault()}

@@ -84,7 +84,7 @@ export function SavedFiltersPanel({
             const isRenaming = renameSavedFilterId === savedFilter.id;
 
             return (
-              <article className="kl-saved-filter" key={savedFilter.id}>
+              <article className="saved-filter-card kl-saved-filter" key={savedFilter.id}>
                 {isRenaming ? (
                   <form
                     className="kl-saved-filter__rename"

@@ -121,7 +121,7 @@ export function ProjectMembersPanel({
               !member.is_active || isUpdating || isRemoving || isProtectedLastLead;
 
             return (
-              <article className="kl-member" key={member.user_id}>
+              <article className="project-member-card kl-member" key={member.user_id}>
                 <span className="kl-member__avatar">
                   {memberInitials(member.display_name)}
                 </span>
