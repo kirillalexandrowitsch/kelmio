@@ -402,11 +402,13 @@ Capability group: `CLOSE-001`.
 
 ## 25. Decision For Next Step
 
-V5 завершена. Перед V6 выполняется behavior-preserving редизайн интерфейса по
+V5 завершена. Перед V6 выполнен behavior-preserving редизайн интерфейса по
 утверждённым макетам «Aurora» (light); направление, scope и порядок коммитов
 зафиксированы в [interface redesign plan](interface-redesign-plan.md). Редизайн
-не меняет capability-статусы в [baseline](product-capability-baseline.md).
+завершён и не изменил capability-статусы в
+[baseline](product-capability-baseline.md).
 
-После зелёного финального QA-гейта редизайна следующий этап должен начаться с
-отдельного `docs/v6-plan.md`, который детализирует capabilities `PLAT-006` и
-`PLAT-007` до начала runtime изменений.
+Следующий этап — V6. Детальный план зафиксирован в
+[v6 plan](v6-plan.md) и детализирует capabilities `PLAT-006` и `PLAT-007`.
+Runtime-изменения V6 ведутся по фазам из этого плана; capability-статусы
+обновляются только в финальном QA-коммите V6.
