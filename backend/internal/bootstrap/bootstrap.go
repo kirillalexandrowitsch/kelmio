@@ -156,8 +156,8 @@ func (s *Service) Bootstrap(ctx context.Context, cfg Config) (Result, error) {
 	}
 
 	if err := tx.QueryRow(ctx, `
-		INSERT INTO users (email, username, password_hash, display_name, is_active)
-		VALUES ($1, $2, $3, $4, true)
+		INSERT INTO users (email, username, password_hash, display_name, is_active, is_site_admin)
+		VALUES ($1, $2, $3, $4, true, true)
 		RETURNING id::text
 	`, cfg.AdminEmail, cfg.AdminUsername, string(passwordHash), cfg.AdminDisplayName).Scan(&result.AdminUserID); err != nil {
 		return Result{}, fmt.Errorf("create admin user: %w", err)

@@ -121,6 +121,10 @@ func main() {
 		logger.Error("ensure admin organization role failed", "error", err)
 		os.Exit(1)
 	}
+	if err := ensureSiteAdmin(ctx, tx, adminID); err != nil {
+		logger.Error("ensure site admin failed", "error", err)
+		os.Exit(1)
+	}
 	if err := ensureOrganizationMembership(ctx, tx, organizationID, demoMemberID, "org_member"); err != nil {
 		logger.Error("ensure demo member organization role failed", "error", err)
 		os.Exit(1)
@@ -637,6 +641,13 @@ func ensureOrganizationMembership(
 		VALUES ($1, $2, $3)
 		ON CONFLICT (organization_id, user_id) DO NOTHING
 	`, organizationID, userID, role)
+	return err
+}
+
+func ensureSiteAdmin(ctx context.Context, tx pgx.Tx, userID string) error {
+	_, err := tx.Exec(ctx, `
+		UPDATE users SET is_site_admin = true WHERE id = $1
+	`, userID)
 	return err
 }
 

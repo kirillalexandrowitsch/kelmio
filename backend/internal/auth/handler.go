@@ -108,6 +108,7 @@ type userRecord struct {
 	WorkspaceID    string
 	Role           string
 	OrganizationID string
+	IsSiteAdmin    bool
 }
 
 type passwordResetUserRecord struct {
@@ -149,6 +150,7 @@ type CurrentUser struct {
 	WorkspaceID    string
 	Role           string
 	OrganizationID string
+	IsSiteAdmin    bool
 }
 
 func NewHandler(
@@ -655,7 +657,8 @@ func (h *Handler) userBySession(ctx context.Context, tokenHash string) (userReco
 			u.display_name,
 			wm.workspace_id::text,
 			wm.role,
-			COALESCE(w.organization_id::text, '')
+			COALESCE(w.organization_id::text, ''),
+			u.is_site_admin
 		FROM sessions s
 		JOIN users u ON u.id = s.user_id
 		JOIN workspace_members wm ON wm.user_id = u.id
@@ -677,6 +680,7 @@ func (h *Handler) userBySession(ctx context.Context, tokenHash string) (userReco
 		&user.WorkspaceID,
 		&user.Role,
 		&user.OrganizationID,
+		&user.IsSiteAdmin,
 	); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return userRecord{}, errInvalidCredentials
@@ -1159,6 +1163,7 @@ func (user userRecord) toCurrentUser() CurrentUser {
 		WorkspaceID:    user.WorkspaceID,
 		Role:           user.Role,
 		OrganizationID: user.OrganizationID,
+		IsSiteAdmin:    user.IsSiteAdmin,
 	}
 }
 
