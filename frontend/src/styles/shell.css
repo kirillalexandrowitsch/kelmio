@@ -42,6 +42,97 @@
   font-weight: 700;
 }
 
+/* Workspace switcher */
+.kl-workspace-switcher {
+  position: relative;
+}
+
+.kl-workspace-switcher__trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+  color: var(--text-strong);
+  cursor: pointer;
+}
+
+.kl-workspace-switcher__trigger:disabled {
+  cursor: default;
+}
+
+.kl-workspace-switcher__trigger:not(:disabled):hover {
+  border-color: var(--accent-500);
+}
+
+.kl-workspace-switcher__label {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+}
+
+.kl-workspace-switcher__label strong {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.kl-workspace-switcher__eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.kl-workspace-switcher__menu {
+  position: absolute;
+  z-index: 20;
+  left: 0;
+  right: 0;
+  margin-top: var(--space-1);
+  padding: var(--space-1);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+  box-shadow: var(--shadow-md);
+}
+
+.kl-workspace-switcher__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-strong);
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.kl-workspace-switcher__item:hover {
+  background: var(--surface-2);
+}
+
+.kl-workspace-switcher__item[aria-current="true"] {
+  color: var(--accent-500);
+}
+
 /* Notification menu (sidebar bell + dropdown) */
 .kl-sidebar__notify {
   position: relative;

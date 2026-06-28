@@ -32,6 +32,7 @@ import {
   type ListLabelsResponse,
   type ListNotificationsResponse,
   type ListOrganizationsResponse,
+  type ListWorkspacesResponse,
   type ListProjectMembersResponse,
   type ListAutomationRulesResponse,
   type ListProjectsResponse,
@@ -139,6 +140,7 @@ export type {
   WorkflowStatus,
   WorkflowStatusCategory,
   WorkflowTransitionInput,
+  Workspace,
 } from "./api-types";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080";
@@ -258,6 +260,17 @@ export async function updateOrganization(
       body: JSON.stringify(input),
     },
   );
+}
+
+export async function listWorkspaces() {
+  return request<ListWorkspacesResponse>("/api/v1/workspaces");
+}
+
+export async function setActiveWorkspace(workspaceId: string) {
+  return request<AuthResponse>("/api/v1/session/active-workspace", {
+    method: "POST",
+    body: JSON.stringify({ workspace_id: workspaceId }),
+  });
 }
 
 export async function listProjects() {

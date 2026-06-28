@@ -20,7 +20,8 @@ import {
   navGroups,
   type AppSection,
 } from "../lib/routing";
-import { type AppNotification } from "../lib/api-types";
+import { type AppNotification, type Workspace } from "../lib/api-types";
+import { WorkspaceSwitcher } from "./workspace-switcher";
 import {
   notificationDescription,
   notificationTitle,
@@ -63,6 +64,10 @@ type AppSidebarProps = {
   displayName: string;
   role: string;
   isSiteAdmin?: boolean;
+  workspaces?: Workspace[];
+  activeWorkspaceId?: string;
+  onSwitchWorkspace?: (workspaceId: string) => void;
+  isSwitchingWorkspace?: boolean;
   unreadNotificationsCount: number;
   isLoggingOut: boolean;
   onSignOut: () => void;
@@ -83,6 +88,10 @@ export function AppSidebar({
   displayName,
   role,
   isSiteAdmin = false,
+  workspaces = [],
+  activeWorkspaceId = "",
+  onSwitchWorkspace,
+  isSwitchingWorkspace = false,
   unreadNotificationsCount,
   isLoggingOut,
   onSignOut,
@@ -177,6 +186,15 @@ export function AppSidebar({
           ) : null}
         </div>
       </div>
+
+      {onSwitchWorkspace ? (
+        <WorkspaceSwitcher
+          activeWorkspaceId={activeWorkspaceId}
+          isSwitching={isSwitchingWorkspace}
+          onSwitch={onSwitchWorkspace}
+          workspaces={workspaces}
+        />
+      ) : null}
 
       <button
         className="kl-sidebar__search"

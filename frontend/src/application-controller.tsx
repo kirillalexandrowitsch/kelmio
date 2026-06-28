@@ -36,6 +36,7 @@ import {
   TransitionIssueInput,
   UpdateWorkflowStatusInput,
   WorkflowTransitionInput,
+  Workspace,
   addIssueToSprint,
   archiveIssue,
   archiveProject,
@@ -84,6 +85,7 @@ import {
   listSprints,
   listTeamInvites,
   listTeamMembers,
+  listWorkspaces,
   login,
   logout,
   markAllNotificationsRead,
@@ -96,6 +98,7 @@ import {
   revokeTeamInvite,
   resendTeamInvite,
   removeIssueFromSprint,
+  setActiveWorkspace,
   setIssueLabels,
   startSprint,
   transitionIssue,
@@ -263,6 +266,8 @@ function upsertSavedFilter(
 
 export function ApplicationController() {
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+  const [isSwitchingWorkspace, setIsSwitchingWorkspace] = useState(false);
   const {
     user,
     setUser,
@@ -866,6 +871,48 @@ export function ApplicationController() {
       isMounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!user) {
+      setWorkspaces([]);
+      return;
+    }
+
+    let isMounted = true;
+    listWorkspaces()
+      .then((response) => {
+        if (isMounted) {
+          setWorkspaces(response.workspaces);
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setWorkspaces([]);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user]);
+
+  function handleSwitchWorkspace(workspaceId: string) {
+    if (isSwitchingWorkspace) {
+      return;
+    }
+
+    setIsSwitchingWorkspace(true);
+    setActiveWorkspace(workspaceId)
+      .then(() => {
+        window.location.assign("/");
+      })
+      .catch((err: unknown) => {
+        setError(
+          err instanceof ApiError ? err.message : "Could not switch workspace.",
+        );
+        setIsSwitchingWorkspace(false);
+      });
+  }
 
   useEffect(() => {
     function handleRouteChange() {
@@ -4851,10 +4898,13 @@ export function ApplicationController() {
     <div className="kl-app">
       <AppSidebar
         activeSection={activeSection}
+        activeWorkspaceId={user.workspace.id}
         displayName={user.display_name}
         isLoggingOut={isLoggingOut}
         isNotificationsOpen={isNotificationsOpen}
         isSiteAdmin={user.is_site_admin}
+        isSwitchingWorkspace={isSwitchingWorkspace}
+        onSwitchWorkspace={handleSwitchWorkspace}
         notifications={notifications}
         notificationsError={notificationsError}
         onMarkAllNotificationsRead={() => {
@@ -4885,6 +4935,7 @@ export function ApplicationController() {
         }}
         role={user.workspace.role}
         unreadNotificationsCount={unreadNotificationsCount}
+        workspaces={workspaces}
       />
 
       <div className="kl-app__main">

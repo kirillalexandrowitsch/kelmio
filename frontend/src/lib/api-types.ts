@@ -56,6 +56,19 @@ export type UpdateOrganizationInput = {
   status?: OrganizationStatus;
 };
 
+export type Workspace = {
+  id: string;
+  name: string;
+  slug: string;
+  status: OrganizationStatus;
+  role: "admin" | "member";
+  is_active: boolean;
+};
+
+export type ListWorkspacesResponse = {
+  workspaces: Workspace[];
+};
+
 export type Project = {
   id: string;
   key: string;
