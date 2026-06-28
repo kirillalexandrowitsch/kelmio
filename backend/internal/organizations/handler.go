@@ -19,6 +19,11 @@ import (
 
 var uuidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 
+var (
+	errInactiveUser          = errors.New("inactive user")
+	errLastOrganizationAdmin = errors.New("last organization admin")
+)
+
 type Handler struct {
 	db   *pgxpool.Pool
 	auth *auth.Handler
@@ -45,6 +50,24 @@ type updateOrganizationRequest struct {
 	Status *string `json:"status"`
 }
 
+type organizationMemberResponse struct {
+	UserID      string    `json:"user_id"`
+	Username    string    `json:"username"`
+	DisplayName string    `json:"display_name"`
+	Email       string    `json:"email"`
+	Role        string    `json:"role"`
+	JoinedAt    time.Time `json:"joined_at"`
+}
+
+type listOrganizationMembersResponse struct {
+	Members []organizationMemberResponse `json:"members"`
+}
+
+type addOrganizationMemberRequest struct {
+	UserID string `json:"user_id"`
+	Role   string `json:"role"`
+}
+
 func NewHandler(db *pgxpool.Pool, authHandler *auth.Handler) *Handler {
 	return &Handler{db: db, auth: authHandler}
 }
@@ -53,6 +76,9 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/organizations", h.list)
 	mux.HandleFunc("POST /api/v1/organizations", h.create)
 	mux.HandleFunc("PATCH /api/v1/organizations/{id}", h.update)
+	mux.HandleFunc("GET /api/v1/organizations/{id}/members", h.listMembers)
+	mux.HandleFunc("POST /api/v1/organizations/{id}/members", h.addMember)
+	mux.HandleFunc("DELETE /api/v1/organizations/{id}/members/{userId}", h.removeMember)
 }
 
 func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
@@ -273,6 +299,312 @@ func (h *Handler) isOrganizationAdmin(ctx context.Context, organizationID string
 		return false, err
 	}
 	return isAdmin, nil
+}
+
+func (h *Handler) listMembers(w http.ResponseWriter, r *http.Request) {
+	user, ok := h.requireUser(w, r)
+	if !ok {
+		return
+	}
+	organizationID, err := normalizeID(r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	if !h.authorizeOrganizationRead(ctx, w, user, organizationID) {
+		return
+	}
+
+	members, err := h.listOrganizationMembers(ctx, organizationID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "internal_error", "could not list organization members")
+		return
+	}
+	writeJSON(w, http.StatusOK, listOrganizationMembersResponse{Members: members})
+}
+
+func (h *Handler) addMember(w http.ResponseWriter, r *http.Request) {
+	user, ok := h.requireUser(w, r)
+	if !ok {
+		return
+	}
+	organizationID, err := normalizeID(r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	if !h.authorizeOrganizationAdmin(ctx, w, user, organizationID) {
+		return
+	}
+
+	var req addOrganizationMemberRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+	targetID, err := normalizeID(req.UserID)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+	role := strings.ToLower(strings.TrimSpace(req.Role))
+	if role != "org_admin" && role != "org_member" {
+		writeError(w, http.StatusBadRequest, "invalid_request", "role must be org_admin or org_member")
+		return
+	}
+
+	member, err := h.addOrganizationMember(ctx, organizationID, targetID, role)
+	if err != nil {
+		switch {
+		case errors.Is(err, pgx.ErrNoRows):
+			writeError(w, http.StatusNotFound, "user_not_found", "user was not found")
+		case errors.Is(err, errInactiveUser):
+			writeError(w, http.StatusBadRequest, "inactive_user", "user is not active")
+		case errors.Is(err, errLastOrganizationAdmin):
+			writeError(w, http.StatusConflict, "last_org_admin", "an organization must keep at least one administrator")
+		default:
+			writeError(w, http.StatusInternalServerError, "internal_error", "could not update organization member")
+		}
+		return
+	}
+	writeJSON(w, http.StatusOK, member)
+}
+
+func (h *Handler) removeMember(w http.ResponseWriter, r *http.Request) {
+	user, ok := h.requireUser(w, r)
+	if !ok {
+		return
+	}
+	organizationID, err := normalizeID(r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+	targetID, err := normalizeID(r.PathValue("userId"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	if !h.authorizeOrganizationAdmin(ctx, w, user, organizationID) {
+		return
+	}
+
+	if err := h.removeOrganizationMember(ctx, organizationID, targetID); err != nil {
+		switch {
+		case errors.Is(err, pgx.ErrNoRows):
+			writeError(w, http.StatusNotFound, "member_not_found", "organization member was not found")
+		case errors.Is(err, errLastOrganizationAdmin):
+			writeError(w, http.StatusConflict, "last_org_admin", "an organization must keep at least one administrator")
+		default:
+			writeError(w, http.StatusInternalServerError, "internal_error", "could not remove organization member")
+		}
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) authorizeOrganizationRead(ctx context.Context, w http.ResponseWriter, user auth.CurrentUser, organizationID string) bool {
+	exists, err := h.organizationExists(ctx, organizationID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "internal_error", "could not load organization")
+		return false
+	}
+	if !exists {
+		writeError(w, http.StatusNotFound, "organization_not_found", "organization was not found")
+		return false
+	}
+	if user.IsSiteAdmin {
+		return true
+	}
+	isMember, err := h.isOrganizationMember(ctx, organizationID, user.ID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "internal_error", "could not authorize organization")
+		return false
+	}
+	if !isMember {
+		writeError(w, http.StatusForbidden, "forbidden", "organization membership is required")
+		return false
+	}
+	return true
+}
+
+func (h *Handler) authorizeOrganizationAdmin(ctx context.Context, w http.ResponseWriter, user auth.CurrentUser, organizationID string) bool {
+	exists, err := h.organizationExists(ctx, organizationID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "internal_error", "could not load organization")
+		return false
+	}
+	if !exists {
+		writeError(w, http.StatusNotFound, "organization_not_found", "organization was not found")
+		return false
+	}
+	if user.IsSiteAdmin {
+		return true
+	}
+	isOrgAdmin, err := h.isOrganizationAdmin(ctx, organizationID, user.ID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "internal_error", "could not authorize organization")
+		return false
+	}
+	if !isOrgAdmin {
+		writeError(w, http.StatusForbidden, "forbidden", "organization administrator role is required")
+		return false
+	}
+	return true
+}
+
+func (h *Handler) organizationExists(ctx context.Context, organizationID string) (bool, error) {
+	var exists bool
+	if err := h.db.QueryRow(ctx, `
+		SELECT EXISTS (SELECT 1 FROM organizations WHERE id = $1)
+	`, organizationID).Scan(&exists); err != nil {
+		return false, err
+	}
+	return exists, nil
+}
+
+func (h *Handler) isOrganizationMember(ctx context.Context, organizationID string, userID string) (bool, error) {
+	var isMember bool
+	if err := h.db.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM organization_members
+			WHERE organization_id = $1 AND user_id = $2
+		)
+	`, organizationID, userID).Scan(&isMember); err != nil {
+		return false, err
+	}
+	return isMember, nil
+}
+
+func (h *Handler) listOrganizationMembers(ctx context.Context, organizationID string) ([]organizationMemberResponse, error) {
+	rows, err := h.db.Query(ctx, `
+		SELECT u.id::text, u.username, u.display_name, u.email, om.role, om.joined_at
+		FROM organization_members om
+		JOIN users u ON u.id = om.user_id
+		WHERE om.organization_id = $1
+		ORDER BY (om.role = 'org_admin') DESC, u.display_name ASC
+	`, organizationID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	members := make([]organizationMemberResponse, 0)
+	for rows.Next() {
+		var member organizationMemberResponse
+		if err := rows.Scan(&member.UserID, &member.Username, &member.DisplayName, &member.Email, &member.Role, &member.JoinedAt); err != nil {
+			return nil, err
+		}
+		members = append(members, member)
+	}
+	return members, rows.Err()
+}
+
+func (h *Handler) addOrganizationMember(ctx context.Context, organizationID string, userID string, role string) (organizationMemberResponse, error) {
+	tx, err := h.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return organizationMemberResponse{}, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	var member organizationMemberResponse
+	var isActive bool
+	if err := tx.QueryRow(ctx, `
+		SELECT id::text, username, display_name, email, is_active
+		FROM users WHERE id = $1
+	`, userID).Scan(&member.UserID, &member.Username, &member.DisplayName, &member.Email, &isActive); err != nil {
+		return organizationMemberResponse{}, err
+	}
+	if !isActive {
+		return organizationMemberResponse{}, errInactiveUser
+	}
+
+	if role == "org_member" {
+		demotesLastAdmin, err := lastOrganizationAdmin(ctx, tx, organizationID, userID)
+		if err != nil {
+			return organizationMemberResponse{}, err
+		}
+		if demotesLastAdmin {
+			return organizationMemberResponse{}, errLastOrganizationAdmin
+		}
+	}
+
+	if err := tx.QueryRow(ctx, `
+		INSERT INTO organization_members (organization_id, user_id, role)
+		VALUES ($1, $2, $3)
+		ON CONFLICT (organization_id, user_id) DO UPDATE SET role = EXCLUDED.role
+		RETURNING role, joined_at
+	`, organizationID, userID, role).Scan(&member.Role, &member.JoinedAt); err != nil {
+		return organizationMemberResponse{}, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return organizationMemberResponse{}, err
+	}
+	return member, nil
+}
+
+func (h *Handler) removeOrganizationMember(ctx context.Context, organizationID string, userID string) error {
+	tx, err := h.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	var role string
+	if err := tx.QueryRow(ctx, `
+		SELECT role FROM organization_members
+		WHERE organization_id = $1 AND user_id = $2
+	`, organizationID, userID).Scan(&role); err != nil {
+		return err
+	}
+
+	if role == "org_admin" {
+		isLast, err := lastOrganizationAdmin(ctx, tx, organizationID, userID)
+		if err != nil {
+			return err
+		}
+		if isLast {
+			return errLastOrganizationAdmin
+		}
+	}
+
+	if _, err := tx.Exec(ctx, `
+		DELETE FROM organization_members
+		WHERE organization_id = $1 AND user_id = $2
+	`, organizationID, userID); err != nil {
+		return err
+	}
+
+	return tx.Commit(ctx)
+}
+
+func lastOrganizationAdmin(ctx context.Context, tx pgx.Tx, organizationID string, userID string) (bool, error) {
+	var targetIsAdmin bool
+	var adminCount int
+	if err := tx.QueryRow(ctx, `
+		SELECT
+			EXISTS (
+				SELECT 1 FROM organization_members
+				WHERE organization_id = $1 AND user_id = $2 AND role = 'org_admin'
+			),
+			(SELECT count(*)::int FROM organization_members WHERE organization_id = $1 AND role = 'org_admin')
+	`, organizationID, userID).Scan(&targetIsAdmin, &adminCount); err != nil {
+		return false, err
+	}
+	return targetIsAdmin && adminCount <= 1, nil
 }
 
 func (h *Handler) requireUser(w http.ResponseWriter, r *http.Request) (auth.CurrentUser, bool) {

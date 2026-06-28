@@ -169,6 +169,138 @@ func TestOrganizationsAPILifecycleAndAuthorization(t *testing.T) {
 	}
 }
 
+func TestOrganizationMembersAPI(t *testing.T) {
+	databaseURL := getDatabaseURL()
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	adminDB, err := database.Connect(ctx, databaseURL)
+	if err != nil {
+		t.Skipf("postgres is not available: %v", err)
+	}
+	defer adminDB.Close()
+	schemaName := fmt.Sprintf("organization_members_%d", time.Now().UnixNano())
+	quotedSchemaName := pgx.Identifier{schemaName}.Sanitize()
+	if _, err := adminDB.Exec(ctx, `CREATE EXTENSION IF NOT EXISTS pgcrypto`); err != nil {
+		t.Fatalf("ensure pgcrypto: %v", err)
+	}
+	if _, err := adminDB.Exec(ctx, `CREATE SCHEMA `+quotedSchemaName); err != nil {
+		t.Fatalf("create schema: %v", err)
+	}
+	t.Cleanup(func() {
+		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cleanupCancel()
+		_, _ = adminDB.Exec(cleanupCtx, `DROP SCHEMA IF EXISTS `+quotedSchemaName+` CASCADE`)
+	})
+	cfg, err := pgxpool.ParseConfig(databaseURL)
+	if err != nil {
+		t.Fatalf("parse database url: %v", err)
+	}
+	cfg.ConnConfig.RuntimeParams["search_path"] = schemaName
+	cfg.MaxConns = 3
+	db, err := pgxpool.NewWithConfig(ctx, cfg)
+	if err != nil {
+		t.Fatalf("connect schema: %v", err)
+	}
+	defer db.Close()
+	if _, err := migrations.Up(ctx, db, "../../migrations"); err != nil {
+		t.Fatalf("apply migrations: %v", err)
+	}
+
+	var defaultOrgID string
+	if err := db.QueryRow(ctx, `SELECT id::text FROM organizations WHERE slug = 'default'`).Scan(&defaultOrgID); err != nil {
+		t.Fatalf("read default organization: %v", err)
+	}
+	var workspaceID string
+	if err := db.QueryRow(ctx, `
+		INSERT INTO workspaces (name, organization_id, slug, status)
+		VALUES ('Org Members', $1, 'org-members', 'active')
+		RETURNING id::text
+	`, defaultOrgID).Scan(&workspaceID); err != nil {
+		t.Fatalf("insert workspace: %v", err)
+	}
+	hash, _ := bcrypt.GenerateFromPassword([]byte("admin12345"), bcrypt.MinCost)
+	insertUser := func(email, username string, siteAdmin bool) string {
+		var id string
+		if err := db.QueryRow(ctx, `
+			INSERT INTO users (email, username, password_hash, display_name, is_active, is_site_admin)
+			VALUES ($1, $2, $3, $2, true, $4)
+			RETURNING id::text
+		`, email, username, string(hash), siteAdmin).Scan(&id); err != nil {
+			t.Fatalf("insert user %s: %v", username, err)
+		}
+		return id
+	}
+	siteAdminID := insertUser("members-site-admin@example.com", "members_site_admin", true)
+	outsiderID := insertUser("members-outsider@example.com", "members_outsider", false)
+	strangerID := insertUser("members-stranger@example.com", "members_stranger", false)
+	if _, err := db.Exec(ctx, `
+		INSERT INTO workspace_members (workspace_id, user_id, role)
+		VALUES ($1, $2, 'admin'), ($1, $3, 'member'), ($1, $4, 'member')
+	`, workspaceID, siteAdminID, outsiderID, strangerID); err != nil {
+		t.Fatalf("insert workspace members: %v", err)
+	}
+
+	authHandler := auth.NewHandler(db, time.Hour, false, nil, nil)
+	apiHandler := NewHandler(db, authHandler)
+	mux := http.NewServeMux()
+	authHandler.RegisterRoutes(mux)
+	apiHandler.RegisterRoutes(mux)
+
+	adminCookies := loginOrgUser(t, mux, "members_site_admin", "admin12345")
+	strangerCookies := loginOrgUser(t, mux, "members_stranger", "admin12345")
+
+	// Site admin creates an organization (becoming its first org admin).
+	response := performOrgRequest(mux, http.MethodPost, "/api/v1/organizations", `{"name":"Members Org"}`, adminCookies)
+	if response.Code != http.StatusCreated {
+		t.Fatalf("create status = %d: %s", response.Code, response.Body.String())
+	}
+	var org organizationResponse
+	_ = json.Unmarshal(response.Body.Bytes(), &org)
+
+	// Members list starts with the creator as org admin.
+	response = performOrgRequest(mux, http.MethodGet, "/api/v1/organizations/"+org.ID+"/members", "", adminCookies)
+	if response.Code != http.StatusOK {
+		t.Fatalf("list members status = %d: %s", response.Code, response.Body.String())
+	}
+	var members listOrganizationMembersResponse
+	_ = json.Unmarshal(response.Body.Bytes(), &members)
+	if len(members.Members) != 1 || members.Members[0].UserID != siteAdminID || members.Members[0].Role != "org_admin" {
+		t.Fatalf("members = %#v, want only the creator as org_admin", members.Members)
+	}
+
+	// Add an outsider as an organization member.
+	response = performOrgRequest(mux, http.MethodPost, "/api/v1/organizations/"+org.ID+"/members", fmt.Sprintf(`{"user_id":%q,"role":"org_member"}`, outsiderID), adminCookies)
+	if response.Code != http.StatusOK {
+		t.Fatalf("add member status = %d: %s", response.Code, response.Body.String())
+	}
+
+	// Removing the only org admin is rejected.
+	response = performOrgRequest(mux, http.MethodDelete, "/api/v1/organizations/"+org.ID+"/members/"+siteAdminID, "", adminCookies)
+	if response.Code != http.StatusConflict {
+		t.Fatalf("remove last admin status = %d, want 409: %s", response.Code, response.Body.String())
+	}
+
+	// Promote the outsider to org admin, then removing the original admin is allowed.
+	response = performOrgRequest(mux, http.MethodPost, "/api/v1/organizations/"+org.ID+"/members", fmt.Sprintf(`{"user_id":%q,"role":"org_admin"}`, outsiderID), adminCookies)
+	if response.Code != http.StatusOK {
+		t.Fatalf("promote status = %d: %s", response.Code, response.Body.String())
+	}
+	response = performOrgRequest(mux, http.MethodDelete, "/api/v1/organizations/"+org.ID+"/members/"+siteAdminID, "", adminCookies)
+	if response.Code != http.StatusNoContent {
+		t.Fatalf("remove admin status = %d, want 204: %s", response.Code, response.Body.String())
+	}
+
+	// A non-site-admin who is not a member cannot read or manage members.
+	response = performOrgRequest(mux, http.MethodGet, "/api/v1/organizations/"+org.ID+"/members", "", strangerCookies)
+	if response.Code != http.StatusForbidden {
+		t.Fatalf("stranger list status = %d, want 403: %s", response.Code, response.Body.String())
+	}
+	response = performOrgRequest(mux, http.MethodPost, "/api/v1/organizations/"+org.ID+"/members", fmt.Sprintf(`{"user_id":%q,"role":"org_member"}`, strangerID), strangerCookies)
+	if response.Code != http.StatusForbidden {
+		t.Fatalf("stranger add status = %d, want 403: %s", response.Code, response.Body.String())
+	}
+}
+
 func getDatabaseURL() string {
 	if value := os.Getenv("DATABASE_URL"); value != "" {
 		return value
