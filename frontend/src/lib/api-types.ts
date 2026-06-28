@@ -3,9 +3,13 @@ export type CurrentUser = {
   email: string;
   username: string;
   display_name: string;
+  is_site_admin: boolean;
   workspace: {
     id: string;
     role: "admin" | "member";
+  };
+  organization: {
+    id: string;
   };
 };
 

@@ -40,7 +40,9 @@ const admin: CurrentUser = {
   email: "admin@example.com",
   username: "admin",
   display_name: "Admin",
+  is_site_admin: true,
   workspace: { id: "workspace-1", role: "admin" },
+  organization: { id: "organization-1" },
 };
 
 const memberUser: CurrentUser = {

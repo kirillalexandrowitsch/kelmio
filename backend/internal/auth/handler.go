@@ -130,16 +130,22 @@ type passwordResetTokenRecord struct {
 }
 
 type userResponse struct {
-	ID          string            `json:"id"`
-	Email       string            `json:"email"`
-	Username    string            `json:"username"`
-	DisplayName string            `json:"display_name"`
-	Workspace   workspaceResponse `json:"workspace"`
+	ID           string               `json:"id"`
+	Email        string               `json:"email"`
+	Username     string               `json:"username"`
+	DisplayName  string               `json:"display_name"`
+	IsSiteAdmin  bool                 `json:"is_site_admin"`
+	Workspace    workspaceResponse    `json:"workspace"`
+	Organization organizationResponse `json:"organization"`
 }
 
 type workspaceResponse struct {
 	ID   string `json:"id"`
 	Role string `json:"role"`
+}
+
+type organizationResponse struct {
+	ID string `json:"id"`
 }
 
 type CurrentUser struct {
@@ -1147,9 +1153,13 @@ func (user userRecord) toResponse() userResponse {
 		Email:       user.Email,
 		Username:    user.Username,
 		DisplayName: user.DisplayName,
+		IsSiteAdmin: user.IsSiteAdmin,
 		Workspace: workspaceResponse{
 			ID:   user.WorkspaceID,
 			Role: user.Role,
+		},
+		Organization: organizationResponse{
+			ID: user.OrganizationID,
 		},
 	}
 }
