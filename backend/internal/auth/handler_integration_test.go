@@ -4,6 +4,7 @@ package auth
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -68,6 +69,50 @@ func TestLoginRateLimitBlocksAndSuccessfulLoginResets(t *testing.T) {
 	}
 	if sessionCount != 1 {
 		t.Fatalf("sessionCount = %d, want 1", sessionCount)
+	}
+}
+
+func TestLoginIncludesSiteAdminAndOrganization(t *testing.T) {
+	ctx, db, userID := setupAuthIntegrationWorkspace(t)
+
+	var organizationID string
+	if err := db.QueryRow(ctx, `
+		SELECT id::text FROM organizations WHERE slug = 'default'
+	`).Scan(&organizationID); err != nil {
+		t.Fatalf("read default organization: %v", err)
+	}
+	if _, err := db.Exec(ctx, `
+		UPDATE workspaces SET organization_id = $1
+		WHERE id = (SELECT workspace_id FROM workspace_members WHERE user_id = $2 LIMIT 1)
+	`, organizationID, userID); err != nil {
+		t.Fatalf("attach workspace to organization: %v", err)
+	}
+	if _, err := db.Exec(ctx, `UPDATE users SET is_site_admin = true WHERE id = $1`, userID); err != nil {
+		t.Fatalf("set site admin: %v", err)
+	}
+
+	handler := NewHandler(db, time.Hour, false, newIntegrationCSRFManager(t), nil)
+	response := performLogin(handler, `{"login":"admin","password":"admin12345"}`)
+	if response.Code != http.StatusOK {
+		t.Fatalf("login status = %d: %s", response.Code, response.Body.String())
+	}
+
+	var payload struct {
+		User struct {
+			IsSiteAdmin  bool `json:"is_site_admin"`
+			Organization struct {
+				ID string `json:"id"`
+			} `json:"organization"`
+		} `json:"user"`
+	}
+	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode login response: %v", err)
+	}
+	if !payload.User.IsSiteAdmin {
+		t.Fatal("login response is_site_admin = false, want true")
+	}
+	if payload.User.Organization.ID != organizationID {
+		t.Fatalf("login organization id = %q, want %q", payload.User.Organization.ID, organizationID)
 	}
 }
 

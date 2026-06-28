@@ -31,6 +31,7 @@ import {
   type ListIssuesResponse,
   type ListLabelsResponse,
   type ListNotificationsResponse,
+  type ListOrganizationsResponse,
   type ListProjectMembersResponse,
   type ListAutomationRulesResponse,
   type ListProjectsResponse,
@@ -41,6 +42,7 @@ import {
   type PaginationParams,
   type PasswordResetPreview,
   type PasswordResetRequestResponse,
+  type Organization,
   type Project,
   type ProjectMember,
   type ProjectRole,
@@ -57,6 +59,7 @@ import {
   type TransitionIssueInput,
   type UnreadNotificationsCountResponse,
   type UpdateIssueInput,
+  type UpdateOrganizationInput,
   type UpdateProjectInput,
   type UpdateProjectMemberInput,
   type UpdateSavedFilterInput,
@@ -231,6 +234,30 @@ export async function updateProfile(displayName: string) {
       display_name: displayName,
     }),
   });
+}
+
+export async function listOrganizations() {
+  return request<ListOrganizationsResponse>("/api/v1/organizations");
+}
+
+export async function createOrganization(name: string) {
+  return request<Organization>("/api/v1/organizations", {
+    method: "POST",
+    body: JSON.stringify({ name }),
+  });
+}
+
+export async function updateOrganization(
+  organizationId: string,
+  input: UpdateOrganizationInput,
+) {
+  return request<Organization>(
+    `/api/v1/organizations/${encodeURIComponent(organizationId)}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    },
+  );
 }
 
 export async function listProjects() {

@@ -7,6 +7,7 @@ export type AppSection =
   | "notifications"
   | "team"
   | "labels"
+  | "administration"
   | "account";
 
 export const appSections = [
@@ -18,8 +19,17 @@ export const appSections = [
   { id: "notifications", title: "Notifications" },
   { id: "team", title: "Team" },
   { id: "labels", title: "Labels" },
+  { id: "administration", title: "Administration" },
   { id: "account", title: "Account" },
 ] satisfies Array<{ id: AppSection; title: string }>;
+
+// Sections that are only available to site administrators. The navigation,
+// command palette and section rendering hide these for everyone else.
+const siteAdminSections = new Set<AppSection>(["administration"]);
+
+export function isSiteAdminSection(section: AppSection) {
+  return siteAdminSections.has(section);
+}
 
 export type NavGroup = {
   id: string;
@@ -40,6 +50,11 @@ export const navGroups: NavGroup[] = [
     label: "Organization",
     sections: ["notifications", "team", "labels"],
   },
+  {
+    id: "administration",
+    label: "Administration",
+    sections: ["administration"],
+  },
 ];
 
 const appSectionPaths: Record<AppSection, string> = {
@@ -51,6 +66,7 @@ const appSectionPaths: Record<AppSection, string> = {
   notifications: "/notifications",
   team: "/team",
   labels: "/labels",
+  administration: "/administration",
   account: "/account",
 };
 

@@ -37,6 +37,25 @@ export type RuntimeVersion = {
   build_time: string | null;
 };
 
+export type OrganizationStatus = "active" | "archived";
+
+export type Organization = {
+  id: string;
+  name: string;
+  slug: string;
+  status: OrganizationStatus;
+  role: string;
+};
+
+export type ListOrganizationsResponse = {
+  organizations: Organization[];
+};
+
+export type UpdateOrganizationInput = {
+  name?: string;
+  status?: OrganizationStatus;
+};
+
 export type Project = {
   id: string;
   key: string;

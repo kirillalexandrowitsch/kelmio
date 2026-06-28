@@ -1,5 +1,6 @@
 import {
   Bell,
+  Building2,
   Columns3,
   FolderKanban,
   LayoutDashboard,
@@ -13,7 +14,12 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-import { appSections, navGroups, type AppSection } from "../lib/routing";
+import {
+  appSections,
+  isSiteAdminSection,
+  navGroups,
+  type AppSection,
+} from "../lib/routing";
 import { type AppNotification } from "../lib/api-types";
 import {
   notificationDescription,
@@ -31,6 +37,7 @@ const sectionIcons: Record<AppSection, LucideIcon> = {
   notifications: Bell,
   team: Users,
   labels: Tag,
+  administration: Building2,
   account: UserRound,
 };
 
@@ -55,6 +62,7 @@ type AppSidebarProps = {
   onOpenCommandPalette: () => void;
   displayName: string;
   role: string;
+  isSiteAdmin?: boolean;
   unreadNotificationsCount: number;
   isLoggingOut: boolean;
   onSignOut: () => void;
@@ -74,6 +82,7 @@ export function AppSidebar({
   onOpenCommandPalette,
   displayName,
   role,
+  isSiteAdmin = false,
   unreadNotificationsCount,
   isLoggingOut,
   onSignOut,
@@ -180,7 +189,15 @@ export function AppSidebar({
       </button>
 
       <nav className="kl-sidebar__nav" aria-label="Main navigation">
-        {navGroups.map((group) => (
+        {navGroups
+          .map((group) => ({
+            ...group,
+            sections: group.sections.filter(
+              (section) => !isSiteAdminSection(section) || isSiteAdmin,
+            ),
+          }))
+          .filter((group) => group.sections.length > 0)
+          .map((group) => (
           <div className="kl-sidebar__group" key={group.id}>
             <p className="kl-sidebar__group-label">{group.label}</p>
             {group.sections.map((section) => (

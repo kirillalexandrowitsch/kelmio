@@ -622,9 +622,12 @@ func (h *Handler) userByIdentifier(ctx context.Context, identifier string) (user
 			u.password_hash,
 			u.display_name,
 			wm.workspace_id::text,
-			wm.role
+			wm.role,
+			COALESCE(w.organization_id::text, ''),
+			u.is_site_admin
 		FROM users u
 		JOIN workspace_members wm ON wm.user_id = u.id
+		JOIN workspaces w ON w.id = wm.workspace_id
 		WHERE
 			u.is_active = true
 			AND (
@@ -641,6 +644,8 @@ func (h *Handler) userByIdentifier(ctx context.Context, identifier string) (user
 		&user.DisplayName,
 		&user.WorkspaceID,
 		&user.Role,
+		&user.OrganizationID,
+		&user.IsSiteAdmin,
 	); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return userRecord{}, errInvalidCredentials
