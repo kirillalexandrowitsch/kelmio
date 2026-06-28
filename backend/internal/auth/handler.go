@@ -68,6 +68,10 @@ type updateProfileRequest struct {
 	DisplayName string `json:"display_name"`
 }
 
+type setActiveWorkspaceRequest struct {
+	WorkspaceID string `json:"workspace_id"`
+}
+
 type passwordResetRequest struct {
 	Email string `json:"email"`
 }
@@ -217,6 +221,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/auth/csrf-token", h.csrfToken)
 	mux.HandleFunc("PATCH /api/v1/auth/profile", h.updateProfile)
 	mux.HandleFunc("PATCH /api/v1/auth/password", h.changePassword)
+	mux.HandleFunc("POST /api/v1/session/active-workspace", h.setActiveWorkspace)
 	mux.HandleFunc("POST /api/v1/auth/password-reset/request", h.requestPasswordReset)
 	mux.HandleFunc("GET /api/v1/auth/password-reset/{token}", h.previewPasswordReset)
 	mux.HandleFunc("POST /api/v1/auth/password-reset/{token}/complete", h.completePasswordReset)
@@ -442,6 +447,78 @@ func (h *Handler) updateProfile(w http.ResponseWriter, r *http.Request) {
 	user, err := h.updateOwnProfile(ctx, currentUser.ID, displayName)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "internal_error", "could not update profile")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, meResponse{
+		User: user.toResponse(),
+	})
+}
+
+func (h *Handler) setActiveWorkspace(w http.ResponseWriter, r *http.Request) {
+	cookie, err := r.Cookie(SessionCookieName)
+	if err != nil || cookie.Value == "" {
+		writeError(w, http.StatusUnauthorized, "unauthorized", "session is required")
+		return
+	}
+
+	var req setActiveWorkspaceRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	workspaceID, ok := normalizeWorkspaceID(req.WorkspaceID)
+	if !ok {
+		writeError(w, http.StatusBadRequest, "invalid_request", "workspace_id is invalid")
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	tokenHash := hashToken(cookie.Value)
+	currentUser, err := h.userBySession(ctx, tokenHash)
+	if err != nil {
+		if errors.Is(err, errInvalidCredentials) {
+			http.SetCookie(w, expiredSessionCookie(h.sessionCookieSecure))
+			writeError(w, http.StatusUnauthorized, "unauthorized", "session is invalid")
+			return
+		}
+
+		writeError(w, http.StatusInternalServerError, "internal_error", "could not load session")
+		return
+	}
+
+	var canActivate bool
+	if err := h.db.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1
+			FROM workspace_members wm
+			JOIN workspaces w ON w.id = wm.workspace_id
+			WHERE wm.workspace_id = $1::uuid
+				AND wm.user_id = $2
+				AND w.status = 'active'
+		)
+	`, workspaceID, currentUser.ID).Scan(&canActivate); err != nil {
+		writeError(w, http.StatusInternalServerError, "internal_error", "could not load workspace")
+		return
+	}
+	if !canActivate {
+		writeError(w, http.StatusForbidden, "forbidden", "workspace is not accessible")
+		return
+	}
+
+	if _, err := h.db.Exec(ctx, `
+		UPDATE sessions SET active_workspace_id = $1::uuid WHERE token_hash = $2
+	`, workspaceID, tokenHash); err != nil {
+		writeError(w, http.StatusInternalServerError, "internal_error", "could not switch workspace")
+		return
+	}
+
+	user, err := h.userBySession(ctx, tokenHash)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "internal_error", "could not load session")
 		return
 	}
 
@@ -994,6 +1071,18 @@ func normalizeDisplayName(displayName string) (string, error) {
 	}
 
 	return displayName, nil
+}
+
+func normalizeWorkspaceID(value string) (string, bool) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "", false
+	}
+	var id pgtype.UUID
+	if err := id.Scan(value); err != nil {
+		return "", false
+	}
+	return value, true
 }
 
 func normalizeChangePassword(req changePasswordRequest) (string, string, error) {
