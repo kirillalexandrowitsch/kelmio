@@ -27,6 +27,7 @@ import (
 	"kelmio/backend/internal/labels"
 	appmetrics "kelmio/backend/internal/metrics"
 	"kelmio/backend/internal/notifications"
+	"kelmio/backend/internal/organizations"
 	"kelmio/backend/internal/projectmembers"
 	"kelmio/backend/internal/projects"
 	"kelmio/backend/internal/ratelimit"
@@ -127,6 +128,9 @@ func main() {
 
 	notificationsHandler := notifications.NewHandler(db, authHandler)
 	notificationsHandler.RegisterRoutes(mux)
+
+	organizationsHandler := organizations.NewHandler(db, authHandler)
+	organizationsHandler.RegisterRoutes(mux)
 
 	handler := http.Handler(recoverPanic(logger, securityHeaders(requestBodyLimit(maxRequestBodyBytes, cors(cfg.TrustedOrigins, csrfProtection(csrfManager, mux))))))
 	if metricsRecorder != nil {
