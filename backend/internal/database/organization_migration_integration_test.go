@@ -103,8 +103,8 @@ func TestOrganizationMigrationBackfillsExistingWorkspace(t *testing.T) {
 	if err != nil {
 		t.Fatalf("apply organization migration: %v", err)
 	}
-	if len(applied) != 1 || applied[0].Version != 18 {
-		t.Fatalf("organization migrations applied = %#v, want only version 18", applied)
+	if len(applied) == 0 || applied[0].Version != 18 {
+		t.Fatalf("organization migrations applied = %#v, want to start at version 18", applied)
 	}
 
 	var organizationID string

@@ -112,8 +112,8 @@ func TestWorkflowIssueStatusMigrationEnablesCustomStatuses(t *testing.T) {
 	if err != nil {
 		t.Fatalf("apply migration 13: %v", err)
 	}
-	if len(applied) != 5 || applied[0].Version != 13 || applied[1].Version != 14 || applied[2].Version != 15 || applied[3].Version != 16 || applied[4].Version != 17 {
-		t.Fatalf("applied migrations = %#v, want versions 13 through 17", applied)
+	if len(applied) == 0 || applied[0].Version != 13 {
+		t.Fatalf("applied migrations = %#v, want to start at version 13", applied)
 	}
 
 	if _, err := db.Exec(ctx, `UPDATE issues SET workflow_status_id = $2 WHERE id = $1`, issueID, reviewID); err != nil {

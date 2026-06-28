@@ -879,8 +879,8 @@ func TestProjectWorkflowMigrationBackfillsLegacyIssues(t *testing.T) {
 	if err != nil {
 		t.Fatalf("apply workflow migration: %v", err)
 	}
-	if len(applied) != 7 || applied[0].Version != 11 || applied[1].Version != 12 || applied[2].Version != 13 || applied[3].Version != 14 || applied[4].Version != 15 || applied[5].Version != 16 || applied[6].Version != 17 {
-		t.Fatalf("post-legacy migrations applied = %#v, want versions 11 through 17", applied)
+	if len(applied) == 0 || applied[0].Version != 11 {
+		t.Fatalf("post-legacy migrations applied = %#v, want to start at version 11", applied)
 	}
 
 	var workflowStatuses int

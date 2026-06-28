@@ -100,13 +100,14 @@ type passwordResetPreviewResponse struct {
 }
 
 type userRecord struct {
-	ID           string
-	Email        string
-	Username     string
-	PasswordHash string
-	DisplayName  string
-	WorkspaceID  string
-	Role         string
+	ID             string
+	Email          string
+	Username       string
+	PasswordHash   string
+	DisplayName    string
+	WorkspaceID    string
+	Role           string
+	OrganizationID string
 }
 
 type passwordResetUserRecord struct {
@@ -141,12 +142,13 @@ type workspaceResponse struct {
 }
 
 type CurrentUser struct {
-	ID          string
-	Email       string
-	Username    string
-	DisplayName string
-	WorkspaceID string
-	Role        string
+	ID             string
+	Email          string
+	Username       string
+	DisplayName    string
+	WorkspaceID    string
+	Role           string
+	OrganizationID string
 }
 
 func NewHandler(
@@ -652,15 +654,19 @@ func (h *Handler) userBySession(ctx context.Context, tokenHash string) (userReco
 			u.password_hash,
 			u.display_name,
 			wm.workspace_id::text,
-			wm.role
+			wm.role,
+			COALESCE(w.organization_id::text, '')
 		FROM sessions s
 		JOIN users u ON u.id = s.user_id
 		JOIN workspace_members wm ON wm.user_id = u.id
+		JOIN workspaces w ON w.id = wm.workspace_id
 		WHERE
 			s.token_hash = $1
 			AND s.expires_at > now()
 			AND u.is_active = true
-		ORDER BY wm.joined_at ASC
+		ORDER BY
+			(wm.workspace_id = s.active_workspace_id) DESC,
+			wm.joined_at ASC
 		LIMIT 1
 	`, tokenHash).Scan(
 		&user.ID,
@@ -670,6 +676,7 @@ func (h *Handler) userBySession(ctx context.Context, tokenHash string) (userReco
 		&user.DisplayName,
 		&user.WorkspaceID,
 		&user.Role,
+		&user.OrganizationID,
 	); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return userRecord{}, errInvalidCredentials
@@ -1145,12 +1152,13 @@ func (user userRecord) toResponse() userResponse {
 
 func (user userRecord) toCurrentUser() CurrentUser {
 	return CurrentUser{
-		ID:          user.ID,
-		Email:       user.Email,
-		Username:    user.Username,
-		DisplayName: user.DisplayName,
-		WorkspaceID: user.WorkspaceID,
-		Role:        user.Role,
+		ID:             user.ID,
+		Email:          user.Email,
+		Username:       user.Username,
+		DisplayName:    user.DisplayName,
+		WorkspaceID:    user.WorkspaceID,
+		Role:           user.Role,
+		OrganizationID: user.OrganizationID,
 	}
 }
 

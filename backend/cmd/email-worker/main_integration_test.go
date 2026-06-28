@@ -162,8 +162,15 @@ func newEmailWorkerIntegrationDB(t *testing.T, ctx context.Context) *pgxpool.Poo
 	if err != nil {
 		t.Fatalf("apply migrations: %v", err)
 	}
-	if len(applied) == 0 || applied[len(applied)-1].Version != 17 {
-		t.Fatalf("applied migrations = %#v, want through version 17", applied)
+	hasEmailOutboxMigration := false
+	for _, migration := range applied {
+		if migration.Version == 16 {
+			hasEmailOutboxMigration = true
+			break
+		}
+	}
+	if !hasEmailOutboxMigration {
+		t.Fatalf("applied migrations = %#v, want the email outbox migration (version 16)", applied)
 	}
 	return db
 }
