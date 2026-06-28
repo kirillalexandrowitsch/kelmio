@@ -209,13 +209,13 @@ A version is complete only when:
 The project is functionally closed only after `CLOSE-001` is complete and no
 included capability remains `planned`, `in_progress` or `deferred`.
 
-The root `README.md` is the final-state product cover and does not track
-per-version implementation status. V24 closure includes a final reconciliation
-of that cover with the completed capability matrix.
+The root `README.md` describes the current implemented capabilities (without
+version numbers) and is kept in step with this matrix as capabilities ship; this
+baseline remains the authoritative record of implementation status.
 
 ## 6. Baseline Governance
 
 This matrix is the sole source of implementation status for Kelmio. Capability
 scope changes require an explicit version target, acceptance summary and QA
-evidence. V24 performs the final reconciliation between this baseline, the
-product roadmap, operational documentation and actual behavior.
+evidence. The `README.md`, product roadmap and operational documentation are
+kept consistent with this baseline and actual behavior as work ships.
