@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -92,7 +93,13 @@ func main() {
 		_ = tx.Rollback(ctx)
 	}()
 
-	workspaceID, err := ensureWorkspace(ctx, tx, seed.WorkspaceName)
+	organizationID, err := ensureDefaultOrganization(ctx, tx)
+	if err != nil {
+		logger.Error("ensure default organization failed", "error", err)
+		os.Exit(1)
+	}
+
+	workspaceID, err := ensureWorkspace(ctx, tx, organizationID, seed.WorkspaceName)
 	if err != nil {
 		logger.Error("ensure workspace failed", "error", err)
 		os.Exit(1)
@@ -107,6 +114,15 @@ func main() {
 	demoMemberID, err := ensureUser(ctx, tx, workspaceID, seed.DemoEmail, seed.DemoUsername, seed.DemoPassword, seed.DemoName, "member")
 	if err != nil {
 		logger.Error("ensure demo member failed", "error", err)
+		os.Exit(1)
+	}
+
+	if err := ensureOrganizationMembership(ctx, tx, organizationID, adminID, "org_admin"); err != nil {
+		logger.Error("ensure admin organization role failed", "error", err)
+		os.Exit(1)
+	}
+	if err := ensureOrganizationMembership(ctx, tx, organizationID, demoMemberID, "org_member"); err != nil {
+		logger.Error("ensure demo member organization role failed", "error", err)
 		os.Exit(1)
 	}
 
@@ -586,23 +602,82 @@ func main() {
 	)
 }
 
-func ensureWorkspace(ctx context.Context, tx pgx.Tx, name string) (string, error) {
-	var workspaceID string
+func ensureDefaultOrganization(ctx context.Context, tx pgx.Tx) (string, error) {
+	var organizationID string
 	err := tx.QueryRow(ctx, `
-		INSERT INTO workspaces (name)
-		SELECT $1
+		INSERT INTO organizations (name, slug)
+		SELECT 'Default Organization', 'default'
 		WHERE NOT EXISTS (
-			SELECT 1 FROM workspaces WHERE name = $1
+			SELECT 1 FROM organizations WHERE slug = 'default'
 		)
 		RETURNING id::text
-	`, name).Scan(&workspaceID)
+	`).Scan(&organizationID)
+	if err == nil {
+		return organizationID, nil
+	}
+
+	if err := tx.QueryRow(ctx, `
+		SELECT id::text FROM organizations WHERE slug = 'default'
+	`).Scan(&organizationID); err != nil {
+		return "", err
+	}
+
+	return organizationID, nil
+}
+
+func ensureOrganizationMembership(
+	ctx context.Context,
+	tx pgx.Tx,
+	organizationID string,
+	userID string,
+	role string,
+) error {
+	_, err := tx.Exec(ctx, `
+		INSERT INTO organization_members (organization_id, user_id, role)
+		VALUES ($1, $2, $3)
+		ON CONFLICT (organization_id, user_id) DO NOTHING
+	`, organizationID, userID, role)
+	return err
+}
+
+func slugify(value string) string {
+	var builder strings.Builder
+	previousHyphen := false
+	for _, r := range strings.ToLower(strings.TrimSpace(value)) {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			builder.WriteRune(r)
+			previousHyphen = false
+			continue
+		}
+		if !previousHyphen && builder.Len() > 0 {
+			builder.WriteByte('-')
+			previousHyphen = true
+		}
+	}
+	slug := strings.Trim(builder.String(), "-")
+	if slug == "" {
+		return "workspace"
+	}
+	return slug
+}
+
+func ensureWorkspace(ctx context.Context, tx pgx.Tx, organizationID string, name string) (string, error) {
+	var workspaceID string
+	err := tx.QueryRow(ctx, `
+		INSERT INTO workspaces (name, organization_id, slug, status)
+		SELECT $1, $2, $3, 'active'
+		WHERE NOT EXISTS (
+			SELECT 1 FROM workspaces WHERE organization_id = $2 AND name = $1
+		)
+		RETURNING id::text
+	`, name, organizationID, slugify(name)).Scan(&workspaceID)
 	if err == nil {
 		return workspaceID, nil
 	}
 
 	if err := tx.QueryRow(ctx, `
-		SELECT id::text FROM workspaces WHERE name = $1
-	`, name).Scan(&workspaceID); err != nil {
+		SELECT id::text FROM workspaces WHERE organization_id = $1 AND name = $2
+	`, organizationID, name).Scan(&workspaceID); err != nil {
 		return "", err
 	}
 

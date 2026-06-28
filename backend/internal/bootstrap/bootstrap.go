@@ -124,11 +124,34 @@ func (s *Service) Bootstrap(ctx context.Context, cfg Config) (Result, error) {
 	}
 
 	var result Result
+
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO organizations (name, slug)
+		VALUES ('Default Organization', 'default')
+		ON CONFLICT (slug) DO NOTHING
+	`); err != nil {
+		return Result{}, fmt.Errorf("create default organization: %w", err)
+	}
+	var organizationID string
 	if err := tx.QueryRow(ctx, `
-		INSERT INTO workspaces (name)
-		VALUES ($1)
+		SELECT id::text FROM organizations WHERE slug = 'default'
+	`).Scan(&organizationID); err != nil {
+		return Result{}, fmt.Errorf("resolve default organization: %w", err)
+	}
+
+	if err := tx.QueryRow(ctx, `
+		INSERT INTO workspaces (name, organization_id, slug, status)
+		VALUES (
+			$1,
+			$2,
+			coalesce(
+				nullif(trim(both '-' from regexp_replace(lower(trim($1)), '[^a-z0-9]+', '-', 'g')), ''),
+				'workspace'
+			),
+			'active'
+		)
 		RETURNING id::text
-	`, cfg.WorkspaceName).Scan(&result.WorkspaceID); err != nil {
+	`, cfg.WorkspaceName, organizationID).Scan(&result.WorkspaceID); err != nil {
 		return Result{}, fmt.Errorf("create workspace: %w", err)
 	}
 
@@ -145,6 +168,13 @@ func (s *Service) Bootstrap(ctx context.Context, cfg Config) (Result, error) {
 		VALUES ($1, $2, 'admin')
 	`, result.WorkspaceID, result.AdminUserID); err != nil {
 		return Result{}, fmt.Errorf("create admin membership: %w", err)
+	}
+
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO organization_members (organization_id, user_id, role)
+		VALUES ($1, $2, 'org_admin')
+	`, organizationID, result.AdminUserID); err != nil {
+		return Result{}, fmt.Errorf("create admin organization membership: %w", err)
 	}
 
 	if err := tx.Commit(ctx); err != nil {
