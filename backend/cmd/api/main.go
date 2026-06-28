@@ -35,6 +35,7 @@ import (
 	"kelmio/backend/internal/sprints"
 	"kelmio/backend/internal/team"
 	"kelmio/backend/internal/workflows"
+	"kelmio/backend/internal/workspaces"
 )
 
 const maxRequestBodyBytes int64 = 1 << 20
@@ -131,6 +132,9 @@ func main() {
 
 	organizationsHandler := organizations.NewHandler(db, authHandler)
 	organizationsHandler.RegisterRoutes(mux)
+
+	workspacesHandler := workspaces.NewHandler(db, authHandler)
+	workspacesHandler.RegisterRoutes(mux)
 
 	handler := http.Handler(recoverPanic(logger, securityHeaders(requestBodyLimit(maxRequestBodyBytes, cors(cfg.TrustedOrigins, csrfProtection(csrfManager, mux))))))
 	if metricsRecorder != nil {
