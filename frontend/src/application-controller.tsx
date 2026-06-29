@@ -165,6 +165,7 @@ import { IssueCreateForm } from "./features/issues/issue-create-form";
 import { IssueDetailSection } from "./features/issues/issue-detail-section";
 import { IssueListPanel } from "./features/issues/issue-list-panel";
 import { SavedFiltersPanel } from "./features/issues/saved-filters-panel";
+import { OrganizationAdminSection } from "./features/administration/organization-admin-section";
 import { SiteAdminSection } from "./features/administration/site-admin-section";
 import { LabelsSection } from "./features/labels/labels-section";
 import { NotificationsSection } from "./features/notifications/notifications-section";
@@ -4902,6 +4903,7 @@ export function ApplicationController() {
         displayName={user.display_name}
         isLoggingOut={isLoggingOut}
         isNotificationsOpen={isNotificationsOpen}
+        isOrgAdmin={user.organization.role === "org_admin"}
         isSiteAdmin={user.is_site_admin}
         isSwitchingWorkspace={isSwitchingWorkspace}
         onSwitchWorkspace={handleSwitchWorkspace}
@@ -5000,6 +5002,13 @@ export function ApplicationController() {
           runtimeVersion={runtimeVersion}
           runtimeVersionError={runtimeVersionError}
           user={user}
+        />
+
+        <OrganizationAdminSection
+          isActive={
+            activeSection === "workspaces" &&
+            (user.is_site_admin || user.organization.role === "org_admin")
+          }
         />
 
         <SiteAdminSection
@@ -5577,6 +5586,7 @@ export function ApplicationController() {
       </div>
 
       <CommandPalette
+        isOrgAdmin={user.organization.role === "org_admin"}
         isSiteAdmin={user.is_site_admin}
         onClose={() => setIsCommandPaletteOpen(false)}
         onNavigate={(section) => {

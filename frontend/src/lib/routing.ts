@@ -7,6 +7,7 @@ export type AppSection =
   | "notifications"
   | "team"
   | "labels"
+  | "workspaces"
   | "administration"
   | "account";
 
@@ -19,6 +20,7 @@ export const appSections = [
   { id: "notifications", title: "Notifications" },
   { id: "team", title: "Team" },
   { id: "labels", title: "Labels" },
+  { id: "workspaces", title: "Workspaces" },
   { id: "administration", title: "Administration" },
   { id: "account", title: "Account" },
 ] satisfies Array<{ id: AppSection; title: string }>;
@@ -27,8 +29,15 @@ export const appSections = [
 // command palette and section rendering hide these for everyone else.
 const siteAdminSections = new Set<AppSection>(["administration"]);
 
+// Sections available to organization administrators (and site admins).
+const organizationAdminSections = new Set<AppSection>(["workspaces"]);
+
 export function isSiteAdminSection(section: AppSection) {
   return siteAdminSections.has(section);
+}
+
+export function isOrganizationAdminSection(section: AppSection) {
+  return organizationAdminSections.has(section);
 }
 
 export type NavGroup = {
@@ -53,7 +62,7 @@ export const navGroups: NavGroup[] = [
   {
     id: "administration",
     label: "Administration",
-    sections: ["administration"],
+    sections: ["workspaces", "administration"],
   },
 ];
 
@@ -66,6 +75,7 @@ const appSectionPaths: Record<AppSection, string> = {
   notifications: "/notifications",
   team: "/team",
   labels: "/labels",
+  workspaces: "/workspaces",
   administration: "/administration",
   account: "/account",
 };

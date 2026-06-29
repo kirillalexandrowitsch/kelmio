@@ -66,10 +66,12 @@ import {
   type UpdateSavedFilterInput,
   type UpdateSprintInput,
   type UpdateTeamMemberInput,
+  type UpdateWorkspaceInput,
   type UpdateWorkflowStatusInput,
   type UpdateAutomationRuleInput,
   type WorkflowStatus,
   type WorkflowStatusCategory,
+  type Workspace,
 } from "./api-types";
 import {
   CSRF_HEADER_NAME,
@@ -264,6 +266,32 @@ export async function updateOrganization(
 
 export async function listWorkspaces() {
   return request<ListWorkspacesResponse>("/api/v1/workspaces");
+}
+
+export async function listOrganizationWorkspaces() {
+  return request<ListWorkspacesResponse>(
+    "/api/v1/workspaces?scope=organization",
+  );
+}
+
+export async function createWorkspace(name: string) {
+  return request<Workspace>("/api/v1/workspaces", {
+    method: "POST",
+    body: JSON.stringify({ name }),
+  });
+}
+
+export async function updateWorkspace(
+  workspaceId: string,
+  input: UpdateWorkspaceInput,
+) {
+  return request<Workspace>(
+    `/api/v1/workspaces/${encodeURIComponent(workspaceId)}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    },
+  );
 }
 
 export async function setActiveWorkspace(workspaceId: string) {

@@ -70,6 +70,11 @@ export type ListWorkspacesResponse = {
   workspaces: Workspace[];
 };
 
+export type UpdateWorkspaceInput = {
+  name?: string;
+  status?: OrganizationStatus;
+};
+
 export type Project = {
   id: string;
   key: string;

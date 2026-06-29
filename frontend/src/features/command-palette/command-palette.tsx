@@ -32,6 +32,7 @@ type CommandPaletteProps = {
   onOpenIssue: (issueId: string) => void;
   recentIssues: CommandPaletteIssue[];
   isSiteAdmin?: boolean;
+  isOrgAdmin?: boolean;
 };
 
 export function CommandPalette({
@@ -41,6 +42,7 @@ export function CommandPalette({
   onOpenIssue,
   recentIssues,
   isSiteAdmin = false,
+  isOrgAdmin = false,
 }: CommandPaletteProps) {
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
@@ -66,6 +68,16 @@ export function CommandPalette({
       { id: "go-labels", group: "Go to", label: "Labels", keywords: "labels", run: goTo("labels") },
     ];
 
+    if (isSiteAdmin || isOrgAdmin) {
+      base.push({
+        id: "go-workspaces",
+        group: "Go to",
+        label: "Workspaces",
+        keywords: "workspaces organization administration",
+        run: goTo("workspaces"),
+      });
+    }
+
     if (isSiteAdmin) {
       base.push({
         id: "go-administration",
@@ -89,7 +101,7 @@ export function CommandPalette({
     }));
 
     return [...base, ...recents];
-  }, [onNavigate, onOpenIssue, onClose, recentIssues, isSiteAdmin]);
+  }, [onNavigate, onOpenIssue, onClose, recentIssues, isSiteAdmin, isOrgAdmin]);
 
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();

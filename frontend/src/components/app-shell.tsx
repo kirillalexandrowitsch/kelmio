@@ -1,5 +1,6 @@
 import {
   Bell,
+  Boxes,
   Building2,
   Columns3,
   FolderKanban,
@@ -16,6 +17,7 @@ import {
 
 import {
   appSections,
+  isOrganizationAdminSection,
   isSiteAdminSection,
   navGroups,
   type AppSection,
@@ -38,6 +40,7 @@ const sectionIcons: Record<AppSection, LucideIcon> = {
   notifications: Bell,
   team: Users,
   labels: Tag,
+  workspaces: Boxes,
   administration: Building2,
   account: UserRound,
 };
@@ -64,6 +67,7 @@ type AppSidebarProps = {
   displayName: string;
   role: string;
   isSiteAdmin?: boolean;
+  isOrgAdmin?: boolean;
   workspaces?: Workspace[];
   activeWorkspaceId?: string;
   onSwitchWorkspace?: (workspaceId: string) => void;
@@ -88,6 +92,7 @@ export function AppSidebar({
   displayName,
   role,
   isSiteAdmin = false,
+  isOrgAdmin = false,
   workspaces = [],
   activeWorkspaceId = "",
   onSwitchWorkspace,
@@ -210,9 +215,15 @@ export function AppSidebar({
         {navGroups
           .map((group) => ({
             ...group,
-            sections: group.sections.filter(
-              (section) => !isSiteAdminSection(section) || isSiteAdmin,
-            ),
+            sections: group.sections.filter((section) => {
+              if (isSiteAdminSection(section)) {
+                return isSiteAdmin;
+              }
+              if (isOrganizationAdminSection(section)) {
+                return isSiteAdmin || isOrgAdmin;
+              }
+              return true;
+            }),
           }))
           .filter((group) => group.sections.length > 0)
           .map((group) => (
