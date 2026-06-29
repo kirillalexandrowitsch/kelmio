@@ -68,6 +68,18 @@ type addOrganizationMemberRequest struct {
 	Role   string `json:"role"`
 }
 
+type directoryUserResponse struct {
+	UserID      string `json:"user_id"`
+	Username    string `json:"username"`
+	DisplayName string `json:"display_name"`
+	Email       string `json:"email"`
+	Role        string `json:"role"`
+}
+
+type directoryResponse struct {
+	Users []directoryUserResponse `json:"users"`
+}
+
 func NewHandler(db *pgxpool.Pool, authHandler *auth.Handler) *Handler {
 	return &Handler{db: db, auth: authHandler}
 }
@@ -79,6 +91,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/organizations/{id}/members", h.listMembers)
 	mux.HandleFunc("POST /api/v1/organizations/{id}/members", h.addMember)
 	mux.HandleFunc("DELETE /api/v1/organizations/{id}/members/{userId}", h.removeMember)
+	mux.HandleFunc("GET /api/v1/directory", h.directory)
 }
 
 func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
@@ -413,6 +426,56 @@ func (h *Handler) removeMember(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// directory lists the active members of the current user's active organization
+// so administrators can pick people for groups and role assignments without
+// exposing users from other organizations.
+func (h *Handler) directory(w http.ResponseWriter, r *http.Request) {
+	user, ok := h.requireUser(w, r)
+	if !ok {
+		return
+	}
+	if user.OrganizationID == "" {
+		writeError(w, http.StatusBadRequest, "invalid_request", "no active organization")
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	if !h.authorizeOrganizationAdmin(ctx, w, user, user.OrganizationID) {
+		return
+	}
+
+	rows, err := h.db.Query(ctx, `
+		SELECT u.id::text, u.username, u.display_name, u.email, om.role
+		FROM organization_members om
+		JOIN users u ON u.id = om.user_id
+		WHERE om.organization_id = $1 AND u.is_active = true
+		ORDER BY u.display_name ASC
+	`, user.OrganizationID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "internal_error", "could not load directory")
+		return
+	}
+	defer rows.Close()
+
+	users := make([]directoryUserResponse, 0)
+	for rows.Next() {
+		var entry directoryUserResponse
+		if err := rows.Scan(&entry.UserID, &entry.Username, &entry.DisplayName, &entry.Email, &entry.Role); err != nil {
+			writeError(w, http.StatusInternalServerError, "internal_error", "could not load directory")
+			return
+		}
+		users = append(users, entry)
+	}
+	if err := rows.Err(); err != nil {
+		writeError(w, http.StatusInternalServerError, "internal_error", "could not load directory")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, directoryResponse{Users: users})
 }
 
 func (h *Handler) authorizeOrganizationRead(ctx context.Context, w http.ResponseWriter, user auth.CurrentUser, organizationID string) bool {
