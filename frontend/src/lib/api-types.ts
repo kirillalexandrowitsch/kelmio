@@ -10,6 +10,7 @@ export type CurrentUser = {
   };
   organization: {
     id: string;
+    role: "org_admin" | "org_member" | "";
   };
 };
 

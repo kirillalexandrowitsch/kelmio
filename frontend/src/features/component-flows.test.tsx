@@ -42,7 +42,7 @@ const admin: CurrentUser = {
   display_name: "Admin",
   is_site_admin: true,
   workspace: { id: "workspace-1", role: "admin" },
-  organization: { id: "organization-1" },
+  organization: { id: "organization-1", role: "org_admin" },
 };
 
 const memberUser: CurrentUser = {

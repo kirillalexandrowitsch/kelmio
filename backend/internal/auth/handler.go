@@ -104,15 +104,16 @@ type passwordResetPreviewResponse struct {
 }
 
 type userRecord struct {
-	ID             string
-	Email          string
-	Username       string
-	PasswordHash   string
-	DisplayName    string
-	WorkspaceID    string
-	Role           string
-	OrganizationID string
-	IsSiteAdmin    bool
+	ID               string
+	Email            string
+	Username         string
+	PasswordHash     string
+	DisplayName      string
+	WorkspaceID      string
+	Role             string
+	OrganizationID   string
+	OrganizationRole string
+	IsSiteAdmin      bool
 }
 
 type passwordResetUserRecord struct {
@@ -149,18 +150,20 @@ type workspaceResponse struct {
 }
 
 type organizationResponse struct {
-	ID string `json:"id"`
+	ID   string `json:"id"`
+	Role string `json:"role"`
 }
 
 type CurrentUser struct {
-	ID             string
-	Email          string
-	Username       string
-	DisplayName    string
-	WorkspaceID    string
-	Role           string
-	OrganizationID string
-	IsSiteAdmin    bool
+	ID               string
+	Email            string
+	Username         string
+	DisplayName      string
+	WorkspaceID      string
+	Role             string
+	OrganizationID   string
+	OrganizationRole string
+	IsSiteAdmin      bool
 }
 
 func NewHandler(
@@ -701,10 +704,13 @@ func (h *Handler) userByIdentifier(ctx context.Context, identifier string) (user
 			wm.workspace_id::text,
 			wm.role,
 			COALESCE(w.organization_id::text, ''),
+			COALESCE(om.role, ''),
 			u.is_site_admin
 		FROM users u
 		JOIN workspace_members wm ON wm.user_id = u.id
 		JOIN workspaces w ON w.id = wm.workspace_id
+		LEFT JOIN organization_members om
+			ON om.organization_id = w.organization_id AND om.user_id = u.id
 		WHERE
 			u.is_active = true
 			AND (
@@ -722,6 +728,7 @@ func (h *Handler) userByIdentifier(ctx context.Context, identifier string) (user
 		&user.WorkspaceID,
 		&user.Role,
 		&user.OrganizationID,
+		&user.OrganizationRole,
 		&user.IsSiteAdmin,
 	); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -746,11 +753,14 @@ func (h *Handler) userBySession(ctx context.Context, tokenHash string) (userReco
 			wm.workspace_id::text,
 			wm.role,
 			COALESCE(w.organization_id::text, ''),
+			COALESCE(om.role, ''),
 			u.is_site_admin
 		FROM sessions s
 		JOIN users u ON u.id = s.user_id
 		JOIN workspace_members wm ON wm.user_id = u.id
 		JOIN workspaces w ON w.id = wm.workspace_id
+		LEFT JOIN organization_members om
+			ON om.organization_id = w.organization_id AND om.user_id = u.id
 		WHERE
 			s.token_hash = $1
 			AND s.expires_at > now()
@@ -768,6 +778,7 @@ func (h *Handler) userBySession(ctx context.Context, tokenHash string) (userReco
 		&user.WorkspaceID,
 		&user.Role,
 		&user.OrganizationID,
+		&user.OrganizationRole,
 		&user.IsSiteAdmin,
 	); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -1253,21 +1264,23 @@ func (user userRecord) toResponse() userResponse {
 			Role: user.Role,
 		},
 		Organization: organizationResponse{
-			ID: user.OrganizationID,
+			ID:   user.OrganizationID,
+			Role: user.OrganizationRole,
 		},
 	}
 }
 
 func (user userRecord) toCurrentUser() CurrentUser {
 	return CurrentUser{
-		ID:             user.ID,
-		Email:          user.Email,
-		Username:       user.Username,
-		DisplayName:    user.DisplayName,
-		WorkspaceID:    user.WorkspaceID,
-		Role:           user.Role,
-		OrganizationID: user.OrganizationID,
-		IsSiteAdmin:    user.IsSiteAdmin,
+		ID:               user.ID,
+		Email:            user.Email,
+		Username:         user.Username,
+		DisplayName:      user.DisplayName,
+		WorkspaceID:      user.WorkspaceID,
+		Role:             user.Role,
+		OrganizationID:   user.OrganizationID,
+		OrganizationRole: user.OrganizationRole,
+		IsSiteAdmin:      user.IsSiteAdmin,
 	}
 }
 

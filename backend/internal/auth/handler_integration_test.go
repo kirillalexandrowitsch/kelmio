@@ -90,6 +90,12 @@ func TestLoginIncludesSiteAdminAndOrganization(t *testing.T) {
 	if _, err := db.Exec(ctx, `UPDATE users SET is_site_admin = true WHERE id = $1`, userID); err != nil {
 		t.Fatalf("set site admin: %v", err)
 	}
+	if _, err := db.Exec(ctx, `
+		INSERT INTO organization_members (organization_id, user_id, role)
+		VALUES ($1, $2, 'org_admin')
+	`, organizationID, userID); err != nil {
+		t.Fatalf("insert organization membership: %v", err)
+	}
 
 	handler := NewHandler(db, time.Hour, false, newIntegrationCSRFManager(t), nil)
 	response := performLogin(handler, `{"login":"admin","password":"admin12345"}`)
@@ -101,7 +107,8 @@ func TestLoginIncludesSiteAdminAndOrganization(t *testing.T) {
 		User struct {
 			IsSiteAdmin  bool `json:"is_site_admin"`
 			Organization struct {
-				ID string `json:"id"`
+				ID   string `json:"id"`
+				Role string `json:"role"`
 			} `json:"organization"`
 		} `json:"user"`
 	}
@@ -113,6 +120,9 @@ func TestLoginIncludesSiteAdminAndOrganization(t *testing.T) {
 	}
 	if payload.User.Organization.ID != organizationID {
 		t.Fatalf("login organization id = %q, want %q", payload.User.Organization.ID, organizationID)
+	}
+	if payload.User.Organization.Role != "org_admin" {
+		t.Fatalf("login organization role = %q, want org_admin", payload.User.Organization.Role)
 	}
 }
 
