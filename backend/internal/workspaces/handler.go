@@ -102,7 +102,7 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 		rows, err := h.db.Query(ctx, `
 			SELECT w.id::text, w.name, COALESCE(w.slug, ''), w.status, COALESCE(wm.role, '')
 			FROM workspaces w
-			LEFT JOIN workspace_members wm
+			LEFT JOIN effective_workspace_members wm
 				ON wm.workspace_id = w.id AND wm.user_id = $1
 			WHERE w.organization_id = $2::uuid
 			ORDER BY w.status ASC, w.name ASC
@@ -114,7 +114,7 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 	rows, err := h.db.Query(ctx, `
 		SELECT w.id::text, w.name, COALESCE(w.slug, ''), w.status, wm.role
 		FROM workspaces w
-		JOIN workspace_members wm ON wm.workspace_id = w.id AND wm.user_id = $1
+		JOIN effective_workspace_members wm ON wm.workspace_id = w.id AND wm.user_id = $1
 		WHERE w.status = 'active'
 			AND ($2 = '' OR w.organization_id = $2::uuid)
 		ORDER BY w.name ASC

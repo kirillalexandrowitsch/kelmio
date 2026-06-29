@@ -591,6 +591,124 @@ func TestWorkspaceRoleAssignments(t *testing.T) {
 	}
 }
 
+func TestEffectiveRoleGrantsWorkspaceAccessViaGroup(t *testing.T) {
+	databaseURL := getDatabaseURL()
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	adminDB, err := database.Connect(ctx, databaseURL)
+	if err != nil {
+		t.Skipf("postgres is not available: %v", err)
+	}
+	defer adminDB.Close()
+	schemaName := fmt.Sprintf("effective_access_%d", time.Now().UnixNano())
+	quotedSchemaName := pgx.Identifier{schemaName}.Sanitize()
+	if _, err := adminDB.Exec(ctx, `CREATE EXTENSION IF NOT EXISTS pgcrypto`); err != nil {
+		t.Fatalf("ensure pgcrypto: %v", err)
+	}
+	if _, err := adminDB.Exec(ctx, `CREATE SCHEMA `+quotedSchemaName); err != nil {
+		t.Fatalf("create schema: %v", err)
+	}
+	t.Cleanup(func() {
+		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cleanupCancel()
+		_, _ = adminDB.Exec(cleanupCtx, `DROP SCHEMA IF EXISTS `+quotedSchemaName+` CASCADE`)
+	})
+	cfg, err := pgxpool.ParseConfig(databaseURL)
+	if err != nil {
+		t.Fatalf("parse database url: %v", err)
+	}
+	cfg.ConnConfig.RuntimeParams["search_path"] = schemaName
+	cfg.MaxConns = 3
+	db, err := pgxpool.NewWithConfig(ctx, cfg)
+	if err != nil {
+		t.Fatalf("connect schema: %v", err)
+	}
+	defer db.Close()
+	if _, err := migrations.Up(ctx, db, "../../migrations"); err != nil {
+		t.Fatalf("apply migrations: %v", err)
+	}
+
+	var orgID string
+	if err := db.QueryRow(ctx, `SELECT id::text FROM organizations WHERE slug = 'default'`).Scan(&orgID); err != nil {
+		t.Fatalf("read default organization: %v", err)
+	}
+	var sharedID string
+	if err := db.QueryRow(ctx, `
+		INSERT INTO workspaces (name, organization_id, slug, status)
+		VALUES ('Shared', $1, 'shared', 'active')
+		RETURNING id::text
+	`, orgID).Scan(&sharedID); err != nil {
+		t.Fatalf("insert workspace: %v", err)
+	}
+	var groupID string
+	if err := db.QueryRow(ctx, `
+		INSERT INTO groups (organization_id, name) VALUES ($1, 'Leads') RETURNING id::text
+	`, orgID).Scan(&groupID); err != nil {
+		t.Fatalf("insert group: %v", err)
+	}
+	if _, err := db.Exec(ctx, `
+		INSERT INTO role_assignments (scope, scope_id, subject_type, subject_id, role)
+		VALUES ('workspace', $1, 'group', $2, 'admin')
+	`, sharedID, groupID); err != nil {
+		t.Fatalf("insert role assignment: %v", err)
+	}
+
+	// The grantee has no direct workspace or organization membership: access is
+	// granted purely through the group's role assignment.
+	hash, _ := bcrypt.GenerateFromPassword([]byte("admin12345"), bcrypt.MinCost)
+	var granteeID string
+	if err := db.QueryRow(ctx, `
+		INSERT INTO users (email, username, password_hash, display_name, is_active)
+		VALUES ('grantee@example.com', 'grantee', $1, 'Grantee', true)
+		RETURNING id::text
+	`, string(hash)).Scan(&granteeID); err != nil {
+		t.Fatalf("insert grantee: %v", err)
+	}
+	if _, err := db.Exec(ctx, `INSERT INTO group_members (group_id, user_id) VALUES ($1, $2)`, groupID, granteeID); err != nil {
+		t.Fatalf("insert group member: %v", err)
+	}
+
+	authHandler := auth.NewHandler(db, time.Hour, false, nil, nil)
+	apiHandler := NewHandler(db, authHandler)
+	mux := http.NewServeMux()
+	authHandler.RegisterRoutes(mux)
+	apiHandler.RegisterRoutes(mux)
+
+	// Login resolves the group-granted workspace with the effective admin role.
+	loginResponse := performRequest(mux, http.MethodPost, "/api/v1/auth/login", `{"login":"grantee","password":"admin12345"}`, nil)
+	if loginResponse.Code != http.StatusOK {
+		t.Fatalf("login status = %d: %s", loginResponse.Code, loginResponse.Body.String())
+	}
+	var loginPayload struct {
+		User struct {
+			Workspace struct {
+				ID   string `json:"id"`
+				Role string `json:"role"`
+			} `json:"workspace"`
+		} `json:"user"`
+	}
+	_ = json.Unmarshal(loginResponse.Body.Bytes(), &loginPayload)
+	if loginPayload.User.Workspace.ID != sharedID || loginPayload.User.Workspace.Role != "admin" {
+		t.Fatalf("login workspace = %#v, want Shared with admin", loginPayload.User.Workspace)
+	}
+	cookies := loginResponse.Result().Cookies()
+
+	// The switcher lists the group-granted workspace with the effective role.
+	listResponse := performRequest(mux, http.MethodGet, "/api/v1/workspaces", "", cookies)
+	var list listWorkspacesResponse
+	_ = json.Unmarshal(listResponse.Body.Bytes(), &list)
+	shared := findWorkspace(list.Workspaces, sharedID)
+	if shared == nil || shared.Role != "admin" || !shared.IsActive {
+		t.Fatalf("switcher Shared = %#v, want present, role admin, active", shared)
+	}
+
+	// Switching to the group-granted workspace is permitted.
+	switchResponse := performRequest(mux, http.MethodPost, "/api/v1/session/active-workspace", fmt.Sprintf(`{"workspace_id":%q}`, sharedID), cookies)
+	if switchResponse.Code != http.StatusOK {
+		t.Fatalf("switch status = %d, want 200: %s", switchResponse.Code, switchResponse.Body.String())
+	}
+}
+
 func findWorkspace(workspaces []workspaceResponse, id string) *workspaceResponse {
 	for i := range workspaces {
 		if workspaces[i].ID == id {

@@ -497,7 +497,7 @@ func (h *Handler) setActiveWorkspace(w http.ResponseWriter, r *http.Request) {
 	if err := h.db.QueryRow(ctx, `
 		SELECT EXISTS (
 			SELECT 1
-			FROM workspace_members wm
+			FROM effective_workspace_members wm
 			JOIN workspaces w ON w.id = wm.workspace_id
 			WHERE wm.workspace_id = $1::uuid
 				AND wm.user_id = $2
@@ -707,7 +707,7 @@ func (h *Handler) userByIdentifier(ctx context.Context, identifier string) (user
 			COALESCE(om.role, ''),
 			u.is_site_admin
 		FROM users u
-		JOIN workspace_members wm ON wm.user_id = u.id
+		JOIN effective_workspace_members wm ON wm.user_id = u.id
 		JOIN workspaces w ON w.id = wm.workspace_id
 		LEFT JOIN organization_members om
 			ON om.organization_id = w.organization_id AND om.user_id = u.id
@@ -757,7 +757,7 @@ func (h *Handler) userBySession(ctx context.Context, tokenHash string) (userReco
 			u.is_site_admin
 		FROM sessions s
 		JOIN users u ON u.id = s.user_id
-		JOIN workspace_members wm ON wm.user_id = u.id
+		JOIN effective_workspace_members wm ON wm.user_id = u.id
 		JOIN workspaces w ON w.id = wm.workspace_id
 		LEFT JOIN organization_members om
 			ON om.organization_id = w.organization_id AND om.user_id = u.id
