@@ -313,6 +313,128 @@ func TestWorkspaceLifecycleAndAuthorization(t *testing.T) {
 	}
 }
 
+func TestListWorkspacesOrganizationScopeForAdmins(t *testing.T) {
+	databaseURL := getDatabaseURL()
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	adminDB, err := database.Connect(ctx, databaseURL)
+	if err != nil {
+		t.Skipf("postgres is not available: %v", err)
+	}
+	defer adminDB.Close()
+	schemaName := fmt.Sprintf("workspaces_org_scope_%d", time.Now().UnixNano())
+	quotedSchemaName := pgx.Identifier{schemaName}.Sanitize()
+	if _, err := adminDB.Exec(ctx, `CREATE EXTENSION IF NOT EXISTS pgcrypto`); err != nil {
+		t.Fatalf("ensure pgcrypto: %v", err)
+	}
+	if _, err := adminDB.Exec(ctx, `CREATE SCHEMA `+quotedSchemaName); err != nil {
+		t.Fatalf("create schema: %v", err)
+	}
+	t.Cleanup(func() {
+		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cleanupCancel()
+		_, _ = adminDB.Exec(cleanupCtx, `DROP SCHEMA IF EXISTS `+quotedSchemaName+` CASCADE`)
+	})
+	cfg, err := pgxpool.ParseConfig(databaseURL)
+	if err != nil {
+		t.Fatalf("parse database url: %v", err)
+	}
+	cfg.ConnConfig.RuntimeParams["search_path"] = schemaName
+	cfg.MaxConns = 3
+	db, err := pgxpool.NewWithConfig(ctx, cfg)
+	if err != nil {
+		t.Fatalf("connect schema: %v", err)
+	}
+	defer db.Close()
+	if _, err := migrations.Up(ctx, db, "../../migrations"); err != nil {
+		t.Fatalf("apply migrations: %v", err)
+	}
+
+	var orgID string
+	if err := db.QueryRow(ctx, `SELECT id::text FROM organizations WHERE slug = 'default'`).Scan(&orgID); err != nil {
+		t.Fatalf("read default organization: %v", err)
+	}
+	insertWorkspace := func(name, slug, status string) string {
+		var id string
+		if err := db.QueryRow(ctx, `
+			INSERT INTO workspaces (name, organization_id, slug, status)
+			VALUES ($1, $2, $3, $4)
+			RETURNING id::text
+		`, name, orgID, slug, status).Scan(&id); err != nil {
+			t.Fatalf("insert workspace %s: %v", name, err)
+		}
+		return id
+	}
+	homeID := insertWorkspace("Home", "home", "active")
+	archivedID := insertWorkspace("Retired", "retired", "archived")
+
+	hash, _ := bcrypt.GenerateFromPassword([]byte("admin12345"), bcrypt.MinCost)
+	insertUser := func(email, username string) string {
+		var id string
+		if err := db.QueryRow(ctx, `
+			INSERT INTO users (email, username, password_hash, display_name, is_active)
+			VALUES ($1, $2, $3, $2, true)
+			RETURNING id::text
+		`, email, username, string(hash)).Scan(&id); err != nil {
+			t.Fatalf("insert user %s: %v", username, err)
+		}
+		return id
+	}
+	adminID := insertUser("org-admin@example.com", "org_admin_user")
+	memberID := insertUser("org-member@example.com", "org_member_user")
+	if _, err := db.Exec(ctx, `
+		INSERT INTO workspace_members (workspace_id, user_id, role)
+		VALUES ($1, $2, 'admin'), ($1, $3, 'member')
+	`, homeID, adminID, memberID); err != nil {
+		t.Fatalf("insert workspace members: %v", err)
+	}
+	if _, err := db.Exec(ctx, `
+		INSERT INTO organization_members (organization_id, user_id, role)
+		VALUES ($1, $2, 'org_admin'), ($1, $3, 'org_member')
+	`, orgID, adminID, memberID); err != nil {
+		t.Fatalf("insert organization members: %v", err)
+	}
+
+	authHandler := auth.NewHandler(db, time.Hour, false, nil, nil)
+	apiHandler := NewHandler(db, authHandler)
+	mux := http.NewServeMux()
+	authHandler.RegisterRoutes(mux)
+	apiHandler.RegisterRoutes(mux)
+
+	adminCookies := loginUser(t, mux, "org_admin_user", "admin12345")
+	memberCookies := loginUser(t, mux, "org_member_user", "admin12345")
+
+	// The organization admin sees every workspace, including archived ones and
+	// workspaces they do not belong to.
+	response := performRequest(mux, http.MethodGet, "/api/v1/workspaces?scope=organization", "", adminCookies)
+	if response.Code != http.StatusOK {
+		t.Fatalf("admin org-scope status = %d: %s", response.Code, response.Body.String())
+	}
+	var payload listWorkspacesResponse
+	_ = json.Unmarshal(response.Body.Bytes(), &payload)
+
+	home := findWorkspace(payload.Workspaces, homeID)
+	if home == nil || home.Role != "admin" {
+		t.Fatalf("home = %#v, want present with role admin", home)
+	}
+	archived := findWorkspace(payload.Workspaces, archivedID)
+	if archived == nil {
+		t.Fatal("archived workspace missing from organization-scope listing")
+	}
+	if archived.Status != "archived" {
+		t.Fatalf("archived status = %q, want archived", archived.Status)
+	}
+	if archived.Role != "" {
+		t.Fatalf("archived role = %q, want empty for a non-member admin", archived.Role)
+	}
+
+	// A plain organization member cannot use the administration listing.
+	memberResponse := performRequest(mux, http.MethodGet, "/api/v1/workspaces?scope=organization", "", memberCookies)
+	if memberResponse.Code != http.StatusForbidden {
+		t.Fatalf("member org-scope status = %d, want 403: %s", memberResponse.Code, memberResponse.Body.String())
+	}
+}
+
 func findWorkspace(workspaces []workspaceResponse, id string) *workspaceResponse {
 	for i := range workspaces {
 		if workspaces[i].ID == id {

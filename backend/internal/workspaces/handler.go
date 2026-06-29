@@ -56,9 +56,11 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("PATCH /api/v1/workspaces/{id}", h.update)
 }
 
-// list returns the active workspaces the current user belongs to within their
-// active organization, flagging the one resolved as the active workspace. The
-// switcher only surfaces active workspaces, so archived ones are excluded.
+// list returns workspaces for the current user. By default it surfaces the
+// active workspaces the user belongs to within their active organization (the
+// switcher source, archived workspaces excluded). With ?scope=organization an
+// organization administrator gets every workspace in the active organization,
+// including archived ones, for administration.
 func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 	user, ok := h.requireUser(w, r)
 	if !ok {
@@ -68,6 +70,26 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
+	if r.URL.Query().Get("scope") == "organization" {
+		if user.OrganizationID == "" {
+			writeError(w, http.StatusBadRequest, "invalid_request", "no active organization")
+			return
+		}
+		if !h.authorizeOrganizationAdmin(ctx, w, user, user.OrganizationID) {
+			return
+		}
+		rows, err := h.db.Query(ctx, `
+			SELECT w.id::text, w.name, COALESCE(w.slug, ''), w.status, COALESCE(wm.role, '')
+			FROM workspaces w
+			LEFT JOIN workspace_members wm
+				ON wm.workspace_id = w.id AND wm.user_id = $1
+			WHERE w.organization_id = $2::uuid
+			ORDER BY w.status ASC, w.name ASC
+		`, user.ID, user.OrganizationID)
+		writeWorkspaceRows(w, rows, err, user.WorkspaceID)
+		return
+	}
+
 	rows, err := h.db.Query(ctx, `
 		SELECT w.id::text, w.name, COALESCE(w.slug, ''), w.status, wm.role
 		FROM workspaces w
@@ -76,7 +98,11 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 			AND ($2 = '' OR w.organization_id = $2::uuid)
 		ORDER BY w.name ASC
 	`, user.ID, user.OrganizationID)
-	if err != nil {
+	writeWorkspaceRows(w, rows, err, user.WorkspaceID)
+}
+
+func writeWorkspaceRows(w http.ResponseWriter, rows pgx.Rows, queryErr error, activeWorkspaceID string) {
+	if queryErr != nil {
 		writeError(w, http.StatusInternalServerError, "internal_error", "could not list workspaces")
 		return
 	}
@@ -95,7 +121,7 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusInternalServerError, "internal_error", "could not list workspaces")
 			return
 		}
-		workspace.IsActive = workspace.ID == user.WorkspaceID
+		workspace.IsActive = workspace.ID == activeWorkspaceID
 		workspaces = append(workspaces, workspace)
 	}
 	if err := rows.Err(); err != nil {
