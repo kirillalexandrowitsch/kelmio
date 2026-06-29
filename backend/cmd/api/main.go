@@ -22,6 +22,7 @@ import (
 	"kelmio/backend/internal/csrf"
 	"kelmio/backend/internal/database"
 	"kelmio/backend/internal/emaildiagnostics"
+	"kelmio/backend/internal/groups"
 	"kelmio/backend/internal/invites"
 	"kelmio/backend/internal/issues"
 	"kelmio/backend/internal/labels"
@@ -135,6 +136,9 @@ func main() {
 
 	workspacesHandler := workspaces.NewHandler(db, authHandler)
 	workspacesHandler.RegisterRoutes(mux)
+
+	groupsHandler := groups.NewHandler(db, authHandler)
+	groupsHandler.RegisterRoutes(mux)
 
 	handler := http.Handler(recoverPanic(logger, securityHeaders(requestBodyLimit(maxRequestBodyBytes, cors(cfg.TrustedOrigins, csrfProtection(csrfManager, mux))))))
 	if metricsRecorder != nil {
