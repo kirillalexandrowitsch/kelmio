@@ -435,6 +435,162 @@ func TestListWorkspacesOrganizationScopeForAdmins(t *testing.T) {
 	}
 }
 
+func TestWorkspaceRoleAssignments(t *testing.T) {
+	databaseURL := getDatabaseURL()
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	adminDB, err := database.Connect(ctx, databaseURL)
+	if err != nil {
+		t.Skipf("postgres is not available: %v", err)
+	}
+	defer adminDB.Close()
+	schemaName := fmt.Sprintf("workspace_assignments_%d", time.Now().UnixNano())
+	quotedSchemaName := pgx.Identifier{schemaName}.Sanitize()
+	if _, err := adminDB.Exec(ctx, `CREATE EXTENSION IF NOT EXISTS pgcrypto`); err != nil {
+		t.Fatalf("ensure pgcrypto: %v", err)
+	}
+	if _, err := adminDB.Exec(ctx, `CREATE SCHEMA `+quotedSchemaName); err != nil {
+		t.Fatalf("create schema: %v", err)
+	}
+	t.Cleanup(func() {
+		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cleanupCancel()
+		_, _ = adminDB.Exec(cleanupCtx, `DROP SCHEMA IF EXISTS `+quotedSchemaName+` CASCADE`)
+	})
+	cfg, err := pgxpool.ParseConfig(databaseURL)
+	if err != nil {
+		t.Fatalf("parse database url: %v", err)
+	}
+	cfg.ConnConfig.RuntimeParams["search_path"] = schemaName
+	cfg.MaxConns = 3
+	db, err := pgxpool.NewWithConfig(ctx, cfg)
+	if err != nil {
+		t.Fatalf("connect schema: %v", err)
+	}
+	defer db.Close()
+	if _, err := migrations.Up(ctx, db, "../../migrations"); err != nil {
+		t.Fatalf("apply migrations: %v", err)
+	}
+
+	var orgID string
+	if err := db.QueryRow(ctx, `SELECT id::text FROM organizations WHERE slug = 'default'`).Scan(&orgID); err != nil {
+		t.Fatalf("read default organization: %v", err)
+	}
+	var workspaceID string
+	if err := db.QueryRow(ctx, `
+		INSERT INTO workspaces (name, organization_id, slug, status)
+		VALUES ('Home', $1, 'home', 'active')
+		RETURNING id::text
+	`, orgID).Scan(&workspaceID); err != nil {
+		t.Fatalf("insert workspace: %v", err)
+	}
+	var groupID string
+	if err := db.QueryRow(ctx, `
+		INSERT INTO groups (organization_id, name) VALUES ($1, 'Engineers')
+		RETURNING id::text
+	`, orgID).Scan(&groupID); err != nil {
+		t.Fatalf("insert group: %v", err)
+	}
+
+	hash, _ := bcrypt.GenerateFromPassword([]byte("admin12345"), bcrypt.MinCost)
+	insertUser := func(email, username string) string {
+		var id string
+		if err := db.QueryRow(ctx, `
+			INSERT INTO users (email, username, password_hash, display_name, is_active)
+			VALUES ($1, $2, $3, $2, true)
+			RETURNING id::text
+		`, email, username, string(hash)).Scan(&id); err != nil {
+			t.Fatalf("insert user %s: %v", username, err)
+		}
+		return id
+	}
+	adminID := insertUser("ra-admin@example.com", "ra_admin")
+	memberID := insertUser("ra-member@example.com", "ra_member")
+	outsiderID := insertUser("ra-outsider@example.com", "ra_outsider")
+	strangerID := insertUser("ra-stranger@example.com", "ra_stranger")
+
+	if _, err := db.Exec(ctx, `
+		INSERT INTO workspace_members (workspace_id, user_id, role)
+		VALUES ($1, $2, 'admin'), ($1, $3, 'member')
+	`, workspaceID, adminID, memberID); err != nil {
+		t.Fatalf("insert workspace members: %v", err)
+	}
+	if _, err := db.Exec(ctx, `
+		INSERT INTO organization_members (organization_id, user_id, role) VALUES
+			($1, $2, 'org_admin'), ($1, $3, 'org_member'), ($1, $4, 'org_member')
+	`, orgID, adminID, memberID, outsiderID); err != nil {
+		t.Fatalf("insert organization members: %v", err)
+	}
+
+	authHandler := auth.NewHandler(db, time.Hour, false, nil, nil)
+	apiHandler := NewHandler(db, authHandler)
+	mux := http.NewServeMux()
+	authHandler.RegisterRoutes(mux)
+	apiHandler.RegisterRoutes(mux)
+
+	adminCookies := loginUser(t, mux, "ra_admin", "admin12345")
+	memberCookies := loginUser(t, mux, "ra_member", "admin12345")
+	base := "/api/v1/workspaces/" + workspaceID + "/role-assignments"
+
+	// Assign a user, then re-assign to upsert the role rather than duplicate.
+	first := performRequest(mux, http.MethodPost, base, fmt.Sprintf(`{"subject_type":"user","subject_id":%q,"role":"member"}`, outsiderID), adminCookies)
+	if first.Code != http.StatusOK {
+		t.Fatalf("assign user status = %d: %s", first.Code, first.Body.String())
+	}
+	upsert := performRequest(mux, http.MethodPost, base, fmt.Sprintf(`{"subject_type":"user","subject_id":%q,"role":"admin"}`, outsiderID), adminCookies)
+	if upsert.Code != http.StatusOK {
+		t.Fatalf("upsert user status = %d: %s", upsert.Code, upsert.Body.String())
+	}
+
+	// Assign a group.
+	groupAssign := performRequest(mux, http.MethodPost, base, fmt.Sprintf(`{"subject_type":"group","subject_id":%q,"role":"member"}`, groupID), adminCookies)
+	if groupAssign.Code != http.StatusOK {
+		t.Fatalf("assign group status = %d: %s", groupAssign.Code, groupAssign.Body.String())
+	}
+
+	// A subject from outside the organization is rejected.
+	stranger := performRequest(mux, http.MethodPost, base, fmt.Sprintf(`{"subject_type":"user","subject_id":%q,"role":"member"}`, strangerID), adminCookies)
+	if stranger.Code != http.StatusNotFound {
+		t.Fatalf("stranger assign status = %d, want 404: %s", stranger.Code, stranger.Body.String())
+	}
+
+	// The workspace has exactly two assignments; the user was upserted to admin.
+	listResponse := performRequest(mux, http.MethodGet, base, "", adminCookies)
+	var assignments listRoleAssignmentsResponse
+	_ = json.Unmarshal(listResponse.Body.Bytes(), &assignments)
+	if len(assignments.Assignments) != 2 {
+		t.Fatalf("assignments = %#v, want exactly two", assignments.Assignments)
+	}
+	var userAssignmentID string
+	for _, assignment := range assignments.Assignments {
+		if assignment.SubjectType == "user" && assignment.SubjectID == outsiderID {
+			if assignment.Role != "admin" {
+				t.Fatalf("user role = %q, want admin after upsert", assignment.Role)
+			}
+			userAssignmentID = assignment.ID
+		}
+	}
+	if userAssignmentID == "" {
+		t.Fatal("user assignment missing from list")
+	}
+
+	// Remove an assignment.
+	remove := performRequest(mux, http.MethodDelete, base+"/"+userAssignmentID, "", adminCookies)
+	if remove.Code != http.StatusNoContent {
+		t.Fatalf("remove status = %d, want 204: %s", remove.Code, remove.Body.String())
+	}
+
+	// A plain workspace member cannot manage role assignments.
+	memberList := performRequest(mux, http.MethodGet, base, "", memberCookies)
+	if memberList.Code != http.StatusForbidden {
+		t.Fatalf("member list status = %d, want 403: %s", memberList.Code, memberList.Body.String())
+	}
+	memberAssign := performRequest(mux, http.MethodPost, base, fmt.Sprintf(`{"subject_type":"user","subject_id":%q,"role":"member"}`, memberID), memberCookies)
+	if memberAssign.Code != http.StatusForbidden {
+		t.Fatalf("member assign status = %d, want 403: %s", memberAssign.Code, memberAssign.Body.String())
+	}
+}
+
 func findWorkspace(workspaces []workspaceResponse, id string) *workspaceResponse {
 	for i := range workspaces {
 		if workspaces[i].ID == id {

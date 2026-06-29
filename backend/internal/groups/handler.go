@@ -256,11 +256,32 @@ func (h *Handler) delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if _, err := h.db.Exec(ctx, `DELETE FROM groups WHERE id = $1`, groupID); err != nil {
+	if err := h.deleteGroup(ctx, groupID); err != nil {
 		writeError(w, http.StatusInternalServerError, "internal_error", "could not delete group")
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// deleteGroup removes the group and any role assignments that referenced it as
+// a subject, since role_assignments is polymorphic and cannot cascade on its
+// own.
+func (h *Handler) deleteGroup(ctx context.Context, groupID string) error {
+	tx, err := h.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	if _, err := tx.Exec(ctx, `
+		DELETE FROM role_assignments WHERE subject_type = 'group' AND subject_id = $1
+	`, groupID); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, `DELETE FROM groups WHERE id = $1`, groupID); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
 }
 
 func (h *Handler) listMembers(w http.ResponseWriter, r *http.Request) {

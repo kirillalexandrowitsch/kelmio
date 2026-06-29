@@ -172,10 +172,28 @@ func TestGroupsAPILifecycleAndAuthorization(t *testing.T) {
 		t.Fatalf("second remove status = %d, want 404: %s", removeAgain.Code, removeAgain.Body.String())
 	}
 
+	// A role assignment referencing the group must be cleaned up when the group
+	// is deleted, since role_assignments is polymorphic and cannot cascade.
+	if _, err := db.Exec(ctx, `
+		INSERT INTO role_assignments (scope, scope_id, subject_type, subject_id, role)
+		VALUES ('workspace', $1, 'group', $2, 'member')
+	`, workspaceID, group.ID); err != nil {
+		t.Fatalf("insert group role assignment: %v", err)
+	}
+
 	// Delete the group.
 	deleteResponse := performRequest(mux, http.MethodDelete, "/api/v1/groups/"+group.ID, "", adminCookies)
 	if deleteResponse.Code != http.StatusNoContent {
 		t.Fatalf("delete status = %d, want 204: %s", deleteResponse.Code, deleteResponse.Body.String())
+	}
+	var orphanCount int
+	if err := db.QueryRow(ctx, `
+		SELECT count(*) FROM role_assignments WHERE subject_type = 'group' AND subject_id = $1
+	`, group.ID).Scan(&orphanCount); err != nil {
+		t.Fatalf("count role assignments: %v", err)
+	}
+	if orphanCount != 0 {
+		t.Fatalf("group role assignments after delete = %d, want 0", orphanCount)
 	}
 	afterDelete := performRequest(mux, http.MethodGet, "/api/v1/groups", "", adminCookies)
 	var afterGroups listGroupsResponse
