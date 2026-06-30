@@ -12,6 +12,7 @@ import {
   Tag,
   UserRound,
   Users,
+  UsersRound,
   type LucideIcon,
 } from "lucide-react";
 
@@ -41,6 +42,7 @@ const sectionIcons: Record<AppSection, LucideIcon> = {
   team: Users,
   labels: Tag,
   workspaces: Boxes,
+  groups: UsersRound,
   administration: Building2,
   account: UserRound,
 };

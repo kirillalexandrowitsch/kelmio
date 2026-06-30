@@ -76,6 +76,13 @@ export function CommandPalette({
         keywords: "workspaces organization administration",
         run: goTo("workspaces"),
       });
+      base.push({
+        id: "go-groups",
+        group: "Go to",
+        label: "Groups",
+        keywords: "groups organization members administration",
+        run: goTo("groups"),
+      });
     }
 
     if (isSiteAdmin) {

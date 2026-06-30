@@ -31,6 +31,8 @@ import {
   type ListIssuesResponse,
   type ListLabelsResponse,
   type ListNotificationsResponse,
+  type Group,
+  type ListGroupsResponse,
   type ListOrganizationsResponse,
   type ListWorkspacesResponse,
   type ListProjectMembersResponse,
@@ -64,6 +66,7 @@ import {
   type UpdateProjectInput,
   type UpdateProjectMemberInput,
   type UpdateSavedFilterInput,
+  type UpdateGroupInput,
   type UpdateSprintInput,
   type UpdateTeamMemberInput,
   type UpdateWorkspaceInput,
@@ -298,6 +301,30 @@ export async function setActiveWorkspace(workspaceId: string) {
   return request<AuthResponse>("/api/v1/session/active-workspace", {
     method: "POST",
     body: JSON.stringify({ workspace_id: workspaceId }),
+  });
+}
+
+export async function listGroups() {
+  return request<ListGroupsResponse>("/api/v1/groups");
+}
+
+export async function createGroup(name: string, description: string) {
+  return request<Group>("/api/v1/groups", {
+    method: "POST",
+    body: JSON.stringify({ name, description }),
+  });
+}
+
+export async function updateGroup(groupId: string, input: UpdateGroupInput) {
+  return request<Group>(`/api/v1/groups/${encodeURIComponent(groupId)}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function deleteGroup(groupId: string) {
+  await request<void>(`/api/v1/groups/${encodeURIComponent(groupId)}`, {
+    method: "DELETE",
   });
 }
 

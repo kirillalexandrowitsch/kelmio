@@ -75,6 +75,22 @@ export type UpdateWorkspaceInput = {
   status?: OrganizationStatus;
 };
 
+export type Group = {
+  id: string;
+  name: string;
+  description: string;
+  member_count: number;
+};
+
+export type ListGroupsResponse = {
+  groups: Group[];
+};
+
+export type UpdateGroupInput = {
+  name?: string;
+  description?: string;
+};
+
 export type Project = {
   id: string;
   key: string;

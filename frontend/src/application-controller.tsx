@@ -165,6 +165,7 @@ import { IssueCreateForm } from "./features/issues/issue-create-form";
 import { IssueDetailSection } from "./features/issues/issue-detail-section";
 import { IssueListPanel } from "./features/issues/issue-list-panel";
 import { SavedFiltersPanel } from "./features/issues/saved-filters-panel";
+import { GroupsAdminSection } from "./features/administration/groups-admin-section";
 import { OrganizationAdminSection } from "./features/administration/organization-admin-section";
 import { SiteAdminSection } from "./features/administration/site-admin-section";
 import { LabelsSection } from "./features/labels/labels-section";
@@ -5007,6 +5008,13 @@ export function ApplicationController() {
         <OrganizationAdminSection
           isActive={
             activeSection === "workspaces" &&
+            (user.is_site_admin || user.organization.role === "org_admin")
+          }
+        />
+
+        <GroupsAdminSection
+          isActive={
+            activeSection === "groups" &&
             (user.is_site_admin || user.organization.role === "org_admin")
           }
         />
