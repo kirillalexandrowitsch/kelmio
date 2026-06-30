@@ -9,6 +9,7 @@ import {
   updateWorkspace,
 } from "../../lib/api";
 import { type Workspace } from "../../lib/api-types";
+import { WorkspaceRolesPanel } from "./workspace-roles-panel";
 
 type OrganizationAdminSectionProps = {
   isActive: boolean;
@@ -40,6 +41,7 @@ export function OrganizationAdminSection({
   const [editingName, setEditingName] = useState("");
   const [rowError, setRowError] = useState("");
   const [pendingId, setPendingId] = useState("");
+  const [rolesWorkspace, setRolesWorkspace] = useState<Workspace | null>(null);
 
   useEffect(() => {
     if (!isActive) {
@@ -236,6 +238,13 @@ export function OrganizationAdminSection({
                     <div className="site-admin__actions">
                       <Button
                         type="button"
+                        onClick={() => setRolesWorkspace(workspace)}
+                        disabled={isPending}
+                      >
+                        Roles
+                      </Button>
+                      <Button
+                        type="button"
                         onClick={() => startEditing(workspace)}
                         disabled={isPending}
                       >
@@ -278,6 +287,15 @@ export function OrganizationAdminSection({
       )}
 
       <FormError message={rowError} />
+
+      {rolesWorkspace ? (
+        <WorkspaceRolesPanel
+          key={rolesWorkspace.id}
+          workspaceId={rolesWorkspace.id}
+          workspaceName={rolesWorkspace.name}
+          onClose={() => setRolesWorkspace(null)}
+        />
+      ) : null}
     </section>
   );
 }

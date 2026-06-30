@@ -31,11 +31,14 @@ import {
   type ListIssuesResponse,
   type ListLabelsResponse,
   type ListNotificationsResponse,
+  type CreateRoleAssignmentInput,
   type DirectoryResponse,
   type Group,
   type GroupMember,
   type ListGroupMembersResponse,
   type ListGroupsResponse,
+  type ListRoleAssignmentsResponse,
+  type RoleAssignment,
   type ListOrganizationsResponse,
   type ListWorkspacesResponse,
   type ListProjectMembersResponse,
@@ -358,6 +361,37 @@ export async function removeGroupMember(groupId: string, userId: string) {
 
 export async function listDirectory() {
   return request<DirectoryResponse>("/api/v1/directory");
+}
+
+export async function listWorkspaceRoleAssignments(workspaceId: string) {
+  return request<ListRoleAssignmentsResponse>(
+    `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/role-assignments`,
+  );
+}
+
+export async function createWorkspaceRoleAssignment(
+  workspaceId: string,
+  input: CreateRoleAssignmentInput,
+) {
+  return request<RoleAssignment>(
+    `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/role-assignments`,
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
+}
+
+export async function deleteWorkspaceRoleAssignment(
+  workspaceId: string,
+  assignmentId: string,
+) {
+  await request<void>(
+    `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/role-assignments/${encodeURIComponent(assignmentId)}`,
+    {
+      method: "DELETE",
+    },
+  );
 }
 
 export async function listProjects() {

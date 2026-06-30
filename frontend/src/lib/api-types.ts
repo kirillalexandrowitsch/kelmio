@@ -115,6 +115,28 @@ export type DirectoryResponse = {
   users: DirectoryUser[];
 };
 
+export type WorkspaceRole = "admin" | "member";
+
+export type RoleAssignmentSubjectType = "user" | "group";
+
+export type RoleAssignment = {
+  id: string;
+  subject_type: RoleAssignmentSubjectType;
+  subject_id: string;
+  subject_name: string;
+  role: WorkspaceRole;
+};
+
+export type ListRoleAssignmentsResponse = {
+  assignments: RoleAssignment[];
+};
+
+export type CreateRoleAssignmentInput = {
+  subject_type: RoleAssignmentSubjectType;
+  subject_id: string;
+  role: WorkspaceRole;
+};
+
 export type Project = {
   id: string;
   key: string;
