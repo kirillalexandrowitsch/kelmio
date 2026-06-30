@@ -1,15 +1,23 @@
 import { type FormEvent, useEffect, useState } from "react";
 
 import { FormError } from "../../components/form-feedback";
-import { Badge, Button, EmptyState, Field, Input } from "../../ui";
+import { Badge, Button, EmptyState, Field, Input, Select } from "../../ui";
 import {
   ApiError,
+  addGroupMember,
   createGroup,
   deleteGroup,
+  listDirectory,
+  listGroupMembers,
   listGroups,
+  removeGroupMember,
   updateGroup,
 } from "../../lib/api";
-import { type Group } from "../../lib/api-types";
+import {
+  type DirectoryUser,
+  type Group,
+  type GroupMember,
+} from "../../lib/api-types";
 
 type GroupsAdminSectionProps = {
   isActive: boolean;
@@ -44,6 +52,15 @@ export function GroupsAdminSection({ isActive }: GroupsAdminSectionProps) {
   const [confirmingDeleteId, setConfirmingDeleteId] = useState("");
   const [rowError, setRowError] = useState("");
   const [pendingId, setPendingId] = useState("");
+
+  const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
+  const [members, setMembers] = useState<GroupMember[]>([]);
+  const [directory, setDirectory] = useState<DirectoryUser[]>([]);
+  const [isLoadingMembers, setIsLoadingMembers] = useState(false);
+  const [membersError, setMembersError] = useState("");
+  const [selectedUserId, setSelectedUserId] = useState("");
+  const [isAddingMember, setIsAddingMember] = useState(false);
+  const [removingMemberId, setRemovingMemberId] = useState("");
 
   useEffect(() => {
     if (!isActive) {
@@ -146,12 +163,100 @@ export function GroupsAdminSection({ isActive }: GroupsAdminSectionProps) {
       await deleteGroup(group.id);
       setGroups((current) => current.filter((item) => item.id !== group.id));
       setConfirmingDeleteId("");
+      if (selectedGroup?.id === group.id) {
+        setSelectedGroup(null);
+      }
     } catch (error: unknown) {
       setRowError(adminErrorMessage(error, "Could not delete the group."));
     } finally {
       setPendingId("");
     }
   }
+
+  useEffect(() => {
+    if (!isActive || !selectedGroup) {
+      return;
+    }
+
+    let isMounted = true;
+    setIsLoadingMembers(true);
+    setMembersError("");
+    setSelectedUserId("");
+
+    Promise.all([listGroupMembers(selectedGroup.id), listDirectory()])
+      .then(([membersResponse, directoryResponse]) => {
+        if (isMounted) {
+          setMembers(membersResponse.members);
+          setDirectory(directoryResponse.users);
+        }
+      })
+      .catch((error: unknown) => {
+        if (isMounted) {
+          setMembersError(adminErrorMessage(error, "Could not load members."));
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsLoadingMembers(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isActive, selectedGroup]);
+
+  function adjustMemberCount(groupID: string, delta: number) {
+    setGroups((current) =>
+      current.map((group) =>
+        group.id === groupID
+          ? { ...group, member_count: group.member_count + delta }
+          : group,
+      ),
+    );
+  }
+
+  async function handleAddMember(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selectedGroup || !selectedUserId || isAddingMember) {
+      return;
+    }
+
+    setIsAddingMember(true);
+    setMembersError("");
+    try {
+      const member = await addGroupMember(selectedGroup.id, selectedUserId);
+      setMembers((current) => [...current, member]);
+      adjustMemberCount(selectedGroup.id, 1);
+      setSelectedUserId("");
+    } catch (error: unknown) {
+      setMembersError(adminErrorMessage(error, "Could not add the member."));
+    } finally {
+      setIsAddingMember(false);
+    }
+  }
+
+  async function handleRemoveMember(userID: string) {
+    if (!selectedGroup || removingMemberId) {
+      return;
+    }
+
+    setRemovingMemberId(userID);
+    setMembersError("");
+    try {
+      await removeGroupMember(selectedGroup.id, userID);
+      setMembers((current) => current.filter((member) => member.user_id !== userID));
+      adjustMemberCount(selectedGroup.id, -1);
+    } catch (error: unknown) {
+      setMembersError(adminErrorMessage(error, "Could not remove the member."));
+    } finally {
+      setRemovingMemberId("");
+    }
+  }
+
+  const availableDirectory = directory.filter(
+    (person) => !members.some((member) => member.user_id === person.user_id),
+  );
 
   return (
     <section
@@ -284,6 +389,13 @@ export function GroupsAdminSection({ isActive }: GroupsAdminSectionProps) {
                         <>
                           <Button
                             type="button"
+                            onClick={() => setSelectedGroup(group)}
+                            disabled={isPending}
+                          >
+                            Members
+                          </Button>
+                          <Button
+                            type="button"
                             onClick={() => startEditing(group)}
                             disabled={isPending}
                           >
@@ -314,6 +426,82 @@ export function GroupsAdminSection({ isActive }: GroupsAdminSectionProps) {
       )}
 
       <FormError message={rowError} />
+
+      {selectedGroup ? (
+        <section className="site-admin__members" aria-label="Group members">
+          <header className="section-header">
+            <div>
+              <p className="eyebrow">Members</p>
+              <h3>{selectedGroup.name}</h3>
+            </div>
+            <div className="site-admin__actions">
+              {isLoadingMembers ? <span className="muted">Loading</span> : null}
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setSelectedGroup(null)}
+              >
+                Close
+              </Button>
+            </div>
+          </header>
+
+          <FormError message={membersError} />
+
+          <form className="site-admin__create" onSubmit={handleAddMember}>
+            <Field label="Add member" htmlFor="add-group-member">
+              <Select
+                id="add-group-member"
+                value={selectedUserId}
+                onChange={(event) => setSelectedUserId(event.target.value)}
+                disabled={isLoadingMembers || availableDirectory.length === 0}
+              >
+                <option value="">Select a person</option>
+                {availableDirectory.map((person) => (
+                  <option key={person.user_id} value={person.user_id}>
+                    {person.display_name} (@{person.username})
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Button
+              type="submit"
+              variant="primary"
+              disabled={isAddingMember || selectedUserId === ""}
+            >
+              {isAddingMember ? "Adding…" : "Add"}
+            </Button>
+          </form>
+
+          {members.length > 0 ? (
+            <ul className="site-admin__list">
+              {members.map((member) => (
+                <li className="site-admin__item" key={member.user_id}>
+                  <div className="site-admin__details">
+                    <strong>{member.display_name}</strong>
+                    <span className="muted">@{member.username}</span>
+                  </div>
+                  <div className="site-admin__actions">
+                    <Button
+                      type="button"
+                      variant="danger"
+                      onClick={() => void handleRemoveMember(member.user_id)}
+                      disabled={removingMemberId === member.user_id}
+                    >
+                      {removingMemberId === member.user_id ? "Removing…" : "Remove"}
+                    </Button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : isLoadingMembers ? null : (
+            <EmptyState
+              title="No members yet"
+              description="Add organization members to this group."
+            />
+          )}
+        </section>
+      ) : null}
     </section>
   );
 }

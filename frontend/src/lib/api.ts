@@ -31,7 +31,10 @@ import {
   type ListIssuesResponse,
   type ListLabelsResponse,
   type ListNotificationsResponse,
+  type DirectoryResponse,
   type Group,
+  type GroupMember,
+  type ListGroupMembersResponse,
   type ListGroupsResponse,
   type ListOrganizationsResponse,
   type ListWorkspacesResponse,
@@ -326,6 +329,35 @@ export async function deleteGroup(groupId: string) {
   await request<void>(`/api/v1/groups/${encodeURIComponent(groupId)}`, {
     method: "DELETE",
   });
+}
+
+export async function listGroupMembers(groupId: string) {
+  return request<ListGroupMembersResponse>(
+    `/api/v1/groups/${encodeURIComponent(groupId)}/members`,
+  );
+}
+
+export async function addGroupMember(groupId: string, userId: string) {
+  return request<GroupMember>(
+    `/api/v1/groups/${encodeURIComponent(groupId)}/members`,
+    {
+      method: "POST",
+      body: JSON.stringify({ user_id: userId }),
+    },
+  );
+}
+
+export async function removeGroupMember(groupId: string, userId: string) {
+  await request<void>(
+    `/api/v1/groups/${encodeURIComponent(groupId)}/members/${encodeURIComponent(userId)}`,
+    {
+      method: "DELETE",
+    },
+  );
+}
+
+export async function listDirectory() {
+  return request<DirectoryResponse>("/api/v1/directory");
 }
 
 export async function listProjects() {

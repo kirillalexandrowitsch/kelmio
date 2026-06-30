@@ -24,6 +24,10 @@ const apiMocks = vi.hoisted(() => {
     createGroup: vi.fn(),
     updateGroup: vi.fn(),
     deleteGroup: vi.fn(),
+    listGroupMembers: vi.fn(),
+    addGroupMember: vi.fn(),
+    removeGroupMember: vi.fn(),
+    listDirectory: vi.fn(),
   };
 });
 
@@ -46,6 +50,10 @@ beforeEach(() => {
   apiMocks.createGroup.mockReset();
   apiMocks.updateGroup.mockReset();
   apiMocks.deleteGroup.mockReset();
+  apiMocks.listGroupMembers.mockReset();
+  apiMocks.addGroupMember.mockReset();
+  apiMocks.removeGroupMember.mockReset();
+  apiMocks.listDirectory.mockReset();
 });
 
 test("lists groups once active", async () => {
@@ -82,6 +90,61 @@ test("creates a group with a description and prepends it", async () => {
 
   await screen.findByText("Leads");
   assert.deepEqual(apiMocks.createGroup.mock.calls[0], ["Leads", "Team leads"]);
+});
+
+test("adds a member from the directory and removes a member", async () => {
+  const user = userEvent.setup();
+  apiMocks.listGroups.mockResolvedValue({ groups: [group({ member_count: 1 })] });
+  apiMocks.listGroupMembers.mockResolvedValue({
+    members: [
+      {
+        user_id: "user-1",
+        username: "ada",
+        display_name: "Ada Lovelace",
+        email: "ada@example.com",
+        added_at: "2026-01-01T00:00:00Z",
+      },
+    ],
+  });
+  apiMocks.listDirectory.mockResolvedValue({
+    users: [
+      { user_id: "user-1", username: "ada", display_name: "Ada Lovelace", email: "ada@example.com", role: "org_member" },
+      { user_id: "user-2", username: "alan", display_name: "Alan Turing", email: "alan@example.com", role: "org_member" },
+    ],
+  });
+  apiMocks.addGroupMember.mockResolvedValue({
+    user_id: "user-2",
+    username: "alan",
+    display_name: "Alan Turing",
+    email: "alan@example.com",
+    added_at: "2026-01-02T00:00:00Z",
+  });
+  apiMocks.removeGroupMember.mockResolvedValue(undefined);
+
+  render(<GroupsAdminSection isActive />);
+
+  const groupItem = (await screen.findByText("Engineers")).closest("li");
+  await user.click(within(groupItem as HTMLElement).getByRole("button", { name: "Members" }));
+
+  const panel = await screen.findByRole("region", { name: "Group members" });
+  await within(panel).findByText("Ada Lovelace");
+
+  // The directory picker only offers people who are not already members.
+  assert.equal(within(panel).queryByRole("option", { name: /Ada Lovelace/ }), null);
+  await user.selectOptions(within(panel).getByLabelText("Add member"), "user-2");
+  await user.click(within(panel).getByRole("button", { name: "Add" }));
+  await within(panel).findByText("Alan Turing");
+  assert.deepEqual(apiMocks.addGroupMember.mock.calls[0], ["group-1", "user-2"]);
+
+  await user.click(
+    within((await within(panel).findByText("Ada Lovelace")).closest("li") as HTMLElement).getByRole(
+      "button",
+      { name: "Remove" },
+    ),
+  );
+  await waitFor(() => {
+    assert.deepEqual(apiMocks.removeGroupMember.mock.calls[0], ["group-1", "user-1"]);
+  });
 });
 
 test("deletes a group after confirmation", async () => {

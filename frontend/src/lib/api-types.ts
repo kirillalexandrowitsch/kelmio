@@ -91,6 +91,30 @@ export type UpdateGroupInput = {
   description?: string;
 };
 
+export type GroupMember = {
+  user_id: string;
+  username: string;
+  display_name: string;
+  email: string;
+  added_at: string;
+};
+
+export type ListGroupMembersResponse = {
+  members: GroupMember[];
+};
+
+export type DirectoryUser = {
+  user_id: string;
+  username: string;
+  display_name: string;
+  email: string;
+  role: string;
+};
+
+export type DirectoryResponse = {
+  users: DirectoryUser[];
+};
+
 export type Project = {
   id: string;
   key: string;
