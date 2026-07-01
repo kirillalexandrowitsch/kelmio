@@ -95,6 +95,72 @@ func TestProjectPermissionEnforcementIntegration(t *testing.T) {
 	assertAccessStatus(t, mux, contributor, http.MethodPatch, "/api/v1/sprints/"+seed.sprintA, `{"name":"Contributor sprint","goal":"","start_date":"","end_date":""}`, http.StatusOK)
 }
 
+func TestGroupDerivedWorkspaceAdminHasProjectAccess(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	db := newAccessIntegrationDB(t, ctx)
+
+	var orgID string
+	if err := db.QueryRow(ctx, `SELECT id::text FROM organizations WHERE slug = 'default'`).Scan(&orgID); err != nil {
+		t.Fatalf("read default organization: %v", err)
+	}
+	var workspaceID string
+	if err := db.QueryRow(ctx, `
+		INSERT INTO workspaces (name, organization_id, slug, status)
+		VALUES ('Group Access', $1, 'group-access', 'active')
+		RETURNING id::text
+	`, orgID).Scan(&workspaceID); err != nil {
+		t.Fatalf("insert workspace: %v", err)
+	}
+
+	passwordHash, err := bcrypt.GenerateFromPassword([]byte("access12345"), bcrypt.MinCost)
+	if err != nil {
+		t.Fatalf("hash password: %v", err)
+	}
+	// The user has no direct workspace or project membership; access comes only
+	// from a group that is assigned the workspace admin role.
+	var granteeID string
+	if err := db.QueryRow(ctx, `
+		INSERT INTO users (email, username, password_hash, display_name)
+		VALUES ('group_grantee@example.com', 'group_grantee', $1, 'Group Grantee')
+		RETURNING id::text
+	`, string(passwordHash)).Scan(&granteeID); err != nil {
+		t.Fatalf("insert user: %v", err)
+	}
+	var groupID string
+	if err := db.QueryRow(ctx, `
+		INSERT INTO groups (organization_id, name) VALUES ($1, 'Access Group') RETURNING id::text
+	`, orgID).Scan(&groupID); err != nil {
+		t.Fatalf("insert group: %v", err)
+	}
+	if _, err := db.Exec(ctx, `INSERT INTO group_members (group_id, user_id) VALUES ($1, $2)`, groupID, granteeID); err != nil {
+		t.Fatalf("insert group member: %v", err)
+	}
+	if _, err := db.Exec(ctx, `
+		INSERT INTO role_assignments (scope, scope_id, subject_type, subject_id, role)
+		VALUES ('workspace', $1, 'group', $2, 'admin')
+	`, workspaceID, groupID); err != nil {
+		t.Fatalf("insert role assignment: %v", err)
+	}
+	var projectID string
+	if err := db.QueryRow(ctx, `
+		INSERT INTO projects (workspace_id, key, name, created_by)
+		VALUES ($1, 'GRP', 'Group Project', $2)
+		RETURNING id::text
+	`, workspaceID, granteeID).Scan(&projectID); err != nil {
+		t.Fatalf("insert project: %v", err)
+	}
+
+	mux := accessIntegrationMux(db)
+	grantee := loginAccessUser(t, mux, "group_grantee")
+
+	// The group-derived workspace admin can read and manage the project even
+	// though they have no direct workspace or project membership.
+	assertAccessStatus(t, mux, grantee, http.MethodGet, "/api/v1/projects/"+projectID, "", http.StatusOK)
+	assertAccessStatus(t, mux, grantee, http.MethodPatch, "/api/v1/projects/"+projectID, `{"name":"Managed by group admin","description":""}`, http.StatusOK)
+}
+
 type accessSeed struct {
 	projectA   string
 	projectB   string

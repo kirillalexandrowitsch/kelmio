@@ -34,7 +34,7 @@ func Resolve(ctx context.Context, db Querier, user auth.CurrentUser, projectID s
 			workspace_member.role,
 			COALESCE(project_member.role, '')
 		FROM projects project
-		JOIN workspace_members workspace_member
+		JOIN effective_workspace_members workspace_member
 			ON workspace_member.workspace_id = project.workspace_id
 			AND workspace_member.user_id = $3
 		JOIN users app_user
@@ -102,7 +102,7 @@ func resolveProjectForUpdate(ctx context.Context, db Querier, user auth.CurrentU
 			workspace_member.role,
 			COALESCE(project_member.role, '')
 		FROM projects project
-		JOIN workspace_members workspace_member
+		JOIN effective_workspace_members workspace_member
 			ON workspace_member.workspace_id = project.workspace_id
 			AND workspace_member.user_id = $3
 		JOIN users app_user
@@ -131,7 +131,7 @@ func resolveForIssue(ctx context.Context, db Querier, user auth.CurrentUser, iss
 			COALESCE(project_member.role, '')
 		FROM issues issue
 		JOIN projects project ON project.id = issue.project_id
-		JOIN workspace_members workspace_member
+		JOIN effective_workspace_members workspace_member
 			ON workspace_member.workspace_id = project.workspace_id
 			AND workspace_member.user_id = $3
 		JOIN users app_user
@@ -160,7 +160,7 @@ func resolveForSprint(ctx context.Context, db Querier, user auth.CurrentUser, sp
 			COALESCE(project_member.role, '')
 		FROM sprints sprint
 		JOIN projects project ON project.id = sprint.project_id
-		JOIN workspace_members workspace_member
+		JOIN effective_workspace_members workspace_member
 			ON workspace_member.workspace_id = project.workspace_id
 			AND workspace_member.user_id = $3
 		JOIN users app_user
