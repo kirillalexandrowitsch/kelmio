@@ -299,6 +299,27 @@ func TestOrganizationMembersAPI(t *testing.T) {
 	if response.Code != http.StatusForbidden {
 		t.Fatalf("stranger add status = %d, want 403: %s", response.Code, response.Body.String())
 	}
+
+	// Administrative actions are recorded in the audit log.
+	var createdCount, addedCount, removedCount int
+	if err := db.QueryRow(ctx, `
+		SELECT
+			count(*) FILTER (WHERE action = 'organization.created' AND actor_id = $2),
+			count(*) FILTER (WHERE action = 'organization.member_added'),
+			count(*) FILTER (WHERE action = 'organization.member_removed')
+		FROM audit_log WHERE organization_id = $1
+	`, org.ID, siteAdminID).Scan(&createdCount, &addedCount, &removedCount); err != nil {
+		t.Fatalf("read audit log: %v", err)
+	}
+	if createdCount != 1 {
+		t.Fatalf("organization.created audit rows = %d, want 1", createdCount)
+	}
+	if addedCount < 2 {
+		t.Fatalf("organization.member_added audit rows = %d, want >= 2", addedCount)
+	}
+	if removedCount != 1 {
+		t.Fatalf("organization.member_removed audit rows = %d, want 1", removedCount)
+	}
 }
 
 func TestDirectoryListsActiveOrganizationMembers(t *testing.T) {

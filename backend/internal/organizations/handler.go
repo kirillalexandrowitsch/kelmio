@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"kelmio/backend/internal/audit"
 	"kelmio/backend/internal/auth"
 )
 
@@ -240,7 +241,7 @@ func (h *Handler) update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	organization, err := h.updateOrganization(ctx, organizationID, name, status)
+	organization, err := h.updateOrganization(ctx, organizationID, user.ID, name, status)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			writeError(w, http.StatusNotFound, "organization_not_found", "organization was not found")
@@ -276,6 +277,16 @@ func (h *Handler) createOrganization(ctx context.Context, name string, slug stri
 		return organizationResponse{}, err
 	}
 
+	if err := audit.Record(ctx, tx, audit.Entry{
+		OrganizationID: organization.ID,
+		ActorID:        creatorID,
+		Action:         "organization.created",
+		TargetType:     "organization",
+		TargetID:       organization.ID,
+	}); err != nil {
+		return organizationResponse{}, err
+	}
+
 	if err := tx.Commit(ctx); err != nil {
 		return organizationResponse{}, err
 	}
@@ -284,9 +295,15 @@ func (h *Handler) createOrganization(ctx context.Context, name string, slug stri
 	return organization, nil
 }
 
-func (h *Handler) updateOrganization(ctx context.Context, organizationID string, name *string, status *string) (organizationResponse, error) {
+func (h *Handler) updateOrganization(ctx context.Context, organizationID string, actorID string, name *string, status *string) (organizationResponse, error) {
+	tx, err := h.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return organizationResponse{}, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
 	var organization organizationResponse
-	err := h.db.QueryRow(ctx, `
+	if err := tx.QueryRow(ctx, `
 		UPDATE organizations
 		SET
 			name = COALESCE($2, name),
@@ -294,8 +311,22 @@ func (h *Handler) updateOrganization(ctx context.Context, organizationID string,
 			updated_at = now()
 		WHERE id = $1
 		RETURNING id::text, name, slug, status
-	`, organizationID, name, status).Scan(&organization.ID, &organization.Name, &organization.Slug, &organization.Status)
-	if err != nil {
+	`, organizationID, name, status).Scan(&organization.ID, &organization.Name, &organization.Slug, &organization.Status); err != nil {
+		return organizationResponse{}, err
+	}
+
+	if err := audit.Record(ctx, tx, audit.Entry{
+		OrganizationID: organization.ID,
+		ActorID:        actorID,
+		Action:         "organization.updated",
+		TargetType:     "organization",
+		TargetID:       organization.ID,
+		Metadata:       map[string]any{"status": organization.Status},
+	}); err != nil {
+		return organizationResponse{}, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
 		return organizationResponse{}, err
 	}
 	return organization, nil
@@ -374,7 +405,7 @@ func (h *Handler) addMember(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	member, err := h.addOrganizationMember(ctx, organizationID, targetID, role)
+	member, err := h.addOrganizationMember(ctx, organizationID, user.ID, targetID, role)
 	if err != nil {
 		switch {
 		case errors.Is(err, pgx.ErrNoRows):
@@ -414,7 +445,7 @@ func (h *Handler) removeMember(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.removeOrganizationMember(ctx, organizationID, targetID); err != nil {
+	if err := h.removeOrganizationMember(ctx, organizationID, user.ID, targetID); err != nil {
 		switch {
 		case errors.Is(err, pgx.ErrNoRows):
 			writeError(w, http.StatusNotFound, "member_not_found", "organization member was not found")
@@ -575,7 +606,7 @@ func (h *Handler) listOrganizationMembers(ctx context.Context, organizationID st
 	return members, rows.Err()
 }
 
-func (h *Handler) addOrganizationMember(ctx context.Context, organizationID string, userID string, role string) (organizationMemberResponse, error) {
+func (h *Handler) addOrganizationMember(ctx context.Context, organizationID string, actorID string, userID string, role string) (organizationMemberResponse, error) {
 	tx, err := h.db.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return organizationMemberResponse{}, err
@@ -613,13 +644,24 @@ func (h *Handler) addOrganizationMember(ctx context.Context, organizationID stri
 		return organizationMemberResponse{}, err
 	}
 
+	if err := audit.Record(ctx, tx, audit.Entry{
+		OrganizationID: organizationID,
+		ActorID:        actorID,
+		Action:         "organization.member_added",
+		TargetType:     "user",
+		TargetID:       userID,
+		Metadata:       map[string]any{"role": role},
+	}); err != nil {
+		return organizationMemberResponse{}, err
+	}
+
 	if err := tx.Commit(ctx); err != nil {
 		return organizationMemberResponse{}, err
 	}
 	return member, nil
 }
 
-func (h *Handler) removeOrganizationMember(ctx context.Context, organizationID string, userID string) error {
+func (h *Handler) removeOrganizationMember(ctx context.Context, organizationID string, actorID string, userID string) error {
 	tx, err := h.db.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return err
@@ -648,6 +690,16 @@ func (h *Handler) removeOrganizationMember(ctx context.Context, organizationID s
 		DELETE FROM organization_members
 		WHERE organization_id = $1 AND user_id = $2
 	`, organizationID, userID); err != nil {
+		return err
+	}
+
+	if err := audit.Record(ctx, tx, audit.Entry{
+		OrganizationID: organizationID,
+		ActorID:        actorID,
+		Action:         "organization.member_removed",
+		TargetType:     "user",
+		TargetID:       userID,
+	}); err != nil {
 		return err
 	}
 
