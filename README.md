@@ -164,6 +164,7 @@ for configuration, monitoring, and backups.
 
 - [Product capability baseline](docs/product-capability-baseline.md)
 - [Product roadmap](docs/product-roadmap.md)
+- [Administration](docs/administration.md)
 - [Self-hosted architecture and operations](docs/self-hosted-deployment.md)
 - [Backup and restore](docs/backup-restore.md)
 
