@@ -86,7 +86,9 @@ command -v node >/dev/null 2>&1 || fail 'node is required'
 
 printf '%s\n' 'Preparing email delivery services...'
 docker compose up -d postgres backend email-worker mailpit >/dev/null
-deadline=$(( $(date +%s) + 60 ))
+# Recreating the dev backend recompiles the mounted source via `go run`, so allow
+# a generous readiness window for a cold compile on a loaded CI runner.
+deadline=$(( $(date +%s) + 180 ))
 until curl -fsS "$API_BASE_URL/readyz" >/dev/null 2>&1; do
 	[ "$(date +%s)" -lt "$deadline" ] || fail 'backend did not become ready'
 	sleep 1
