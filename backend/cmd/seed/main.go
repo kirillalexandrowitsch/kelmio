@@ -591,6 +591,11 @@ func main() {
 		os.Exit(1)
 	}
 
+	if err := ensureDemoOrganization(ctx, tx); err != nil {
+		logger.Error("ensure demo organization failed", "error", err)
+		os.Exit(1)
+	}
+
 	if err := tx.Commit(ctx); err != nil {
 		logger.Error("commit seed transaction failed", "error", err)
 		os.Exit(1)
@@ -603,6 +608,7 @@ func main() {
 		"admin_username", seed.AdminUsername,
 		"demo_username", seed.DemoUsername,
 		"demo_project", "DEMO",
+		"demo_organization", "Acme Corp",
 	)
 }
 
@@ -693,6 +699,116 @@ func ensureWorkspace(ctx context.Context, tx pgx.Tx, organizationID string, name
 	}
 
 	return workspaceID, nil
+}
+
+// ensureDemoOrganization seeds a reproducible second organization so QA can
+// exercise multi-organization isolation, groups, the directory and reusable
+// role assignments. It is additive and idempotent; the default organization is
+// left untouched. The Acme member is a direct workspace member but also belongs
+// to a group that is assigned the admin role, so their effective role resolves
+// to admin — a demonstration of group-derived access.
+func ensureDemoOrganization(ctx context.Context, tx pgx.Tx) error {
+	organizationID, err := ensureOrganization(ctx, tx, "Acme Corp", "acme")
+	if err != nil {
+		return fmt.Errorf("organization: %w", err)
+	}
+
+	workspaceID, err := ensureWorkspace(ctx, tx, organizationID, "Acme Product")
+	if err != nil {
+		return fmt.Errorf("workspace: %w", err)
+	}
+
+	acmeAdminID, err := ensureUser(ctx, tx, workspaceID, "acme.admin@example.com", "acme_admin", "acme12345", "Acme Admin", "admin")
+	if err != nil {
+		return fmt.Errorf("admin user: %w", err)
+	}
+	acmeMemberID, err := ensureUser(ctx, tx, workspaceID, "acme.member@example.com", "acme_member", "acme12345", "Acme Member", "member")
+	if err != nil {
+		return fmt.Errorf("member user: %w", err)
+	}
+
+	if err := ensureOrganizationMembership(ctx, tx, organizationID, acmeAdminID, "org_admin"); err != nil {
+		return fmt.Errorf("admin organization role: %w", err)
+	}
+	if err := ensureOrganizationMembership(ctx, tx, organizationID, acmeMemberID, "org_member"); err != nil {
+		return fmt.Errorf("member organization role: %w", err)
+	}
+
+	groupID, err := ensureGroup(ctx, tx, organizationID, "Acme Engineers", "Builds the Acme product", acmeAdminID)
+	if err != nil {
+		return fmt.Errorf("group: %w", err)
+	}
+	if err := ensureGroupMember(ctx, tx, groupID, acmeMemberID); err != nil {
+		return fmt.Errorf("group member: %w", err)
+	}
+
+	if err := ensureWorkspaceRoleAssignment(ctx, tx, workspaceID, "group", groupID, "admin", acmeAdminID); err != nil {
+		return fmt.Errorf("role assignment: %w", err)
+	}
+	return nil
+}
+
+func ensureOrganization(ctx context.Context, tx pgx.Tx, name string, slug string) (string, error) {
+	var organizationID string
+	err := tx.QueryRow(ctx, `
+		INSERT INTO organizations (name, slug)
+		SELECT $1, $2
+		WHERE NOT EXISTS (
+			SELECT 1 FROM organizations WHERE slug = $2
+		)
+		RETURNING id::text
+	`, name, slug).Scan(&organizationID)
+	if err == nil {
+		return organizationID, nil
+	}
+
+	if err := tx.QueryRow(ctx, `
+		SELECT id::text FROM organizations WHERE slug = $1
+	`, slug).Scan(&organizationID); err != nil {
+		return "", err
+	}
+	return organizationID, nil
+}
+
+func ensureGroup(ctx context.Context, tx pgx.Tx, organizationID string, name string, description string, createdBy string) (string, error) {
+	var groupID string
+	err := tx.QueryRow(ctx, `
+		INSERT INTO groups (organization_id, name, description, created_by)
+		SELECT $1, $2, $3, $4
+		WHERE NOT EXISTS (
+			SELECT 1 FROM groups WHERE organization_id = $1 AND name = $2
+		)
+		RETURNING id::text
+	`, organizationID, name, description, createdBy).Scan(&groupID)
+	if err == nil {
+		return groupID, nil
+	}
+
+	if err := tx.QueryRow(ctx, `
+		SELECT id::text FROM groups WHERE organization_id = $1 AND name = $2
+	`, organizationID, name).Scan(&groupID); err != nil {
+		return "", err
+	}
+	return groupID, nil
+}
+
+func ensureGroupMember(ctx context.Context, tx pgx.Tx, groupID string, userID string) error {
+	_, err := tx.Exec(ctx, `
+		INSERT INTO group_members (group_id, user_id)
+		VALUES ($1, $2)
+		ON CONFLICT (group_id, user_id) DO NOTHING
+	`, groupID, userID)
+	return err
+}
+
+func ensureWorkspaceRoleAssignment(ctx context.Context, tx pgx.Tx, workspaceID string, subjectType string, subjectID string, role string, createdBy string) error {
+	_, err := tx.Exec(ctx, `
+		INSERT INTO role_assignments (scope, scope_id, subject_type, subject_id, role, created_by)
+		VALUES ('workspace', $1, $2, $3, $4, $5)
+		ON CONFLICT (scope, scope_id, subject_type, subject_id)
+		DO UPDATE SET role = EXCLUDED.role
+	`, workspaceID, subjectType, subjectID, role, createdBy)
+	return err
 }
 
 func ensureUser(
