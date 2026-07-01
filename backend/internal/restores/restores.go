@@ -33,11 +33,12 @@ const (
 var migrationFilePattern = regexp.MustCompile(`^(\d+)_.*\.sql$`)
 
 type Verification struct {
-	MigrationVersion int
-	CoreTableCount   int
-	WorkspaceCount   int
-	UserCount        int
-	MembershipCount  int
+	MigrationVersion  int
+	CoreTableCount    int
+	WorkspaceCount    int
+	UserCount         int
+	MembershipCount   int
+	OrganizationCount int
 }
 
 type Result struct {
@@ -114,7 +115,7 @@ func (r *Runner) Run(ctx context.Context, backupPath string) (Result, error) {
 	if err != nil {
 		return r.fail(result, ErrorVerification, err)
 	}
-	if verification.MigrationVersion != r.ExpectedMigrationVersion || verification.CoreTableCount != 6 || verification.WorkspaceCount < 1 || verification.UserCount < 1 || verification.MembershipCount < 1 {
+	if verification.MigrationVersion != r.ExpectedMigrationVersion || verification.CoreTableCount != 8 || verification.WorkspaceCount < 1 || verification.UserCount < 1 || verification.MembershipCount < 1 || verification.OrganizationCount < 1 {
 		return r.fail(result, ErrorVerification, fmt.Errorf("restored core state is incomplete"))
 	}
 	result.MigrationVersion = verification.MigrationVersion
@@ -167,16 +168,17 @@ func (e PSQLExecutor) Restore(ctx context.Context, backupPath string) error {
 func (e PSQLExecutor) Verify(ctx context.Context) (Verification, error) {
 	query := `SELECT concat_ws('|',
 COALESCE((SELECT max(version)::text FROM schema_migrations), '0'),
-(SELECT count(*)::text FROM information_schema.tables WHERE table_schema = 'public' AND table_name IN ('schema_migrations','workspaces','users','workspace_members','projects','issues')),
+(SELECT count(*)::text FROM information_schema.tables WHERE table_schema = 'public' AND table_name IN ('schema_migrations','organizations','organization_members','workspaces','users','workspace_members','projects','issues')),
 (SELECT count(*)::text FROM workspaces),
 (SELECT count(*)::text FROM users),
-(SELECT count(*)::text FROM workspace_members));`
+(SELECT count(*)::text FROM workspace_members),
+(SELECT count(*)::text FROM organizations));`
 	output, err := e.output(ctx, query)
 	if err != nil {
 		return Verification{}, err
 	}
 	parts := strings.Split(strings.TrimSpace(output), "|")
-	if len(parts) != 5 {
+	if len(parts) != 6 {
 		return Verification{}, errors.New("unexpected restore verification output")
 	}
 	values := make([]int, len(parts))
@@ -188,11 +190,12 @@ COALESCE((SELECT max(version)::text FROM schema_migrations), '0'),
 		values[index] = value
 	}
 	return Verification{
-		MigrationVersion: values[0],
-		CoreTableCount:   values[1],
-		WorkspaceCount:   values[2],
-		UserCount:        values[3],
-		MembershipCount:  values[4],
+		MigrationVersion:  values[0],
+		CoreTableCount:    values[1],
+		WorkspaceCount:    values[2],
+		UserCount:         values[3],
+		MembershipCount:   values[4],
+		OrganizationCount: values[5],
 	}, nil
 }
 

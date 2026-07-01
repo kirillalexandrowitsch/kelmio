@@ -142,7 +142,7 @@ func TestLatestMigrationVersion(t *testing.T) {
 }
 
 func validVerification(version int) Verification {
-	return Verification{MigrationVersion: version, CoreTableCount: 6, WorkspaceCount: 1, UserCount: 1, MembershipCount: 1}
+	return Verification{MigrationVersion: version, CoreTableCount: 8, WorkspaceCount: 1, UserCount: 1, MembershipCount: 1, OrganizationCount: 1}
 }
 
 func writeGzipArtifact(t *testing.T, dir string, name string, content string) string {
