@@ -409,7 +409,13 @@ V5 завершена. Перед V6 выполнен behavior-preserving ред
 завершён и не изменил capability-статусы в
 [baseline](product-capability-baseline.md).
 
-Следующий этап — V6. Детальный план зафиксирован в
-[v6 plan](v6-plan.md) и детализирует capabilities `PLAT-006` и `PLAT-007`.
-Runtime-изменения V6 ведутся по фазам из этого плана; capability-статусы
-обновляются только в финальном QA-коммите V6.
+V6 завершена по [v6 plan](v6-plan.md): несколько изолированных организаций,
+multi-workspace с безопасным переключением, три уровня администрирования
+(site/organization/workspace), группы и directory, переиспользуемые role
+assignments с объединением direct и group-derived ролей, organization-aware
+seed, restore-drill и минимальный audit foundation. Полный V1–V6 Full QA —
+зелёный; capabilities `PLAT-006` и `PLAT-007` отмечены `complete` в
+[baseline](product-capability-baseline.md). Администрирование описано в
+[administration guide](administration.md).
+
+Следующий этап — V7 (configurable work types, custom fields и schemes).
