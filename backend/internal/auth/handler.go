@@ -447,14 +447,17 @@ func (h *Handler) updateProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := h.updateOwnProfile(ctx, currentUser.ID, displayName)
-	if err != nil {
+	if err := h.updateDisplayName(ctx, currentUser.ID, displayName); err != nil {
 		writeError(w, http.StatusInternalServerError, "internal_error", "could not update profile")
 		return
 	}
 
+	// Reuse the already-resolved session user so the response keeps the active
+	// workspace, organization and site-admin fields (userBySession is
+	// active-workspace-aware; re-resolving here would drop them).
+	currentUser.DisplayName = displayName
 	writeJSON(w, http.StatusOK, meResponse{
-		User: user.toResponse(),
+		User: currentUser.toResponse(),
 	})
 }
 
@@ -1007,40 +1010,11 @@ func (h *Handler) completePasswordResetTransaction(ctx context.Context, tokenHas
 	return tx.Commit(ctx)
 }
 
-func (h *Handler) updateOwnProfile(ctx context.Context, userID string, displayName string) (userRecord, error) {
-	var user userRecord
-	if err := h.db.QueryRow(ctx, `
-		WITH updated_user AS (
-			UPDATE users
-			SET display_name = $2
-			WHERE id = $1
-			RETURNING id, email, username, password_hash, display_name
-		)
-		SELECT
-			u.id::text,
-			u.email,
-			u.username,
-			u.password_hash,
-			u.display_name,
-			wm.workspace_id::text,
-			wm.role
-		FROM updated_user u
-		JOIN workspace_members wm ON wm.user_id = u.id
-		ORDER BY wm.joined_at ASC
-		LIMIT 1
-	`, userID, displayName).Scan(
-		&user.ID,
-		&user.Email,
-		&user.Username,
-		&user.PasswordHash,
-		&user.DisplayName,
-		&user.WorkspaceID,
-		&user.Role,
-	); err != nil {
-		return userRecord{}, err
-	}
-
-	return user, nil
+func (h *Handler) updateDisplayName(ctx context.Context, userID string, displayName string) error {
+	_, err := h.db.Exec(ctx, `
+		UPDATE users SET display_name = $2 WHERE id = $1
+	`, userID, displayName)
+	return err
 }
 
 func (req loginRequest) identifier() string {

@@ -126,6 +126,85 @@ func TestLoginIncludesSiteAdminAndOrganization(t *testing.T) {
 	}
 }
 
+func TestUpdateProfilePreservesIdentity(t *testing.T) {
+	ctx, db, userID := setupAuthIntegrationWorkspace(t)
+
+	var organizationID string
+	if err := db.QueryRow(ctx, `SELECT id::text FROM organizations WHERE slug = 'default'`).Scan(&organizationID); err != nil {
+		t.Fatalf("read default organization: %v", err)
+	}
+	if _, err := db.Exec(ctx, `
+		UPDATE workspaces SET organization_id = $1
+		WHERE id = (SELECT workspace_id FROM workspace_members WHERE user_id = $2 LIMIT 1)
+	`, organizationID, userID); err != nil {
+		t.Fatalf("attach workspace to organization: %v", err)
+	}
+	if _, err := db.Exec(ctx, `UPDATE users SET is_site_admin = true WHERE id = $1`, userID); err != nil {
+		t.Fatalf("set site admin: %v", err)
+	}
+	if _, err := db.Exec(ctx, `
+		INSERT INTO organization_members (organization_id, user_id, role) VALUES ($1, $2, 'org_admin')
+	`, organizationID, userID); err != nil {
+		t.Fatalf("insert organization membership: %v", err)
+	}
+
+	handler := NewHandler(db, time.Hour, false, newIntegrationCSRFManager(t), nil)
+	mux := http.NewServeMux()
+	handler.RegisterRoutes(mux)
+
+	loginResponse := performMuxRequest(mux, http.MethodPost, "/api/v1/auth/login", `{"login":"admin","password":"admin12345"}`, nil)
+	if loginResponse.Code != http.StatusOK {
+		t.Fatalf("login status = %d: %s", loginResponse.Code, loginResponse.Body.String())
+	}
+	cookies := loginResponse.Result().Cookies()
+	var loginPayload struct {
+		User struct {
+			Workspace struct {
+				ID string `json:"id"`
+			} `json:"workspace"`
+		} `json:"user"`
+	}
+	_ = json.Unmarshal(loginResponse.Body.Bytes(), &loginPayload)
+	activeWorkspaceID := loginPayload.User.Workspace.ID
+
+	response := performMuxRequest(mux, http.MethodPatch, "/api/v1/auth/profile", `{"display_name":"Renamed Admin"}`, cookies)
+	if response.Code != http.StatusOK {
+		t.Fatalf("profile status = %d: %s", response.Code, response.Body.String())
+	}
+
+	var payload struct {
+		User struct {
+			DisplayName string `json:"display_name"`
+			IsSiteAdmin bool   `json:"is_site_admin"`
+			Workspace   struct {
+				ID string `json:"id"`
+			} `json:"workspace"`
+			Organization struct {
+				ID   string `json:"id"`
+				Role string `json:"role"`
+			} `json:"organization"`
+		} `json:"user"`
+	}
+	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode profile response: %v", err)
+	}
+	if payload.User.DisplayName != "Renamed Admin" {
+		t.Fatalf("display_name = %q, want Renamed Admin", payload.User.DisplayName)
+	}
+	if !payload.User.IsSiteAdmin {
+		t.Fatal("profile response is_site_admin = false, want true")
+	}
+	if payload.User.Organization.ID != organizationID {
+		t.Fatalf("organization id = %q, want %q", payload.User.Organization.ID, organizationID)
+	}
+	if payload.User.Organization.Role != "org_admin" {
+		t.Fatalf("organization role = %q, want org_admin", payload.User.Organization.Role)
+	}
+	if payload.User.Workspace.ID != activeWorkspaceID {
+		t.Fatalf("workspace id = %q, want active %q", payload.User.Workspace.ID, activeWorkspaceID)
+	}
+}
+
 func TestMeCleansExpiredSessionsAndKeepsActiveSessions(t *testing.T) {
 	ctx, db, userID := setupAuthIntegrationWorkspace(t)
 
